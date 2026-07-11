@@ -1,5 +1,4 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { App as AntdApp } from "antd";
 
 import { microcopy } from "../../constants/microcopy";
 import type { CitationRef } from "../../interfaces/agent";
@@ -13,11 +12,7 @@ describe("CitationChip", () => {
             quote: "Alice created the task"
         };
 
-        render(
-            <AntdApp>
-                <CitationChip citation={citation} index={1} />
-            </AntdApp>
-        );
+        render(<CitationChip citation={citation} index={1} />);
 
         expect(
             screen.getByLabelText("Citation 1: User u1")
@@ -31,11 +26,7 @@ describe("CitationChip", () => {
             quote: "Alice created the task"
         };
 
-        render(
-            <AntdApp>
-                <CitationChip citation={citation} index={1} />
-            </AntdApp>
-        );
+        render(<CitationChip citation={citation} index={1} />);
 
         expect(
             screen.getByRole("img", { name: "Citation 1: User u1" })
@@ -51,13 +42,11 @@ describe("CitationChip", () => {
         };
 
         render(
-            <AntdApp>
-                <CitationChip
-                    citation={citation}
-                    index={2}
-                    onNavigate={jest.fn()}
-                />
-            </AntdApp>
+            <CitationChip
+                citation={citation}
+                index={2}
+                onNavigate={jest.fn()}
+            />
         );
 
         expect(
@@ -80,11 +69,7 @@ describe("CitationChip", () => {
             quote: "Switch to TanStack Query for board fetches."
         };
 
-        render(
-            <AntdApp>
-                <CitationChip citation={citation} index={3} />
-            </AntdApp>
-        );
+        render(<CitationChip citation={citation} index={3} />);
 
         // The body is not in the DOM before the user activates the chip.
         expect(

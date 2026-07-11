@@ -1,8 +1,10 @@
-import styled from "@emotion/styled";
-import { Space, Segmented, Tabs, Typography } from "antd";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Title } from "@/components/ui/typography";
+import { cn } from "@/lib/utils";
 
 import { microcopy } from "../../constants/microcopy";
-import { fontWeight, space } from "../../theme/tokens";
+import { space } from "../../theme/tokens";
 import type { MutationProposal, TriageNudge } from "../../interfaces/agent";
 import AiSparkleIcon from "../aiSparkleIcon";
 import GlassPanel from "../glassPanel";
@@ -15,51 +17,21 @@ import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 
 export type CopilotDockTab = "chat" | "brief" | "inbox";
 
-const DockTabPane = styled.div<{ $active: boolean }>`
-    display: ${({ $active }) => ($active ? "flex" : "none")};
-    flex: 1 1 auto;
-    flex-direction: column;
-    min-height: 0;
-`;
-
-const DockTabs = styled(Tabs)`
-    && {
-        display: flex;
-        flex: 1 1 auto;
-        flex-direction: column;
-        min-height: 0;
-    }
-
-    && .ant-tabs-content-holder,
-    && .ant-tabs-content {
-        display: flex;
-        flex: 1 1 auto;
-        min-height: 0;
-    }
-
-    && .ant-tabs-tabpane-active {
-        display: flex;
-        flex: 1 1 auto;
-        flex-direction: column;
-        min-height: 0;
-    }
-`;
-
 /**
  * Phase 4 A8 — body slot for the dock surface (tabs + active tab body).
  *
- * Lifted out of the Drawer shell so the host can keep the Drawer mount
+ * Lifted out of the Sheet shell so the host can keep the surface mount
  * stable across `projectId` changes (Lane A caveat fix): the dock body
  * carries `key={projectId}` to reset per-project state (chat hook, brief
- * cache, triage-agent thread, nudge inbox), while the Drawer container
- * stays mounted continuously so AntD does NOT animate a close/open
+ * cache, triage-agent thread, nudge inbox), while the Sheet container
+ * stays mounted continuously so it does NOT animate a close/open
  * transition on project switch.
  *
  * Used by:
- *   - `CopilotDockHost` (production) — wraps this in a host-owned Drawer
+ *   - `CopilotDockHost` (production) — wraps this in a host-owned Sheet
  *     and keys it on projectId so the body remounts cleanly per project.
  *   - `<CopilotDock>` below (legacy single-mount tests) — wraps it in
- *     its own Drawer so the public component contract stays unchanged
+ *     its own Sheet so the public component contract stays unchanged
  *     for tests that compose the dock outside of `CopilotDockHost`.
  */
 export interface CopilotDockBodyProps {
@@ -200,51 +172,80 @@ export const CopilotDockBody: React.FC<CopilotDockBodyProps> = ({
         <>
             {isPhone ? (
                 <>
-                    <Segmented
+                    <ToggleGroup
                         aria-label={microcopy.copilotDock.tabListLabel}
-                        block
+                        className="mb-xs w-full"
                         data-testid="copilot-dock-segmented"
-                        onChange={(key) => onTabChange(key as CopilotDockTab)}
-                        options={segmentedOptions}
-                        style={{ marginBottom: space.xs }}
+                        onValueChange={(key) => {
+                            // Radix single-select emits "" when the active
+                            // item is re-tapped; Segmented never deselects.
+                            if (key) onTabChange(key as CopilotDockTab);
+                        }}
+                        type="single"
                         value={activeTab}
-                    />
+                    >
+                        {segmentedOptions.map((option) => (
+                            <ToggleGroupItem
+                                className="flex-1"
+                                key={option.value}
+                                value={option.value}
+                            >
+                                {option.label}
+                            </ToggleGroupItem>
+                        ))}
+                    </ToggleGroup>
                     {tabItems.map((item) => (
-                        <DockTabPane
-                            $active={activeTab === item.key}
+                        <div
+                            className={cn(
+                                "min-h-0 flex-1 flex-col",
+                                activeTab === item.key ? "flex" : "hidden"
+                            )}
                             data-testid={`copilot-dock-pane-${item.key}`}
                             key={item.key}
                         >
                             {item.children}
-                        </DockTabPane>
+                        </div>
                     ))}
                 </>
             ) : (
-                <DockTabs
-                    activeKey={activeTab}
+                <Tabs
                     aria-label={microcopy.copilotDock.tabListLabel}
+                    className="flex min-h-0 flex-1 flex-col"
                     data-testid="copilot-dock-tabs"
-                    /*
-                     * `destroyOnHidden={false}` keeps inactive tabs mounted
-                     * so chat history + the brief cache survive a tab switch
-                     * — both bodies own their own state and teardown via
-                     * their `dockOpen` prop. Replaces the deprecated
-                     * `destroyInactiveTabPane` (AntD 5.18+).
-                     */
-                    destroyOnHidden={false}
-                    items={tabItems}
-                    onChange={(key) => onTabChange(key as CopilotDockTab)}
-                    size="small"
-                />
+                    onValueChange={(key) => onTabChange(key as CopilotDockTab)}
+                    value={activeTab}
+                >
+                    <TabsList className="self-start">
+                        {tabItems.map((item) => (
+                            <TabsTrigger key={item.key} value={item.key}>
+                                {item.label}
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+                    {tabItems.map((item) => (
+                        /*
+                         * `forceMount` keeps inactive tabs mounted so chat
+                         * history + the brief cache survive a tab switch —
+                         * both bodies own their own state and teardown via
+                         * their `dockOpen` prop. Radix stamps `hidden` on the
+                         * inactive panes; the active pane flips to a flex
+                         * column so the body fills the dock.
+                         */
+                        <TabsContent
+                            className="mt-sm min-h-0 flex-1 data-[state=active]:flex data-[state=active]:flex-col"
+                            forceMount
+                            key={item.key}
+                            value={item.key}
+                        >
+                            {item.children}
+                        </TabsContent>
+                    ))}
+                </Tabs>
             )}
             {footerSlot ? (
                 <div
+                    className="mt-xs flex shrink-0"
                     data-testid="copilot-dock-footer-slot"
-                    style={{
-                        display: "flex",
-                        flexShrink: 0,
-                        marginTop: space.xs
-                    }}
                 >
                     {footerSlot}
                 </div>
@@ -260,38 +261,17 @@ export const CopilotDockBody: React.FC<CopilotDockBodyProps> = ({
  * inside the surface body — those children are the project-scoped tab
  * content keyed on `projectId` in the host.
  *
- * Phase 6 Wave 3 — the placement / chrome split previously inlined here
- * (phone bottom Drawer vs desktop right Drawer) now ships via the shared
- * `<Sheet>` primitive. On phone the Sheet renders a multi-detent
- * animated surface; on desktop / tablet / reduced-motion it falls back
- * to the AntD `<Drawer>` with `desktopPlacement="right"` and a 420 px
- * shelf so the dock keeps its prior visual footprint.
+ * The placement / chrome split ships via the shared `<Sheet>` primitive.
+ * On phone the Sheet renders a multi-detent animated surface; on desktop
+ * / tablet / reduced-motion it renders the shadcn `<Sheet>` surface with
+ * `desktopPlacement="right"` and a 420 px shelf so the dock keeps its
+ * prior visual footprint.
  */
 export interface CopilotDockShellProps {
     open: boolean;
     onClose: () => void;
     children: React.ReactNode;
 }
-
-/*
- * Legibility-first glass: the GlassPanel root carries `backdrop-filter`,
- * which on macOS Safari forces a compositing layer that disables
- * sub-pixel antialiasing on descendant text. Per the GlassPanel contract
- * (its header note), text must live in an isolated content child so the
- * tab bodies paint on their own stacking context instead of the filtered
- * root. `isolation: isolate` + `position: relative` establish that
- * context; the flex props mirror the GlassPanel's own layout so the inner
- * Tabs (`flex: 1 1 auto`) + footer slot stay full-bleed — visually inert
- * on Chrome / Firefox.
- */
-const DockContentLayer = styled.div`
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    isolation: isolate;
-    min-height: 0;
-    position: relative;
-`;
 
 export const CopilotDockShell: React.FC<CopilotDockShellProps> = ({
     open,
@@ -345,20 +325,16 @@ export const CopilotDockShell: React.FC<CopilotDockShellProps> = ({
                 }
             }}
             title={
-                <Space align="center" size={space.xs}>
+                <span className="inline-flex items-center gap-xs">
                     <AiSparkleIcon aria-hidden />
-                    <Typography.Title
+                    <Title
+                        className="m-0 font-semibold text-[length:inherit]"
                         id="copilot-dock-title"
                         level={4}
-                        style={{
-                            fontSize: "inherit",
-                            fontWeight: fontWeight.semibold,
-                            margin: 0
-                        }}
                     >
                         {microcopy.copilotDock.title}
-                    </Typography.Title>
-                </Space>
+                    </Title>
+                </span>
             }
         >
             <GlassPanel
@@ -366,7 +342,7 @@ export const CopilotDockShell: React.FC<CopilotDockShellProps> = ({
                 tone="aurora"
                 /*
                  * Dock body wash, NOT a full glass card: the surrounding
-                 * Sheet (whether animated or AntD-Drawer fallback)
+                 * Sheet (whether animated or desktop fallback)
                  * already owns the chrome, so we strip the panel's own
                  * border + radius so it reads as a wash rather than an
                  * inset card. The aurora dome (radial gradient anchored
@@ -392,7 +368,21 @@ export const CopilotDockShell: React.FC<CopilotDockShellProps> = ({
                     paddingTop: space.lg
                 }}
             >
-                <DockContentLayer>{children}</DockContentLayer>
+                {/*
+                 * Legibility-first glass: the GlassPanel root carries
+                 * `backdrop-filter`, which on macOS Safari forces a
+                 * compositing layer that disables sub-pixel antialiasing on
+                 * descendant text. Per the GlassPanel contract, text must
+                 * live in an isolated content child so the tab bodies paint
+                 * on their own stacking context instead of the filtered root.
+                 * `isolate` + `relative` establish that context; the flex
+                 * props mirror the GlassPanel's own layout so the inner Tabs
+                 * + footer slot stay full-bleed — visually inert on
+                 * Chrome / Firefox.
+                 */}
+                <div className="relative flex min-h-0 flex-1 flex-col [isolation:isolate]">
+                    {children}
+                </div>
             </GlassPanel>
         </Sheet>
     );

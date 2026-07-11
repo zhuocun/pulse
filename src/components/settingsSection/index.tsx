@@ -1,20 +1,11 @@
-import { RightOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
+import { ChevronRight } from "lucide-react";
 import React from "react";
 import { Link } from "react-router";
 
-import {
-    easing,
-    fontSize,
-    fontWeight,
-    letterSpacing,
-    motion,
-    radius,
-    space,
-    touchTargetCoarse
-} from "../../theme/tokens";
-import useReducedMotion from "../../utils/hooks/useReducedMotion";
+import { cn } from "@/lib/utils";
+
 import { flattenSlots } from "../../utils/flattenSlots";
+import useReducedMotion from "../../utils/hooks/useReducedMotion";
 
 /**
  * SettingsSection / SettingsRow — the iOS 26 grouped-table idiom for the
@@ -37,175 +28,15 @@ import { flattenSlots } from "../../utils/flattenSlots";
  */
 
 /*
- * Leading inset for the row content AND the hairline divider. The divider
- * is inset from the leading edge (never full-bleed) so it aligns under the
- * label text rather than running to the group's edge — the iOS grouped-
- * table look.
+ * Row shell shared by the three flavours (static container, router Link,
+ * button). Flex space-between, the 44px touch-target floor, the row
+ * padding, and `flex-wrap` so a wide trailing control drops to its own
+ * line on narrow phones instead of crushing the leading icon + label.
  */
-const LEADING_INSET = space.md;
-
-const Group = styled.div`
-    /* Opaque subtle fill, distinct from the page background, so the group
-     * reads as a contained surface. */
-    background: var(--ant-color-bg-container, #fff);
-    /* Round the OUTER corners only — clipping the children squares the
-     * inner row joints so the first row's top corners and last row's
-     * bottom corners are the only rounded edges. */
-    border-radius: ${radius.lg}px;
-    overflow: hidden;
-
-    /* Horizontal hairline on the BOTTOM edge of every row except the last,
-     * inset from the leading edge to align under the label. */
-    > *:not(:last-child) {
-        position: relative;
-    }
-
-    > *:not(:last-child)::after {
-        content: "";
-        position: absolute;
-        inset-inline-start: ${LEADING_INSET}px;
-        inset-inline-end: 0;
-        inset-block-end: 0;
-        height: 1px;
-        background: var(--ant-color-text, rgba(15, 23, 42, 0.9));
-        opacity: 0.15;
-        pointer-events: none;
-    }
-
-    @media (forced-colors: active) {
-        background: Canvas;
-
-        > *:not(:last-child)::after {
-            background: CanvasText;
-            opacity: 1;
-        }
-    }
-`;
-
-const Header = styled.div`
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-    font-size: ${fontSize.sm}px;
-    font-weight: ${fontWeight.semibold};
-    letter-spacing: ${letterSpacing.wide};
-    margin: ${space.lg}px 0 ${space.xs}px;
-    padding-inline-start: ${space.md}px;
-    text-transform: uppercase;
-`;
-
-const Footer = styled.div`
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-    font-size: ${fontSize.sm}px;
-    margin: ${space.xs}px 0 0;
-    padding-inline-start: ${space.md}px;
-    padding-inline-end: ${space.md}px;
-`;
-
-/*
- * Row shells. The three element flavours (static container, router Link,
- * button) share one set of layout rules — flex space-between, the touch-
- * target floor, the row padding, and a press highlight on the interactive
- * variants. The shared declarations live in a string the styled factories
- * splice in so the three stay byte-for-byte aligned.
- */
-const rowLayout = `
-    align-items: center;
-    display: flex;
-    /* Wide trailing controls (the Theme / Language Segmented pickers)
-     * drop to their own line on narrow phones instead of crushing the
-     * leading icon + label — Trailing never shrinks (flex: 0 0 auto),
-     * so without wrap the only give in the row was the Leading slot. */
-    flex-wrap: wrap;
-    gap: ${space.sm}px;
-    justify-content: space-between;
-    min-height: ${touchTargetCoarse}px;
-    /* Block padding only matters once a row wraps to two lines (the
-     * 44px min-height dominates single-line rows); it keeps a wrapped
-     * control from kissing the hairline divider. */
-    padding: ${space.xxs}px ${space.md}px;
-    position: relative;
-    width: 100%;
-`;
-
-const StaticRow = styled.div`
-    ${rowLayout}
-`;
-
-interface InteractiveRowProps {
-    $reducedMotion: boolean;
-}
-
-const LinkRow = styled(Link, {
-    // `Link` forwards unknown props to its underlying `<a>`; React 19
-    // warns on the non-standard `$reducedMotion` DOM attribute. Filter the
-    // transient prop so it drives styling only. (Host-element styled
-    // factories strip `$`-prefixed props automatically; wrapped components
-    // do not.)
-    shouldForwardProp: (prop) => prop !== "$reducedMotion"
-})<InteractiveRowProps>`
-    ${rowLayout}
-    /* Strip the anchor chrome so the row reads as a table cell, not a
-     * link. The chevron + label carry the affordance. */
-    color: inherit;
-    text-align: start;
-    text-decoration: none;
-    transition: ${(p) =>
-        p.$reducedMotion
-            ? "none"
-            : `background ${motion.short}ms ${easing.standard}`};
-
-    &:active {
-        background: var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.08));
-    }
-`;
-
-const ButtonRow = styled.button<InteractiveRowProps>`
-    ${rowLayout}
-    appearance: none;
-    background: transparent;
-    border: 0;
-    color: inherit;
-    cursor: pointer;
-    font: inherit;
-    text-align: start;
-    transition: ${(p) =>
-        p.$reducedMotion
-            ? "none"
-            : `background ${motion.short}ms ${easing.standard}`};
-
-    &:active {
-        background: var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.08));
-    }
-`;
-
-const Leading = styled.span`
-    align-items: center;
-    display: inline-flex;
-    gap: ${space.sm}px;
-    min-width: 0;
-`;
-
-/*
- * The icon never shrinks. Leading is the row's only shrinkable slot
- * (min-width: 0), and without this guard a wide trailing control
- * squeezed the icon glyph before the label ellipsized.
- */
-const IconSlot = styled.span`
-    align-items: center;
-    display: inline-flex;
-    flex: 0 0 auto;
-`;
-
-const Trailing = styled.span`
-    align-items: center;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-    display: inline-flex;
-    flex: 0 0 auto;
-    gap: ${space.xs}px;
-`;
-
-const Chevron = styled(RightOutlined)`
-    color: var(--ant-color-text-quaternary, rgba(15, 23, 42, 0.35));
-`;
+const ROW_LAYOUT = cn(
+    "relative flex w-full flex-wrap items-center justify-between gap-sm",
+    "min-h-[44px] px-md py-xxs"
+);
 
 export interface SettingsSectionProps {
     header?: React.ReactNode;
@@ -227,6 +58,38 @@ export interface SettingsRowProps {
     className?: string;
 }
 
+const Leading = ({
+    icon,
+    label
+}: {
+    icon?: React.ReactNode;
+    label: React.ReactNode;
+}) => (
+    <span className="inline-flex min-w-0 items-center gap-sm">
+        {icon ? (
+            // The icon never shrinks — Leading is the row's only shrinkable
+            // slot, so without this the icon glyph squeezes before the
+            // label ellipsizes.
+            <span className="inline-flex flex-none items-center">{icon}</span>
+        ) : null}
+        {label}
+    </span>
+);
+
+const Trailing = ({ children }: { children: React.ReactNode }) => (
+    <span className="inline-flex flex-none items-center gap-xs text-muted-foreground">
+        {children}
+    </span>
+);
+
+const Chevron = () => (
+    <ChevronRight
+        aria-hidden
+        className="size-4 text-foreground/35"
+        data-chevron
+    />
+);
+
 export const SettingsRow = ({
     label,
     icon,
@@ -244,62 +107,68 @@ export const SettingsRow = ({
      * A row navigates — and so earns a disclosure chevron — when it links
      * (`to`) or fires a non-destructive `onActivate`, AND it carries no
      * trailing control (a row WITH a control is not itself clickable).
-     * Destructive actions are not drill-ins, so they get no chevron; any
-     * danger tint comes from the caller's `control` (e.g. a danger Button),
-     * not from this prop.
+     * Destructive actions are not drill-ins, so they get no chevron.
      */
     const navigates =
         !control &&
         (to !== undefined || (onActivate !== undefined && !destructive));
 
-    const leading = (
-        <Leading>
-            {icon ? <IconSlot>{icon}</IconSlot> : null}
-            {label}
-        </Leading>
-    );
-
+    const leading = <Leading icon={icon} label={label} />;
     const trailing = (
         <Trailing>
             {control ?? value}
-            {navigates ? <Chevron aria-hidden /> : null}
+            {navigates ? <Chevron /> : null}
         </Trailing>
     );
 
+    const pressTransition = reducedMotion
+        ? ""
+        : "transition-colors duration-short ease-standard";
+
     if (to !== undefined && !control) {
         return (
-            <LinkRow
-                $reducedMotion={reducedMotion}
-                className={className}
+            <Link
+                className={cn(
+                    ROW_LAYOUT,
+                    "text-start text-inherit no-underline",
+                    "active:bg-foreground/[0.08]",
+                    pressTransition,
+                    className
+                )}
                 data-testid={dataTestid}
                 to={to}
             >
                 {leading}
                 {trailing}
-            </LinkRow>
+            </Link>
         );
     }
 
     if (onActivate !== undefined && !control) {
         return (
-            <ButtonRow
-                $reducedMotion={reducedMotion}
-                className={className}
+            <button
+                className={cn(
+                    ROW_LAYOUT,
+                    "cursor-pointer appearance-none border-0 bg-transparent text-start font-[inherit]",
+                    "active:bg-foreground/[0.08]",
+                    pressTransition,
+                    className
+                )}
                 data-testid={dataTestid}
                 onClick={onActivate}
                 type="button"
             >
                 {leading}
                 {trailing}
-            </ButtonRow>
+            </button>
         );
     }
 
     return (
-        <StaticRow className={className} data-testid={dataTestid}>
+        <div className={cn(ROW_LAYOUT, className)} data-testid={dataTestid}>
             {leading}
             {trailing}
-        </StaticRow>
+        </div>
     );
 };
 
@@ -315,19 +184,34 @@ export const SettingsSection = ({
     return (
         <section className={className} data-testid={dataTestid}>
             {header !== undefined && header !== null ? (
-                <Header>{header}</Header>
+                <div className="mb-xs mt-lg ps-md text-sm font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                    {header}
+                </div>
             ) : null}
-            <Group>
+            <div className="overflow-hidden rounded-lg bg-card forced-colors:bg-[Canvas]">
                 {slots.map((child, index) => (
                     // Slots are positional decoration around a stable,
                     // ordered row set; the index is the correct identity.
-                    <div className="pulse-settings-slot" key={index}>
+                    // The hairline divider is inset from the leading edge
+                    // to align under the label — the iOS grouped-table look.
+                    <div
+                        className={cn(
+                            "pulse-settings-slot relative",
+                            "after:pointer-events-none after:absolute after:bottom-0 after:start-md after:end-0",
+                            "after:h-px after:bg-foreground/[0.15] after:content-['']",
+                            "last:after:hidden",
+                            "forced-colors:after:bg-[CanvasText] forced-colors:after:opacity-100"
+                        )}
+                        key={index}
+                    >
                         {child}
                     </div>
                 ))}
-            </Group>
+            </div>
             {footer !== undefined && footer !== null ? (
-                <Footer>{footer}</Footer>
+                <div className="mt-xs px-md text-sm text-muted-foreground">
+                    {footer}
+                </div>
             ) : null}
         </section>
     );

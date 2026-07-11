@@ -1,5 +1,6 @@
-import { Typography } from "antd";
 import React from "react";
+
+import { Typography } from "@/components/ui/typography";
 
 import { microcopy } from "../../constants/microcopy";
 import extractErrorMessage from "../../utils/extractErrorMessage";
@@ -36,9 +37,9 @@ const ErrorBox = React.forwardRef<
         <div
             aria-atomic="true"
             aria-live="assertive"
+            className="min-h-[1.5em]"
             ref={ref}
             role="alert"
-            style={{ minHeight: "1.5em" }}
             tabIndex={message ? -1 : undefined}
         >
             {message ? (

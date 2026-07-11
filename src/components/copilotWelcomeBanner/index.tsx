@@ -1,18 +1,12 @@
-import { CloseOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
-import { Button, Space, Typography } from "antd";
+import { X } from "lucide-react";
 import React from "react";
+
+import { Button } from "@/components/ui/button";
+import { Typography } from "@/components/ui/typography";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import { microcopy } from "../../constants/microcopy";
-import {
-    fontSize,
-    fontWeight,
-    lineHeight,
-    radius,
-    space,
-    touchTargetCoarse
-} from "../../theme/tokens";
+import { fontSize, fontWeight, lineHeight, space } from "../../theme/tokens";
 import AiSparkleIcon from "../aiSparkleIcon";
 import GlassPanel from "../glassPanel";
 
@@ -31,59 +25,16 @@ import GlassPanel from "../glassPanel";
  * flex row + padding + margin + overflow clipping that the body, CTA
  * cluster, and dismiss button sit inside.
  */
-const Wrap = styled(GlassPanel)`
-    align-items: flex-start;
-    position: relative;
-    overflow: hidden;
-    border-radius: ${radius.md}px;
-    display: flex;
-    /* Prevent flex-column parents (BoardShell has min-height: 0) from
-     * squishing this banner — without this, overflow: hidden above
-     * clips the body text and CTA buttons on short viewports. */
-    flex-shrink: 0;
-    gap: ${space.sm}px;
-    margin-bottom: ${space.md}px;
-    padding: ${space.sm}px ${space.md}px;
-`;
 
-const Body = styled.div`
-    flex: 1 1 auto;
-    min-width: 0;
-`;
-
-/**
+/*
  * Centres the decorative sparkle against the banner title's first
- * line-box. The banner's `Wrap` uses `align-items: flex-start` (the body
- * is a multi-line block), so without a line-height-matched slot the
- * 24 px sparkle would pin to the top edge and sit above the 16 px title
- * cap. Sizing the slot to the title line-box (`fontSize.md × lineHeight`)
- * lets flexbox centring do the alignment — no magic per-pixel offset,
- * matching the auto-spaced sparkle used at every AntD `Button icon=` site.
+ * line-box. The banner uses `items-start` (the body is a multi-line
+ * block), so without a line-height-matched slot the 24px sparkle would
+ * pin to the top edge and sit above the 16px title cap. Sizing the slot
+ * to the title line-box (`fontSize.md × lineHeight`) lets flex centring
+ * do the alignment — no magic per-pixel offset.
  */
-const IconSlot = styled.span`
-    align-items: center;
-    display: inline-flex;
-    flex-shrink: 0;
-    min-height: ${fontSize.md * lineHeight.normal}px;
-`;
-
-const BannerActions = styled(Space)`
-    @media (pointer: coarse) {
-        && .ant-btn {
-            min-height: ${touchTargetCoarse}px;
-            min-width: ${touchTargetCoarse}px;
-        }
-    }
-`;
-
-const IconDismissButton = styled(Button)`
-    @media (pointer: coarse) {
-        && {
-            min-height: ${touchTargetCoarse}px;
-            min-width: ${touchTargetCoarse}px;
-        }
-    }
-`;
+const ICON_SLOT_MIN_HEIGHT = fontSize.md * lineHeight.normal;
 
 interface CopilotWelcomeBannerProps {
     /** Override the storage key for tests / multi-tenant boards. */
@@ -146,16 +97,20 @@ const CopilotWelcomeBanner: React.FC<CopilotWelcomeBannerProps> = ({
         }
     };
     return (
-        <Wrap
+        <GlassPanel
             aria-label={microcopy.a11y.boardCopilotWelcome}
+            className="relative mb-md flex flex-shrink-0 items-start gap-sm overflow-hidden rounded-md px-md py-sm"
             intensity="strong"
             role="region"
             tone="accent"
         >
-            <IconSlot>
+            <span
+                className="inline-flex flex-shrink-0 items-center"
+                style={{ minHeight: ICON_SLOT_MIN_HEIGHT }}
+            >
                 <AiSparkleIcon size="lg" aria-hidden />
-            </IconSlot>
-            <Body>
+            </span>
+            <div className="min-w-0 flex-1">
                 <Typography.Text
                     style={{
                         display: "block",
@@ -171,23 +126,28 @@ const CopilotWelcomeBanner: React.FC<CopilotWelcomeBannerProps> = ({
                 >
                     {microcopy.ai.welcomeBannerBody}
                 </Typography.Paragraph>
-                <BannerActions size={space.xs}>
-                    <Button onClick={handleCta} size="small" type="primary">
+                <div
+                    className="flex flex-wrap items-center gap-xs"
+                    data-testid="welcome-banner-actions"
+                >
+                    <Button onClick={handleCta} size="sm" variant="primary">
                         {microcopy.ai.welcomeBannerCta}
                     </Button>
-                    <Button onClick={dismiss} size="small" type="text">
+                    <Button onClick={dismiss} size="sm" variant="ghost">
                         {microcopy.ai.welcomeBannerDismiss}
                     </Button>
-                </BannerActions>
-            </Body>
-            <IconDismissButton
+                </div>
+            </div>
+            <Button
                 aria-label={microcopy.ai.welcomeBannerDismiss}
-                icon={<CloseOutlined />}
+                data-testid="welcome-banner-dismiss-icon"
                 onClick={dismiss}
-                size="small"
-                type="text"
-            />
-        </Wrap>
+                size="icon"
+                variant="ghost"
+            >
+                <X aria-hidden />
+            </Button>
+        </GlassPanel>
     );
 };
 

@@ -12,7 +12,6 @@ import { useNavigate } from "react-router";
 
 import { store } from "../../store";
 import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
-import { ruleTextsFor, styledClassFor } from "../../testUtils/styleRules";
 import useAuth from "../../utils/hooks/useAuth";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
@@ -269,23 +268,11 @@ describe("Header", () => {
             renderHeader("/projects");
             // Forced-colors strips the translucent active-pill background,
             // so the NavTab re-draws the pill with a CanvasText border. The
-            // sheet is walked directly because jsdom does not evaluate
-            // media queries via getComputedStyle.
-            const css = Array.from(document.styleSheets)
-                .map((sheet) => {
-                    let rules: CSSRuleList;
-                    try {
-                        rules = sheet.cssRules;
-                    } catch {
-                        return "";
-                    }
-                    return Array.from(rules)
-                        .map((rule) => rule.cssText)
-                        .join("\n");
-                })
-                .join("\n");
-            expect(css).toMatch(
-                /forced-colors:\s*active[\s\S]*?\[aria-current="page"\][^}]*border:\s*1px solid CanvasText/
+            // recipe rides in a stacked `forced-colors:aria-[current=page]:`
+            // utility rather than an emitted media rule.
+            const boards = screen.getByRole("link", { name: /boards/i });
+            expect(boards.className).toContain(
+                "forced-colors:aria-[current=page]:border-[CanvasText]"
             );
         });
     });
@@ -336,13 +323,12 @@ describe("Header", () => {
     it("declares a full 44 px coarse-pointer target for the logo", () => {
         renderHeader("/projects");
         const logo = screen.getByRole("button", { name: /pulse home/i });
-        const styledClass = styledClassFor(logo);
-        expect(styledClass).toBeTruthy();
-
-        const ruleText = ruleTextsFor(styledClass ?? "").join("\n");
-        expect(ruleText).toContain("height: 44px");
-        expect(ruleText).toContain("min-width: 44px");
-        expect(ruleText).toContain("justify-content: center");
+        // Tailwind's compiled stylesheet is not loaded in jsdom, so the
+        // 44px coarse-pointer floor is verified by the presence of the
+        // canonical utility classes rather than a computed height.
+        expect(logo.className).toContain("coarse:h-[44px]");
+        expect(logo.className).toContain("coarse:min-w-[44px]");
+        expect(logo.className).toContain("coarse:justify-center");
     });
 
     it("invokes setPreference when the inline theme IconButton is clicked", () => {
@@ -362,10 +348,18 @@ describe("Header", () => {
         expect(setPreference).toHaveBeenCalledWith("dark");
     });
 
-    it("prevents default navigation from the account trigger", () => {
+    it("opens the account menu when the trigger is clicked", async () => {
         renderHeader();
 
-        expect(fireEvent.click(accountTrigger())).toBe(false);
+        fireEvent.click(accountTrigger());
+
+        // The account menu is a Popover (opens on click, unlike a Radix
+        // dropdown menu which opens on pointerdown). Its interactive
+        // settings body — the language toggle group — is portalled in on
+        // open.
+        expect(
+            await screen.findByRole("group", { name: /change language/i })
+        ).toBeInTheDocument();
     });
 
     it("calls logout from the account dropdown", async () => {
@@ -444,62 +438,12 @@ describe("Header", () => {
     it("declares a touch-target height of at least 44 px (WCAG 2.5.8)", () => {
         renderHeader();
         const button = accountTrigger();
-        // styled-components hashes the rule into a class like `css-mcde2a`
-        // (without the `dev-only` / `var-root` cssinjs naming). Pick that
-        // out so the search below is anchored to the exact emitted rule.
-        const styledCls = button.className
-            .split(/\s+/)
-            .find(
-                (tok) =>
-                    /^css-[a-z0-9]{4,}$/i.test(tok) &&
-                    !tok.startsWith("css-var-") &&
-                    !tok.startsWith("css-dev-only-")
-            );
-        expect(styledCls).toBeTruthy();
-
-        // Scope the height search to rules nested inside an
-        // `@media (pointer: coarse)` block — that is where the 44 px
-        // declaration is supposed to live. A rule containing a literal
-        // `44` outside that media query (incidental layout math, for
-        // example) must NOT satisfy this assertion.
-        const heights: number[] = [];
-        const visit = (rule: CSSRule) => {
-            if (rule instanceof CSSStyleRule) {
-                if (!styledCls || !rule.selectorText.includes(styledCls))
-                    return;
-                const parent = rule.parentRule;
-                const inCoarse =
-                    parent instanceof CSSMediaRule &&
-                    parent.conditionText.includes("coarse");
-                if (!inCoarse) return;
-                const re = /(?<!-)height:\s*(\d+(?:\.\d+)?)px/gi;
-                let m: RegExpExecArray | null = re.exec(rule.cssText);
-                while (m !== null) {
-                    heights.push(parseFloat(m[1] ?? "0"));
-                    m = re.exec(rule.cssText);
-                }
-            } else if ("cssRules" in rule) {
-                for (const child of Array.from(
-                    (rule as CSSGroupingRule).cssRules
-                )) {
-                    visit(child);
-                }
-            }
-        };
-        Array.from(document.styleSheets).forEach((sheet) => {
-            let rules: CSSRuleList;
-            try {
-                rules = sheet.cssRules;
-            } catch {
-                return;
-            }
-            for (const rule of Array.from(rules)) visit(rule);
-        });
-
-        // The styled component's `@media (pointer: coarse) { height: 44px }`
-        // rule must be one of them. A regression to a smaller value or a
-        // removed rule fails loudly.
-        expect(heights).toContain(44);
+        // The account `PillTrigger` is the dominant always-on chrome
+        // control on every authenticated route. Tailwind's compiled sheet
+        // is not loaded in jsdom, so the coarse-pointer 44 px floor is
+        // verified by the presence of the canonical `coarse:h-[44px]`
+        // utility. A style refactor that drops it must fail CI.
+        expect(button.className).toContain("coarse:h-[44px]");
     });
 
     describe("AgentHealthBadge", () => {
@@ -602,30 +546,18 @@ describe("Header", () => {
             installAntdBrowserMocks();
         });
 
-        const sheetText = () =>
-            Array.from(document.styleSheets)
-                .map((sheet) => {
-                    let rules: CSSRuleList;
-                    try {
-                        rules = sheet.cssRules;
-                    } catch {
-                        return "";
-                    }
-                    return Array.from(rules)
-                        .map((rule) => rule.cssText)
-                        .join("\n");
-                })
-                .join("\n");
-
-        it("emits a JS-driven display:none rule for the demoted right-cluster when the flag is on and the pointer is coarse", () => {
+        it("hides the demoted right-cluster via a display utility when the flag is on and the pointer is coarse", () => {
             installCoarsePointer();
             envMod.default.bottomNavEnabled = true;
             renderHeader();
-            // The styled `HiddenWhenDemoted` `$hidden=true` branch
-            // emits a plain `display: none;` rule (no media wrapper)
-            // because the predicate is computed from the shared
-            // `useIsPhoneChrome` hook rather than CSS.
-            expect(sheetText()).toMatch(/display:\s*none/i);
+            // The demotion wrapper toggles a plain `hidden` utility (no
+            // media wrapper) because the predicate is computed from the
+            // shared `useIsPhoneChrome` hook rather than CSS. jsdom does
+            // not compile Tailwind, so the class is still queryable.
+            const account = screen.getByRole("button", {
+                name: /account menu for alice/i
+            });
+            expect(account.closest("span")?.className).toContain("hidden");
         });
 
         it("wraps both the theme button and the account dropdown in the demotion span", () => {
@@ -828,20 +760,11 @@ describe("Header", () => {
      * ::after via getComputedStyle.
      */
     describe("Liquid Glass chrome recipe (Wave 2 T3)", () => {
-        const sheetText = () =>
-            Array.from(document.styleSheets)
-                .map((sheet) => {
-                    let rules: CSSRuleList;
-                    try {
-                        rules = sheet.cssRules;
-                    } catch {
-                        return "";
-                    }
-                    return Array.from(rules)
-                        .map((rule) => rule.cssText)
-                        .join("\n");
-                })
-                .join("\n");
+        const headerEl = (): HTMLElement => {
+            const node = document.querySelector("header");
+            if (!node) throw new Error("header not rendered");
+            return node as HTMLElement;
+        };
 
         it('marks the PageHeader root with data-glass-context="true"', () => {
             const { container } = render(
@@ -856,55 +779,52 @@ describe("Header", () => {
             expect(header?.getAttribute("data-glass-context")).toBe("true");
         });
 
-        it("emits a ::before specular-rim layer with --glass-specular-top", () => {
+        it("paints a ::before specular-rim layer from --glass-specular-top", () => {
             renderHeader();
-            const css = sheetText();
-            // The rim recipe paints the highlight gradient on the
-            // header's ::before pseudo-element. styled-components emits
-            // the rule verbatim into the document head.
-            expect(css).toMatch(
-                /::before[^}]*background:\s*var\(--glass-specular-top\)/
+            // The rim highlight rides on the header's ::before pseudo via a
+            // Tailwind arbitrary background-image utility. jsdom does not
+            // compile Tailwind, so presence of the class is the contract.
+            expect(headerEl().className).toContain(
+                "before:bg-[image:var(--glass-specular-top)]"
             );
         });
 
-        it("emits a ::after companion / scroll-edge layer with --glass-specular-bottom + mask-image", () => {
+        it("paints a ::after companion layer with --glass-specular-bottom + a scroll-edge mask", () => {
             renderHeader();
-            const css = sheetText();
-            expect(css).toMatch(
-                /::after[^}]*background:\s*var\(--glass-specular-bottom\)/
+            const cls = headerEl().className;
+            expect(cls).toContain(
+                "after:bg-[image:var(--glass-specular-bottom)]"
             );
-            // Scroll-edge dissolve: the ::after layer is masked with a
-            // linear-gradient to fade the bottom 12 px into transparent
-            // so scrolling content dissolves through the chrome edge.
-            expect(css).toMatch(
-                /mask-image:\s*linear-gradient\([^)]*calc\(100% - 12px\)/
+            // Scroll-edge dissolve: the chrome surface is masked with a
+            // linear-gradient that fades its bottom 12 px into transparent.
+            expect(cls).toContain(
+                "[mask-image:linear-gradient(to_bottom,black_calc(100%-12px),transparent_100%)]"
             );
         });
 
-        it("applies gel-flex transform recipe to the account PillTrigger", () => {
+        it("applies the gel-flex transform recipe to the account PillTrigger", () => {
             renderHeader();
-            const css = sheetText();
+            const trigger = accountTrigger();
             // The PillTrigger transitions transform on the gel-flex
             // duration + spring-snap easing tokens, and yields to
             // scale(0.97) under :active.
-            expect(css).toMatch(/transform[^;]*var\(--motion-gel-flex/);
-            expect(css).toMatch(/:active[^}]*transform:\s*scale\(0\.97\)/);
+            expect(trigger.className).toContain("var(--motion-gel-flex");
+            expect(trigger.className).toContain("active:scale-[0.97]");
         });
 
-        it("respects prefers-reduced-motion by dropping the gel-flex transition + scale", () => {
+        it("respects prefers-reduced-motion by dropping the gel-flex scale on the PillTrigger", () => {
             renderHeader();
-            const css = sheetText();
-            // The reduced-motion block neutralizes both the transition
-            // and the :active transform. We assert by string containment
-            // because the styled rule is verbatim in the sheet.
-            expect(css).toMatch(/prefers-reduced-motion[^}]*reduce/);
-            expect(css).toMatch(/transform:\s*none/);
+            // The reduced-motion variant neutralizes the :active transform.
+            expect(accountTrigger().className).toContain(
+                "motion-reduce:active:scale-100"
+            );
         });
 
-        it("respects prefers-reduced-transparency by dropping the rim background + dissolve", () => {
+        it("respects prefers-reduced-transparency by collapsing the glass surface", () => {
             renderHeader();
-            const css = sheetText();
-            expect(css).toMatch(/prefers-reduced-transparency[^}]*reduce/);
+            expect(headerEl().className).toContain(
+                "[@media(prefers-reduced-transparency:reduce)]:[background:var(--page-background)]"
+            );
         });
     });
 });

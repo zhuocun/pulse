@@ -1,9 +1,10 @@
-import { CloseOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
+import { X } from "lucide-react";
 import React from "react";
 
+import { cn } from "@/lib/utils";
+
 import { microcopy } from "../../constants/microcopy";
-import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
+import { TOUCH_TARGET } from "../ui/touchTarget";
 
 export interface FilterChip {
     /** Stable key (e.g. "manager", "type"). Drives the dismiss handler. */
@@ -22,107 +23,6 @@ interface FilterChipsProps {
     clearAllLabel?: string;
 }
 
-const ChipRow = styled.div`
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xs}px;
-    padding-top: ${space.xs}px;
-`;
-
-const Chip = styled.span`
-    align-items: center;
-    background: var(--ant-color-primary-bg, rgba(234, 88, 12, 0.08));
-    border: 1px solid var(--ant-color-primary-border, rgba(234, 88, 12, 0.2));
-    border-radius: ${radius.pill}px;
-    color: var(--ant-color-primary, #ea580c);
-    display: inline-flex;
-    font-size: ${fontSize.xs}px;
-    font-weight: ${fontWeight.medium};
-    gap: ${space.xxs}px;
-    padding: 2px ${space.xs}px 2px ${space.sm}px;
-    max-width: 100%;
-
-    > span:first-of-type {
-        opacity: 0.65;
-    }
-
-    > span:nth-of-type(2) {
-        max-width: 14ch;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-`;
-
-const ChipDismiss = styled.button`
-    align-items: center;
-    background: transparent;
-    border: none;
-    border-radius: 50%;
-    color: inherit;
-    cursor: pointer;
-    display: inline-flex;
-    height: 18px;
-    justify-content: center;
-    margin-inline-start: ${space.xxs}px;
-    min-height: 18px;
-    min-width: 18px;
-    opacity: 0.7;
-    padding: 0;
-    transition:
-        background-color 120ms ease-out,
-        opacity 120ms ease-out;
-    width: 18px;
-
-    &:hover,
-    &:focus-visible {
-        background: var(--pulse-accent-bg-hover, rgba(234, 88, 12, 0.18));
-        opacity: 1;
-    }
-
-    @media (pointer: coarse) {
-        height: 44px;
-        min-height: 44px;
-        min-width: 44px;
-        width: 44px;
-    }
-
-    svg {
-        font-size: 9px;
-    }
-`;
-
-const ClearAllButton = styled.button`
-    background: transparent;
-    border: none;
-    color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.5));
-    cursor: pointer;
-    font-size: ${fontSize.xs}px;
-    font-weight: ${fontWeight.medium};
-    padding: 2px ${space.xs}px;
-    text-decoration: underline;
-    text-decoration-color: transparent;
-    text-underline-offset: 2px;
-    transition:
-        color 120ms ease-out,
-        text-decoration-color 120ms ease-out;
-
-    &:hover,
-    &:focus-visible {
-        color: var(--ant-color-text, rgba(15, 23, 42, 0.85));
-        text-decoration-color: currentColor;
-    }
-
-    /* Lift to the 44 px touch floor on coarse pointers (WCAG 2.5.8),
-     * mirroring the sibling ChipDismiss control so both filter affordances
-     * stay comfortably tappable on a phone without disturbing the dense
-     * desktop rhythm. */
-    @media (pointer: coarse) {
-        min-height: 44px;
-    }
-`;
-
 /**
  * Renders the active filters as dismissible chips. Pairs with a search /
  * filter panel so users can see at a glance what is filtered, drop a single
@@ -138,29 +38,52 @@ const FilterChips: React.FC<FilterChipsProps> = ({
 }) => {
     if (chips.length === 0) return null;
     return (
-        <ChipRow role="region" aria-label={microcopy.a11y.activeFilters}>
+        <div
+            role="region"
+            aria-label={microcopy.a11y.activeFilters}
+            className="flex flex-wrap items-center gap-xs pt-xs"
+        >
             {chips.map((chip) => (
-                <Chip key={chip.key}>
-                    <span>{chip.label}:</span>
-                    <span>{chip.value}</span>
-                    <ChipDismiss
+                <span
+                    key={chip.key}
+                    className="inline-flex max-w-full items-center gap-xxs rounded-full border border-primary/20 bg-primary/10 py-[2px] pl-sm pr-xs text-xs font-medium text-primary"
+                >
+                    <span className="opacity-65">{chip.label}:</span>
+                    <span className="max-w-[14ch] overflow-hidden text-ellipsis whitespace-nowrap">
+                        {chip.value}
+                    </span>
+                    <button
                         aria-label={microcopy.a11y.removeFilter.replace(
                             "{label}",
                             chip.label
                         )}
                         onClick={() => onDismiss(chip.key)}
                         type="button"
+                        className={cn(
+                            "ms-xxs inline-flex size-[18px] items-center justify-center rounded-full p-0 text-current opacity-70 transition-colors",
+                            "hover:bg-primary/20 hover:opacity-100 focus-visible:bg-primary/20 focus-visible:opacity-100 focus-visible:outline-none",
+                            "coarse:size-11",
+                            TOUCH_TARGET
+                        )}
                     >
-                        <CloseOutlined aria-hidden />
-                    </ChipDismiss>
-                </Chip>
+                        <X aria-hidden className="size-[9px]" />
+                    </button>
+                </span>
             ))}
             {onClearAll && chips.length >= 2 ? (
-                <ClearAllButton onClick={onClearAll} type="button">
+                <button
+                    onClick={onClearAll}
+                    type="button"
+                    className={cn(
+                        "px-xs py-[2px] text-xs font-medium text-muted-foreground underline decoration-transparent underline-offset-2 transition-colors",
+                        "hover:text-foreground hover:decoration-current focus-visible:text-foreground focus-visible:decoration-current focus-visible:outline-none",
+                        TOUCH_TARGET
+                    )}
+                >
                     {clearAllLabel}
-                </ClearAllButton>
+                </button>
             ) : null}
-        </ChipRow>
+        </div>
     );
 };
 

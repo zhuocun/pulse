@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { axe, toHaveNoViolations } from "jest-axe";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
@@ -49,7 +50,7 @@ import AiRewritePanel from ".";
 
 const mockedTrack = track as jest.MockedFunction<typeof track>;
 
-const installAntdBrowserMocks = () => {
+const installBrowserMocks = () => {
     Object.defineProperty(window, "matchMedia", {
         writable: true,
         value: (query: string) => ({
@@ -63,6 +64,11 @@ const installAntdBrowserMocks = () => {
             removeListener: jest.fn()
         })
     });
+    // Radix Select's listbox relies on PointerEvent APIs jsdom doesn't
+    // ship — polyfill them so the mode picker can open.
+    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+    Element.prototype.releasePointerCapture = jest.fn();
 };
 
 const renderPanel = (
@@ -84,7 +90,7 @@ const openPanel = () => {
 };
 
 describe("AiRewritePanel", () => {
-    beforeAll(installAntdBrowserMocks);
+    beforeAll(installBrowserMocks);
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -183,15 +189,20 @@ describe("AiRewritePanel", () => {
         ).toBeInTheDocument();
     });
 
-    it("blocks translate/free on the local engine with an explanatory notice", () => {
+    it("blocks translate/free on the local engine with an explanatory notice", async () => {
+        const user = userEvent.setup();
         renderPanel();
         openPanel();
-        fireEvent.mouseDown(
+        await user.click(
             screen.getByRole("combobox", {
                 name: microcopy.aiRewrite.modeSelectAria
             })
         );
-        fireEvent.click(screen.getByText(microcopy.aiRewrite.modes.free));
+        await user.click(
+            await screen.findByRole("option", {
+                name: microcopy.aiRewrite.modes.free
+            })
+        );
         expect(
             screen.getByTestId("ai-rewrite-local-unsupported")
         ).toBeInTheDocument();

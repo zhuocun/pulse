@@ -1,6 +1,6 @@
-import styled from "@emotion/styled";
+import * as React from "react";
 
-import { breakpoints, pageMaxWidthRem, space } from "../../theme/tokens";
+import { cn } from "@/lib/utils";
 
 /**
  * Routed page wrapper. Owns horizontal/vertical padding so individual
@@ -11,20 +11,27 @@ import { breakpoints, pageMaxWidthRem, space } from "../../theme/tokens";
  * `max-width` caps the line length on ultra-wide monitors so headings
  * and tables don't sprawl. The board page opts out (full-bleed columns).
  */
-const PageContainer = styled.div`
-    margin-inline: auto;
-    max-width: ${pageMaxWidthRem}rem;
-    padding: ${space.lg}px ${space.md}px;
-    padding-block-end: max(${space.lg}px, env(safe-area-inset-bottom));
-    padding-inline-start: max(${space.md}px, env(safe-area-inset-left));
-    padding-inline-end: max(${space.md}px, env(safe-area-inset-right));
-    width: 100%;
+const PageContainer = React.forwardRef<
+    HTMLDivElement,
+    React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+    <div
+        ref={ref}
+        className={cn(
+            "mx-auto w-full max-w-[88rem]",
+            "px-md pt-lg",
+            "pb-[max(var(--pulse-space-lg),env(safe-area-inset-bottom))]",
+            "pl-[max(var(--pulse-space-md),env(safe-area-inset-left))]",
+            "pr-[max(var(--pulse-space-md),env(safe-area-inset-right))]",
+            "md:px-xl md:pt-xl md:pb-xxl",
+            "md:pl-[max(var(--pulse-space-xl),env(safe-area-inset-left))]",
+            "md:pr-[max(var(--pulse-space-xl),env(safe-area-inset-right))]",
+            className
+        )}
+        {...props}
+    />
+));
 
-    @media (min-width: ${breakpoints.md}px) {
-        padding: ${space.xl}px ${space.xl}px ${space.xxl}px;
-        padding-inline-start: max(${space.xl}px, env(safe-area-inset-left));
-        padding-inline-end: max(${space.xl}px, env(safe-area-inset-right));
-    }
-`;
+PageContainer.displayName = "PageContainer";
 
 export default PageContainer;

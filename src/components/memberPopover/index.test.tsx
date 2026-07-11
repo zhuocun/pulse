@@ -1,10 +1,5 @@
-import {
-    fireEvent,
-    render,
-    screen,
-    waitFor,
-    within
-} from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import useMembersList from "../../utils/hooks/useMembersList";
 
@@ -23,33 +18,12 @@ const member = (overrides: Partial<IMember> = {}): IMember => ({
     ...overrides
 });
 
-const installAntdBrowserMocks = () => {
-    Object.defineProperty(window, "matchMedia", {
-        writable: true,
-        value: (query: string) => ({
-            addEventListener: jest.fn(),
-            addListener: jest.fn(),
-            dispatchEvent: jest.fn(),
-            matches: false,
-            media: query,
-            onchange: null,
-            removeEventListener: jest.fn(),
-            removeListener: jest.fn()
-        })
-    });
-
-    class ResizeObserverMock {
-        observe = jest.fn();
-
-        unobserve = jest.fn();
-
-        disconnect = jest.fn();
-    }
-
-    Object.defineProperty(window, "ResizeObserver", {
-        writable: true,
-        value: ResizeObserverMock
-    });
+const installBrowserMocks = () => {
+    // Radix Popover drives its surface with pointer-capture APIs jsdom
+    // doesn't ship; polyfill them so the members list can open.
+    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+    Element.prototype.releasePointerCapture = jest.fn();
 };
 
 const renderMemberPopover = (members: IMember[] = [member()]) => {
@@ -67,7 +41,7 @@ const renderMemberPopover = (members: IMember[] = [member()]) => {
 
 describe("MemberPopover", () => {
     beforeAll(() => {
-        installAntdBrowserMocks();
+        installBrowserMocks();
     });
 
     beforeEach(() => {
@@ -91,7 +65,7 @@ describe("MemberPopover", () => {
         expect(within(trigger).getByText("A")).toBeInTheDocument();
         expect(within(trigger).getByText("B")).toBeInTheDocument();
 
-        fireEvent.mouseEnter(trigger);
+        await userEvent.setup().click(trigger);
 
         expect(await screen.findByText("Team members")).toBeInTheDocument();
         expect(screen.getByText("Alice")).toBeInTheDocument();
@@ -109,7 +83,7 @@ describe("MemberPopover", () => {
         });
         expect(within(trigger).getByText("0")).toBeInTheDocument();
 
-        fireEvent.mouseEnter(trigger);
+        await userEvent.setup().click(trigger);
 
         expect(await screen.findByText("Team members")).toBeInTheDocument();
         expect(screen.queryByText("Alice")).not.toBeInTheDocument();

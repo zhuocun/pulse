@@ -15,7 +15,6 @@
  * link and observe the dock state across them.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { App as AntdApp } from "antd";
 import {
     act,
     fireEvent,
@@ -116,7 +115,7 @@ const baseAgent = (
     ...overrides
 });
 
-const installAntdBrowserMocks = () => {
+const installBrowserMocks = () => {
     Object.defineProperty(window, "matchMedia", {
         writable: true,
         value: (query: string) => ({
@@ -143,6 +142,11 @@ const installAntdBrowserMocks = () => {
         writable: true,
         value: ResizeObserverMock
     });
+
+    // Radix's dialog/sheet/tabs lean on PointerEvent APIs jsdom doesn't ship.
+    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+    Element.prototype.releasePointerCapture = jest.fn();
 };
 
 const project = (overrides: Partial<IProject> = {}): IProject => ({
@@ -220,30 +224,28 @@ const renderHarness = ({
                      * mirrors that layering: host first, then a routed
                      * stub page that owns the navigation Link.
                      */}
-                    <AntdApp>
-                        <CopilotDockHost />
-                        <Routes>
-                            <Route
-                                path="/projects/:projectId/board"
-                                element={
-                                    <div>
-                                        <h1>Board page</h1>
-                                        <Link to="/projects/p2/board">
-                                            Go to p2
-                                        </Link>
-                                        <Link to="/projects/p1/board">
-                                            Go to p1
-                                        </Link>
-                                        <Link to="/projects">Leave board</Link>
-                                    </div>
-                                }
-                            />
-                            <Route
-                                path="/projects"
-                                element={<div>Project list</div>}
-                            />
-                        </Routes>
-                    </AntdApp>
+                    <CopilotDockHost />
+                    <Routes>
+                        <Route
+                            path="/projects/:projectId/board"
+                            element={
+                                <div>
+                                    <h1>Board page</h1>
+                                    <Link to="/projects/p2/board">
+                                        Go to p2
+                                    </Link>
+                                    <Link to="/projects/p1/board">
+                                        Go to p1
+                                    </Link>
+                                    <Link to="/projects">Leave board</Link>
+                                </div>
+                            }
+                        />
+                        <Route
+                            path="/projects"
+                            element={<div>Project list</div>}
+                        />
+                    </Routes>
                 </MemoryRouter>
             </QueryClientProvider>
         </Provider>
@@ -257,7 +259,7 @@ describe("CopilotDockHost", () => {
     >;
 
     beforeAll(() => {
-        installAntdBrowserMocks();
+        installBrowserMocks();
     });
 
     beforeEach(() => {
@@ -345,7 +347,7 @@ describe("CopilotDockHost", () => {
         renderHarness();
 
         // Initial dock state is closed (per-test reset above). The host
-        // mounts but the CopilotDock's AntD Drawer doesn't paint its
+        // mounts but the CopilotDock's Sheet surface doesn't paint its
         // contents until `open=true`.
         expect(
             document.querySelector("[data-testid='copilot-dock']")
@@ -486,13 +488,18 @@ describe("CopilotDockHost", () => {
             ).not.toBeNull();
         });
 
-        // Click the mask to invoke the dock's onClose handler — that
-        // path is wired by `ProjectScopedDock.handleClose` to flip the
-        // dock state AND clear the legacy flags so the bridge doesn't
-        // silently reopen on the next route change.
-        const mask = document.querySelector(".ant-drawer-mask");
+        // Pointer-down on the Sheet scrim (Radix overlay) invokes the
+        // dock's onClose handler — that path is wired by
+        // `ProjectScopedDock.handleClose` to flip the dock state AND clear
+        // the legacy flags so the bridge doesn't silently reopen on the
+        // next route change. Radix arms its outside-pointer listener on a
+        // `setTimeout(0)`, so let that flush first.
+        const mask = document.querySelector('[class*="bg-black/45"]');
         expect(mask).not.toBeNull();
-        fireEvent.click(mask as Element);
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+        fireEvent.pointerDown(mask as Element);
 
         await waitFor(() => {
             expect(store.getState().overlays.copilotDock.open).toBe(false);
@@ -771,13 +778,18 @@ describe("CopilotDockHost", () => {
             expect(store.getState().overlays.copilotDock.open).toBe(true);
         });
 
-        // Simulate the user dismissing the dock via its mask click —
-        // the host's `handleClose` calls closeDock + closeChatDrawer +
-        // closeBoardBrief so the legacy flags fan out and the dock
-        // does not silently reopen on the next render.
-        const mask = document.querySelector(".ant-drawer-mask");
+        // Simulate the user dismissing the dock via its scrim (Radix
+        // overlay) pointer-down — the host's `handleClose` calls
+        // closeDock + closeChatDrawer + closeBoardBrief so the legacy
+        // flags fan out and the dock does not silently reopen on the next
+        // render. Radix arms its outside-pointer listener on a
+        // `setTimeout(0)`, so let that flush first.
+        const mask = document.querySelector('[class*="bg-black/45"]');
         expect(mask).not.toBeNull();
-        fireEvent.click(mask as Element);
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+        fireEvent.pointerDown(mask as Element);
 
         await waitFor(() => {
             expect(store.getState().overlays.copilotDock.open).toBe(false);

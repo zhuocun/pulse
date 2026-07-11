@@ -7,7 +7,6 @@ import {
     waitFor
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { message, Modal } from "antd";
 import { Provider } from "react-redux";
 import { Outlet, RouterProvider, createMemoryRouter } from "react-router-dom";
 
@@ -15,6 +14,64 @@ import { microcopy } from "../../constants/microcopy";
 import { store } from "../../store";
 
 import TaskDetailPanel from ".";
+
+/*
+ * The transient Undo toast and the delete-failure error toast both route
+ * through the out-of-Batch-B, AntD-backed `useUndoToast` / `useAppMessage`
+ * hooks. Mock them so this suite stays free of AntD's global message
+ * container while still asserting the panel raises the toast with the right
+ * copy and that the undo closures replay the inverse PUT / POST.
+ */
+interface UndoOptions {
+    description: string;
+    undo: () => void | Promise<void>;
+    analyticsTag?: string;
+    dismissOnUnmount?: boolean;
+}
+let mockLastUndoOptions: UndoOptions | null = null;
+const mockShowUndoToast = jest.fn((options: UndoOptions) => {
+    mockLastUndoOptions = options;
+    return { dismiss: jest.fn() };
+});
+const mockMessageError = jest.fn();
+jest.mock("../../utils/hooks/useUndoToast", () => ({
+    __esModule: true,
+    default: () => ({ show: mockShowUndoToast })
+}));
+jest.mock("../../utils/hooks/useAppMessage", () => ({
+    __esModule: true,
+    default: () => ({
+        error: mockMessageError,
+        success: jest.fn(),
+        info: jest.fn(),
+        warning: jest.fn(),
+        loading: jest.fn(),
+        open: jest.fn(),
+        destroy: jest.fn()
+    })
+}));
+
+/*
+ * Radix `Popover` (SelectField / MultiSelectField) and `DropdownMenu`
+ * (the comments mention picker) drive their surfaces with pointer-capture
+ * and `scrollIntoView`, neither of which jsdom implements.
+ */
+Element.prototype.scrollIntoView = jest.fn();
+if (!Element.prototype.hasPointerCapture) {
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+}
+if (!Element.prototype.setPointerCapture) {
+    Element.prototype.setPointerCapture = jest.fn();
+}
+if (!Element.prototype.releasePointerCapture) {
+    Element.prototype.releasePointerCapture = jest.fn();
+}
+
+beforeEach(() => {
+    mockShowUndoToast.mockClear();
+    mockMessageError.mockClear();
+    mockLastUndoOptions = null;
+});
 
 /*
  * Focused unit tests for the routed TaskDetailPanel (Phase 3 A2).
@@ -227,15 +284,6 @@ describe("TaskDetailPanel", () => {
         installAntdBrowserMocks();
     });
 
-    afterEach(() => {
-        // The Undo toast lives in a global AntD message container that
-        // outlives unmount (10 s window); tear it down so a leaked "Undo"
-        // button never bleeds into a sibling test's queries.
-        act(() => {
-            message.destroy();
-        });
-    });
-
     beforeEach(() => {
         fetchMock.mockReset();
         // The tasks endpoint resolves to an ITask[]. The members
@@ -280,18 +328,16 @@ describe("TaskDetailPanel", () => {
         await screen.findByText(/edit task · build task/i);
 
         // jsdom default mocks `pointer: coarse` to false, so
-        // `useIsPhoneChrome()` returns false and the right-drawer
-        // branch wins. Phase 6 Wave 3 Phase 2 routes that branch
-        // through the `<Sheet>` primitive's AntD `<Drawer>` fallback,
-        // so the placement class lives on the Drawer wrapper rather
-        // than a public `data-placement` attribute. We assert the
-        // `.ant-drawer-right` class — internal to AntD but the only
-        // public signal of placement when the Sheet fallback fires.
-        expect(
-            document.querySelector("[data-testid='task-detail-panel']")
-        ).not.toBeNull();
-        expect(document.querySelector(".ant-drawer-right")).not.toBeNull();
-        expect(document.querySelector(".ant-drawer-bottom")).toBeNull();
+        // `useIsPhoneChrome()` returns false and the right-overlay
+        // branch wins — the shared `<Sheet>` primitive renders its
+        // shadcn `<Sheet>` fallback at `side="right"`. The placement
+        // now lives in the content's Tailwind side classes
+        // (`right-0` for the right shelf, `bottom-0` for the phone
+        // bottom sheet) rather than the legacy `.ant-drawer-*` chrome.
+        const panel = screen.getByTestId("task-detail-panel");
+        expect(panel).toBeInTheDocument();
+        expect(panel.className).toContain("right-0");
+        expect(panel.className).not.toContain("bottom-0");
     });
 
     it("mounts as an animated Sheet surface on coarse-pointer phone viewports", async () => {
@@ -359,12 +405,15 @@ describe("TaskDetailPanel", () => {
         fireEvent.change(input, { target: { value: "Build task details" } });
         fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
-        expect(
-            await screen.findByText(microcopy.feedback.taskSaved)
-        ).toBeInTheDocument();
-        const undoButton = await screen.findByRole("button", { name: "Undo" });
+        // The reversible save raises the Undo toast with the "task saved"
+        // copy; invoking the captured undo closure replays the inverse PUT
+        // with the pre-edit name.
+        await waitFor(() => expect(mockShowUndoToast).toHaveBeenCalled());
+        expect(mockLastUndoOptions?.description).toBe(
+            microcopy.feedback.taskSaved
+        );
         await act(async () => {
-            fireEvent.click(undoButton);
+            await mockLastUndoOptions?.undo();
         });
 
         await waitFor(() => {
@@ -453,10 +502,8 @@ describe("TaskDetailPanel", () => {
     });
 
     it("deletes the task immediately (no confirm) and surfaces an Undo toast", async () => {
-        // §2.A.4 — task delete is reversible, so it skips Modal.confirm
+        // §2.A.4 — task delete is reversible, so it skips a confirm dialog
         // and goes straight to an optimistic DELETE + Undo toast.
-        const confirmSpy = jest.spyOn(Modal, "confirm");
-
         renderPanelAt("/projects/project-1/board/task/task-1");
         await screen.findByText(/edit task · build task/i);
         fireEvent.click(
@@ -470,8 +517,12 @@ describe("TaskDetailPanel", () => {
             );
             expect(deleteCalls.length).toBeGreaterThanOrEqual(1);
         });
-        // No confirm dialog fired for the reversible delete.
-        expect(confirmSpy).not.toHaveBeenCalled();
+        // No discard-confirm dialog fired for the reversible delete.
+        expect(
+            screen.queryByText(
+                microcopy.taskDetailPanel.confirmDiscardTitle as string
+            )
+        ).not.toBeInTheDocument();
         const deleteCall = fetchMock.mock.calls.find(
             (call) => (call[1] as RequestInit | undefined)?.method === "DELETE"
         )!;
@@ -480,12 +531,12 @@ describe("TaskDetailPanel", () => {
         // carries the right task id.
         expect(deleteCall[0]).toContain("/api/v1/tasks");
         expect(deleteCall[0]).toContain("taskId=task-1");
-        // The toast announces the delete and offers a real Undo button.
-        expect(await screen.findByText("Task deleted")).toBeInTheDocument();
-        expect(
-            screen.getByRole("button", { name: "Undo" })
-        ).toBeInTheDocument();
-        confirmSpy.mockRestore();
+        // The reversible delete raises the Undo toast with the "task
+        // deleted" copy and a working undo closure.
+        expect(mockShowUndoToast).toHaveBeenCalled();
+        expect(mockLastUndoOptions?.description).toBe(
+            microcopy.feedback.taskDeleted
+        );
     });
 
     it("re-creates the task via a POST when the Undo toast is clicked", async () => {
@@ -495,9 +546,9 @@ describe("TaskDetailPanel", () => {
             screen.getByRole("button", { name: /^delete build task$/i })
         );
 
-        const undoButton = await screen.findByRole("button", { name: "Undo" });
+        await waitFor(() => expect(mockShowUndoToast).toHaveBeenCalled());
         await act(async () => {
-            fireEvent.click(undoButton);
+            await mockLastUndoOptions?.undo();
         });
 
         // Undo replays the inverse mutation: a POST re-creating the task.
@@ -574,12 +625,11 @@ describe("TaskDetailPanel", () => {
         const input = await screen.findByDisplayValue("Build task");
         fireEvent.change(input, { target: { value: "Edited" } });
 
-        // Drawer mask is rendered as `.ant-drawer-mask`. Clicking
-        // it fires the Drawer's onClose, which we route through
-        // `requestClose`.
-        const mask = document.querySelector(".ant-drawer-mask");
-        expect(mask).not.toBeNull();
-        fireEvent.click(mask as Element);
+        // Pressing Escape routes the Sheet's `onClose` through
+        // `requestClose`; with dirty edits that surfaces the discard
+        // confirm dialog (the migrated equivalent of the old drawer
+        // mask-click path).
+        fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" });
 
         // Confirm dialog appears with the Phase 3 A2 microcopy.
         expect(
@@ -599,7 +649,7 @@ describe("TaskDetailPanel", () => {
 
         const input = await screen.findByDisplayValue("Build task");
         fireEvent.change(input, { target: { value: "Edited" } });
-        fireEvent.click(document.querySelector(".ant-drawer-mask") as Element);
+        fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" });
 
         await screen.findByText(
             microcopy.taskDetailPanel.confirmDiscardTitle as string
@@ -622,7 +672,7 @@ describe("TaskDetailPanel", () => {
 
         const input = await screen.findByDisplayValue("Build task");
         fireEvent.change(input, { target: { value: "Edited" } });
-        fireEvent.click(document.querySelector(".ant-drawer-mask") as Element);
+        fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" });
 
         await screen.findByText(
             microcopy.taskDetailPanel.confirmDiscardTitle as string
@@ -635,10 +685,8 @@ describe("TaskDetailPanel", () => {
         // Panel is still open — the task title is still visible
         // and the user's edit is still in the input.
         expect(screen.getByDisplayValue("Edited")).toBeInTheDocument();
-        // Confirm dialog gets hidden. AntD's Modal animates the
-        // close, so we look at the visible state rather than DOM
-        // removal — the wrapper retains the title node but the
-        // modal switches to `aria-hidden`.
+        // Confirm dialog is dismissed — the shadcn `Dialog` unmounts
+        // its content on close, so the titled dialog is gone.
         await waitFor(() => {
             const dialog = screen.queryByRole("dialog", {
                 hidden: false,
@@ -784,13 +832,6 @@ describe("TaskDetailPanel", () => {
     });
 
     it("surfaces the error (and still closes the panel) when DELETE fails (B-T1)", async () => {
-        const messageErrorSpy = jest
-            .spyOn(
-                // eslint-disable-next-line @typescript-eslint/no-require-imports
-                require("antd").message,
-                "error"
-            )
-            .mockImplementation(() => undefined);
         fetchMock.mockImplementation(async (input, init) => {
             const url = typeof input === "string" ? input : input.toString();
             const method = (init as RequestInit | undefined)?.method;
@@ -827,15 +868,13 @@ describe("TaskDetailPanel", () => {
         // immediately; the failure surfaces a task-specific error toast
         // (the optimistic-update layer rolls the task back into the cache).
         await waitFor(() => {
-            expect(messageErrorSpy).toHaveBeenCalled();
+            expect(mockMessageError).toHaveBeenCalled();
         });
         await waitFor(() =>
             expect(router.state.location.pathname).toBe(
                 "/projects/project-1/board"
             )
         );
-
-        messageErrorSpy.mockRestore();
     });
 
     it("deep-links: rendering the panel route directly opens the panel on the board", async () => {
@@ -1959,12 +1998,6 @@ describe("TaskDetailPanel — richness fields + comments (GAP-009/010)", () => {
         installAntdBrowserMocks();
     });
 
-    afterEach(() => {
-        act(() => {
-            message.destroy();
-        });
-    });
-
     beforeEach(() => {
         currentTasks = siblingTasks;
         fetchMock.mockReset();
@@ -2013,31 +2046,27 @@ describe("TaskDetailPanel — richness fields + comments (GAP-009/010)", () => {
         const parentSelect = screen.getByRole("combobox", {
             name: /parent task/i
         });
-        fireEvent.mouseDown(parentSelect);
+        fireEvent.click(parentSelect);
         await screen.findByRole("option", { name: "Fix bug" });
-        const optionContents = Array.from(
-            document.querySelectorAll(".ant-select-item-option-content")
-        ).map((el) => el.textContent);
-        expect(optionContents).toContain("Fix bug");
-        expect(optionContents).not.toContain("Build task");
+        const optionLabels = screen
+            .getAllByRole("option")
+            .map((el) => el.textContent);
+        expect(optionLabels).toContain("Fix bug");
+        expect(optionLabels).not.toContain("Build task");
     });
 
     it("includes labels, assignees, and parent in the PUT payload on save (parity with TaskModal)", async () => {
         renderRichnessPanel();
         await screen.findByDisplayValue("Build task");
 
-        fireEvent.mouseDown(screen.getByRole("combobox", { name: /labels/i }));
-        fireEvent.click(await screen.findByText("Backend"));
+        fireEvent.click(screen.getByRole("combobox", { name: /labels/i }));
+        fireEvent.click(await screen.findByRole("option", { name: "Backend" }));
 
-        fireEvent.mouseDown(
-            screen.getByRole("combobox", { name: /assignees/i })
-        );
-        fireEvent.click(await screen.findByText("Bob"));
+        fireEvent.click(screen.getByRole("combobox", { name: /assignees/i }));
+        fireEvent.click(await screen.findByRole("option", { name: "Bob" }));
 
-        fireEvent.mouseDown(
-            screen.getByRole("combobox", { name: /parent task/i })
-        );
-        fireEvent.click(await screen.findByText("Fix bug"));
+        fireEvent.click(screen.getByRole("combobox", { name: /parent task/i }));
+        fireEvent.click(await screen.findByRole("option", { name: "Fix bug" }));
 
         fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
@@ -2113,13 +2142,13 @@ describe("TaskDetailPanel — richness fields + comments (GAP-009/010)", () => {
         });
         await screen.findByDisplayValue("Build task");
 
-        const parentControl = screen
-            .getByRole("combobox", { name: /parent task/i })
-            .closest(".ant-select") as HTMLElement;
-        const clearButton = parentControl.querySelector(".ant-select-clear");
-        expect(clearButton).not.toBeNull();
-        fireEvent.mouseDown(clearButton as Element);
-        fireEvent.click(clearButton as Element);
+        // The parent `SelectField` renders its clear affordance (a
+        // "Clear" button) only when a value is set; it's the only
+        // clearable control in the form, so it's unambiguous here.
+        const clearButton = screen.getByRole("button", {
+            name: microcopy.actions.clear as string
+        });
+        fireEvent.click(clearButton);
 
         fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
@@ -2172,11 +2201,13 @@ describe("TaskDetailPanel — richness fields + comments (GAP-009/010)", () => {
         const composer = await screen.findByTestId("comment-composer-input");
         fireEvent.change(composer, { target: { value: "Ping @Bob" } });
 
-        const mentionSelect = screen.getByRole("combobox", {
-            name: /mention/i
-        });
-        fireEvent.mouseDown(mentionSelect);
-        fireEvent.click(await screen.findByText("Bob"));
+        // The mention picker is now a `DropdownMenu` of checkbox items;
+        // open it and check Bob (Alice is the seeded coordinator).
+        const menuUser = userEvent.setup({ pointerEventsCheck: 0 });
+        await menuUser.click(screen.getByTestId("comment-mention-select"));
+        await menuUser.click(
+            await screen.findByRole("menuitemcheckbox", { name: "Bob" })
+        );
 
         await act(async () => {
             fireEvent.click(screen.getByTestId("comment-post"));

@@ -1,5 +1,8 @@
-import { Button, Result, Space } from "antd";
+import { AlertCircle } from "lucide-react";
 import React from "react";
+
+import { Button } from "@/components/ui/button";
+import { Empty } from "@/components/ui/empty";
 
 import { microcopy } from "../../constants/microcopy";
 import { reportError } from "../../utils/observability/sinks";
@@ -61,28 +64,30 @@ class ErrorBoundary extends React.Component<
         const { children, fallback } = this.props;
         if (!error) return children;
         if (fallback) return fallback(error, this.handleRetry);
-        // Wrap the AntD `Result` in a live region so screen readers
-        // announce the failure (Nielsen #1 — visibility of system
-        // status; WCAG 4.1.3 status messages). AntD's `Result` renders
-        // a styled card but no role="alert" of its own.
+        // Wrap the fallback in a live region so screen readers announce
+        // the failure (Nielsen #1 — visibility of system status; WCAG
+        // 4.1.3 status messages).
         return (
             <div aria-atomic="true" aria-live="assertive" role="alert">
-                <Result
-                    status="error"
-                    title={microcopy.feedback.renderFailed}
-                    subTitle={
-                        error.message || microcopy.feedback.renderFailedHint
-                    }
-                    extra={
-                        <Space wrap>
-                            <Button onClick={this.handleRetry} type="primary">
+                <Empty
+                    action={
+                        <div className="flex flex-wrap justify-center gap-xs">
+                            <Button
+                                onClick={this.handleRetry}
+                                variant="primary"
+                            >
                                 {microcopy.actions.retry}
                             </Button>
                             <Button onClick={this.handleReload}>
                                 {microcopy.feedback.reloadPage}
                             </Button>
-                        </Space>
+                        </div>
                     }
+                    description={
+                        error.message || microcopy.feedback.renderFailedHint
+                    }
+                    icon={<AlertCircle className="text-destructive" />}
+                    title={microcopy.feedback.renderFailed}
                 />
             </div>
         );

@@ -5,7 +5,7 @@ import {
     screen,
     waitFor
 } from "@testing-library/react";
-import { message as messageApi } from "antd";
+import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -18,8 +18,23 @@ import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
 import { aiLedgerActions } from "../../store/reducers/aiLedgerSlice";
 import { projectActions } from "../../store/reducers/projectModalSlice";
 import useActivityFeed from "../../utils/hooks/useActivityFeed";
+import useUndoToast from "../../utils/hooks/useUndoToast";
 
 import ProjectModal from ".";
+
+// The transient Undo toast routes through the out-of-scope, AntD-backed
+// `useUndoToast`. Mock it so this suite stays free of AntD's global message
+// container while still asserting the save flow raises the toast with the
+// right copy and a working inverse-mutation undo closure.
+jest.mock("../../utils/hooks/useUndoToast");
+
+interface UndoOptions {
+    description: string;
+    analyticsTag?: string;
+    undo: () => Promise<void>;
+}
+const showUndoToast = jest.fn();
+let lastUndoOptions: UndoOptions | null = null;
 
 const member = (overrides: Partial<IMember> = {}): IMember => ({
     _id: "member-1",
@@ -71,7 +86,7 @@ const silenceExpectedConsoleErrors = (expectedMessages: string[][]) => {
         });
 };
 
-const installAntdBrowserMocks = () => {
+const installBrowserMocks = () => {
     Object.defineProperty(window, "matchMedia", {
         writable: true,
         value: (query: string) => ({
@@ -98,6 +113,18 @@ const installAntdBrowserMocks = () => {
         writable: true,
         value: ResizeObserverMock
     });
+
+    // Radix Select drives its listbox with pointer-capture + scroll APIs
+    // jsdom doesn't ship; polyfill them so the manager picker can open.
+    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+    Element.prototype.releasePointerCapture = jest.fn();
+};
+
+const pickManager = async (name: string) => {
+    const menuUser = userEvent.setup();
+    await menuUser.click(screen.getByRole("combobox"));
+    await menuUser.click(await screen.findByRole("option", { name }));
 };
 
 const LocationProbe = () => {
@@ -147,7 +174,7 @@ describe("ProjectModal", () => {
     let consoleErrorSpy: jest.SpyInstance;
 
     beforeAll(() => {
-        installAntdBrowserMocks();
+        installBrowserMocks();
         consoleErrorSpy = silenceExpectedConsoleErrors([
             ["An update to", "null", "not wrapped in act"],
             ["An update to", "Field", "not wrapped in act"]
@@ -155,6 +182,13 @@ describe("ProjectModal", () => {
     });
 
     beforeEach(() => {
+        lastUndoOptions = null;
+        showUndoToast.mockReset();
+        showUndoToast.mockImplementation((options: UndoOptions) => {
+            lastUndoOptions = options;
+            return { dismiss: jest.fn() };
+        });
+        (useUndoToast as jest.Mock).mockReturnValue({ show: showUndoToast });
         store.dispatch(projectActions.closeModal());
         // Clear both slices so cross-test pollution from earlier
         // suites doesn't pre-populate the activity feed.
@@ -201,10 +235,6 @@ describe("ProjectModal", () => {
         act(() => {
             store.dispatch(activityFeedActions.clearActivityFeed());
             store.dispatch(aiLedgerActions.clearAiLedger());
-            // The Undo toast lives in a global AntD message container that
-            // outlives unmount (10 s window); tear it down so a leaked
-            // "Undo" button never bleeds into a sibling test's queries.
-            messageApi.destroy();
         });
     });
 
@@ -304,8 +334,7 @@ describe("ProjectModal", () => {
         fireEvent.change(screen.getByLabelText("Organization"), {
             target: { value: "Finance" }
         });
-        fireEvent.mouseDown(screen.getByRole("combobox"));
-        fireEvent.click(await screen.findByText("Alice"));
+        await pickManager("Alice");
         fireEvent.click(screen.getByRole("button", { name: "Create project" }));
 
         await waitFor(() =>
@@ -349,20 +378,23 @@ describe("ProjectModal", () => {
         fireEvent.change(screen.getByLabelText("Organization"), {
             target: { value: "Finance" }
         });
-        fireEvent.mouseDown(screen.getByRole("combobox"));
-        fireEvent.click(await screen.findByText("Alice"));
+        await pickManager("Alice");
         await act(async () => {
             fireEvent.click(
                 screen.getByRole("button", { name: "Create project" })
             );
         });
 
-        expect(
-            await screen.findByText(microcopy.feedback.projectCreated)
-        ).toBeInTheDocument();
-        const undoButton = await screen.findByRole("button", { name: "Undo" });
+        // The create flow raises the transient Undo toast with the created
+        // copy; its `undo` closure DELETEs the just-created project by id.
+        await waitFor(() => expect(showUndoToast).toHaveBeenCalledTimes(1));
+        expect(showUndoToast).toHaveBeenCalledWith(
+            expect.objectContaining({
+                description: microcopy.feedback.projectCreated
+            })
+        );
         await act(async () => {
-            fireEvent.click(undoButton);
+            await lastUndoOptions?.undo();
         });
 
         await waitFor(() => {
@@ -403,8 +435,7 @@ describe("ProjectModal", () => {
         fireEvent.change(screen.getByLabelText("Organization"), {
             target: { value: "Finance" }
         });
-        fireEvent.mouseDown(screen.getByRole("combobox"));
-        fireEvent.click(await screen.findByText("Alice"));
+        await pickManager("Alice");
         fireEvent.click(screen.getByRole("button", { name: "Create project" }));
 
         await waitFor(() =>
@@ -433,11 +464,13 @@ describe("ProjectModal", () => {
         await waitFor(() =>
             expect(screen.getByTestId("location")).toHaveTextContent("")
         );
-        // Modal stays force-rendered; the input still exists in the DOM but
-        // its value has been reset by the cancel handler.
-        expect(
-            (screen.getByLabelText("Project name") as HTMLInputElement).value
-        ).toBe("");
+        // The Radix Dialog unmounts on close, so the form leaves the DOM;
+        // reopening it (a fresh mount) starts from the reset initial values.
+        await waitFor(() =>
+            expect(
+                screen.queryByRole("dialog", { name: "Create project" })
+            ).not.toBeInTheDocument()
+        );
     });
 
     it("shows edit loading, populates the form, and updates the project", async () => {
@@ -465,7 +498,9 @@ describe("ProjectModal", () => {
         renderProjectModal({ type: "edit", id: "project-1" });
 
         await waitFor(() =>
-            expect(document.body.querySelector(".ant-spin")).toBeInTheDocument()
+            expect(
+                screen.getByText(microcopy.a11y.loadingProject)
+            ).toBeInTheDocument()
         );
         await act(async () => {
             resolveProject(response(project()));
@@ -510,33 +545,29 @@ describe("ProjectModal", () => {
             name: "Create project"
         });
         const body = dialog.querySelector(
-            ".ant-modal-body"
+            '[style*="keyboard-inset-height"]'
         ) as HTMLElement | null;
         expect(body).not.toBeNull();
         expect(body!.style.maxHeight).toMatch(/env\(keyboard-inset-height/);
         expect(body!.style.maxHeight).toMatch(/max\(/);
     });
 
-    it("stacks the phone footer Cancel → Save so the primary lands in the thumb zone", async () => {
+    it("stacks the footer Cancel → Create so the primary lands in the thumb zone", async () => {
         // Regression for QW-19 (docs/design/ui-ux-comprehensive-review-2026-05.md).
-        // The matchMedia mock returns `matches: false` so AntD resolves to
-        // phone mode. The footer must render Cancel above Save so the
-        // primary action is the bottom-most target a thumb can reach.
+        // The footer must render Cancel before Create in DOM order so the
+        // primary action is the bottom-most / right-most target — on phone
+        // the stacked column puts it in the thumb zone.
         renderProjectModal({ type: "open" });
         await screen.findByRole("dialog", { name: "Create project" });
 
-        const footerButtons = Array.from(
-            document.querySelectorAll(".ant-modal-footer button")
-        ) as HTMLButtonElement[];
-        const labels = footerButtons.map(
-            (btn) => btn.textContent?.trim() ?? ""
-        );
-        const cancelIdx = labels.findIndex((label) => /^cancel$/i.test(label));
-        const primaryIdx = labels.findIndex((label) =>
-            /^create project$/i.test(label)
-        );
-        expect(cancelIdx).toBeGreaterThanOrEqual(0);
-        expect(primaryIdx).toBeGreaterThan(cancelIdx);
+        const cancelButton = screen.getByRole("button", { name: /^cancel$/i });
+        const primaryButton = screen.getByRole("button", {
+            name: /^create project$/i
+        });
+        expect(
+            cancelButton.compareDocumentPosition(primaryButton) &
+                Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
     });
 
     it("surfaces a save error and keeps the modal open when PUT fails", async () => {

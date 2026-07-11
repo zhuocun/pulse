@@ -1,27 +1,25 @@
-import { CloseOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
-import {
-    Alert,
-    Button,
-    Input,
-    Select,
-    Skeleton,
-    Space,
-    Typography
-} from "antd";
+import { AlertCircle, Info, X } from "lucide-react";
 import React, { useCallback, useId, useMemo, useRef, useState } from "react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Typography } from "@/components/ui/typography";
+import { cn } from "@/lib/utils";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
 import { microcopy, microcopyString } from "../../constants/microcopy";
 import { useLocale } from "../../i18n";
-import {
-    fontWeight,
-    radius,
-    semantic,
-    space,
-    touchTargetCoarse
-} from "../../theme/tokens";
+import { fontWeight, space } from "../../theme/tokens";
 import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import {
     diffLines,
@@ -47,36 +45,14 @@ const srOnly: React.CSSProperties = {
     width: 1
 };
 
-const TouchButton = styled(Button)`
-    @media (pointer: coarse) {
-        min-height: ${touchTargetCoarse}px;
-    }
-`;
+const DIFF_ROW_BASE =
+    "px-xs py-[1px] font-mono text-[0.85em] whitespace-pre-wrap break-words";
 
-const TouchIconButton = styled(Button)`
-    @media (pointer: coarse) {
-        min-height: ${touchTargetCoarse}px;
-        min-width: ${touchTargetCoarse}px;
-    }
-`;
-
-const DiffRow = styled.div<{ $type: "context" | "added" | "removed" }>`
-    background: ${({ $type }) =>
-        $type === "added"
-            ? semantic.successBg
-            : $type === "removed"
-              ? semantic.errorBg
-              : "transparent"};
-    color: ${({ $type }) => ($type === "removed" ? semantic.error : "inherit")};
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.85em;
-    padding-block: 1px;
-    padding-inline: ${space.xs}px;
-    text-decoration: ${({ $type }) =>
-        $type === "removed" ? "line-through" : "none"};
-    white-space: pre-wrap;
-    word-break: break-word;
-`;
+const DIFF_ROW_TONE: Record<"context" | "added" | "removed", string> = {
+    context: "",
+    added: "bg-successBg",
+    removed: "bg-errorBg text-error line-through"
+};
 
 interface RewritePanelBodyProps {
     note: string;
@@ -182,12 +158,14 @@ const RewritePanelBody: React.FC<RewritePanelBodyProps> = ({
     const resultView = (() => {
         if (isStreaming && !result) {
             return (
-                <Skeleton
-                    active
+                <div
                     aria-label={microcopyString(microcopy.aiRewrite.rewriting)}
-                    paragraph={{ rows: 3 }}
-                    title={false}
-                />
+                    role="status"
+                >
+                    <Skeleton className="mb-xs h-4 w-full" />
+                    <Skeleton className="mb-xs h-4 w-full" />
+                    <Skeleton className="h-4 w-2/3" />
+                </div>
             );
         }
         if (!result) return null;
@@ -196,15 +174,15 @@ const RewritePanelBody: React.FC<RewritePanelBodyProps> = ({
             return (
                 <div
                     aria-label={microcopyString(microcopy.aiRewrite.diffLabel)}
+                    className="overflow-hidden rounded-sm"
                     role="group"
-                    style={{
-                        borderRadius: radius.sm,
-                        overflow: "hidden"
-                    }}
                 >
                     {lines.map((line, index) => (
-                        <DiffRow
-                            $type={line.type}
+                        <div
+                            className={cn(
+                                DIFF_ROW_BASE,
+                                DIFF_ROW_TONE[line.type]
+                            )}
                             key={`${line.type}-${index}-${line.text}`}
                         >
                             {line.type !== "context" ? (
@@ -221,7 +199,7 @@ const RewritePanelBody: React.FC<RewritePanelBodyProps> = ({
                                 </span>
                             ) : null}
                             {line.text.length > 0 ? line.text : "\u00A0"}
-                        </DiffRow>
+                        </div>
                     ))}
                 </div>
             );
@@ -243,43 +221,33 @@ const RewritePanelBody: React.FC<RewritePanelBodyProps> = ({
         <GlassPanel
             as="section"
             aria-label={microcopyString(microcopy.aiRewrite.panelAriaLabel)}
+            className="mt-xs rounded-md p-md"
             id={panelId}
             intensity="strong"
             onKeyDown={onKeyDown}
             tone="aurora"
-            style={{
-                borderRadius: radius.md,
-                marginBlockStart: space.xs,
-                padding: space.md
-            }}
         >
             <SrOnlyLive>
                 {isStreaming
                     ? microcopyString(microcopy.aiRewrite.streamingAnnouncement)
                     : ""}
             </SrOnlyLive>
-            <div
-                style={{
-                    alignItems: "center",
-                    display: "flex",
-                    gap: space.xs,
-                    justifyContent: "space-between",
-                    marginBlockEnd: space.sm
-                }}
-            >
-                <Space align="center" size={space.xs}>
+            <div className="mb-sm flex items-center justify-between gap-xs">
+                <span className="inline-flex items-center gap-xs">
                     <AiSparkleIcon aria-hidden />
                     <span style={{ fontWeight: fontWeight.semibold }}>
                         {microcopy.aiRewrite.panelTitle}
                     </span>
-                </Space>
-                <TouchIconButton
+                </span>
+                <Button
                     aria-label={microcopyString(microcopy.aiRewrite.closeAria)}
-                    icon={<CloseOutlined aria-hidden />}
+                    className="coarse:min-w-[44px]"
                     onClick={handleCancel}
-                    size="small"
-                    type="text"
-                />
+                    size="icon"
+                    variant="ghost"
+                >
+                    <X aria-hidden />
+                </Button>
             </div>
 
             <CopilotRemoteConsentNotice route="task-note" />
@@ -292,14 +260,26 @@ const RewritePanelBody: React.FC<RewritePanelBodyProps> = ({
                 {microcopy.aiRewrite.modeLabel}
             </Typography.Text>
             <Select
-                aria-label={microcopyString(microcopy.aiRewrite.modeSelectAria)}
-                autoFocus
-                data-testid="ai-rewrite-mode"
-                onChange={(value: RewriteMode) => setMode(value)}
-                options={modeOptions}
-                style={{ width: "100%" }}
+                onValueChange={(value) => setMode(value as RewriteMode)}
                 value={mode}
-            />
+            >
+                <SelectTrigger
+                    aria-label={microcopyString(
+                        microcopy.aiRewrite.modeSelectAria
+                    )}
+                    autoFocus
+                    data-testid="ai-rewrite-mode"
+                >
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    {modeOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
 
             {mode === "free" ? (
                 <div style={{ marginBlockStart: space.sm }}>
@@ -309,7 +289,7 @@ const RewritePanelBody: React.FC<RewritePanelBodyProps> = ({
                     >
                         {microcopy.aiRewrite.freePromptLabel}
                     </Typography.Text>
-                    <Input.TextArea
+                    <Textarea
                         aria-labelledby={`${panelId}-free-label`}
                         autoComplete="off"
                         data-testid="ai-rewrite-free-prompt"
@@ -334,16 +314,19 @@ const RewritePanelBody: React.FC<RewritePanelBodyProps> = ({
 
             {localUnsupportedMode ? (
                 <Alert
+                    className="my-sm"
                     data-testid="ai-rewrite-local-unsupported"
-                    message={microcopy.aiRewrite.localUnsupported}
-                    showIcon
-                    style={{ marginBlock: space.sm }}
-                    type="info"
-                />
+                    variant="info"
+                >
+                    <Info aria-hidden />
+                    <AlertTitle>
+                        {microcopy.aiRewrite.localUnsupported}
+                    </AlertTitle>
+                </Alert>
             ) : null}
 
             <div style={{ marginBlockStart: space.sm }}>
-                <TouchButton
+                <Button
                     data-testid="ai-rewrite-run"
                     disabled={
                         noteEmpty ||
@@ -353,33 +336,35 @@ const RewritePanelBody: React.FC<RewritePanelBodyProps> = ({
                     }
                     loading={isStreaming}
                     onClick={handleRewrite}
-                    type="primary"
+                    variant="primary"
                 >
                     {isStreaming
                         ? microcopy.aiRewrite.rewriting
                         : hasRun
                           ? microcopy.aiRewrite.regenerate
                           : microcopy.aiRewrite.rewriteButton}
-                </TouchButton>
+                </Button>
             </div>
 
             {error ? (
                 <Alert
-                    action={
+                    className="mt-sm"
+                    data-testid="ai-rewrite-error"
+                    variant="destructive"
+                >
+                    <AlertCircle aria-hidden />
+                    <AlertTitle>{microcopy.aiRewrite.errorTitle}</AlertTitle>
+                    <AlertDescription>
                         <Button
+                            className="h-auto p-0"
                             onClick={handleRewrite}
-                            size="small"
-                            type="link"
+                            size="sm"
+                            variant="link"
                         >
                             {microcopy.aiRewrite.regenerate}
                         </Button>
-                    }
-                    data-testid="ai-rewrite-error"
-                    message={microcopy.aiRewrite.errorTitle}
-                    showIcon
-                    style={{ marginBlockStart: space.sm }}
-                    type="error"
-                />
+                    </AlertDescription>
+                </Alert>
             ) : null}
 
             {resultView ? (
@@ -395,21 +380,21 @@ const RewritePanelBody: React.FC<RewritePanelBodyProps> = ({
                     </Typography.Text>
                     <div data-testid="ai-rewrite-result">{resultView}</div>
                     {!isStreaming && result ? (
-                        <Space style={{ marginBlockStart: space.sm }}>
-                            <TouchButton
+                        <div className="mt-sm flex flex-wrap gap-xs">
+                            <Button
                                 data-testid="ai-rewrite-accept"
                                 onClick={handleAccept}
-                                type="primary"
+                                variant="primary"
                             >
                                 {microcopy.aiRewrite.accept}
-                            </TouchButton>
-                            <TouchButton
+                            </Button>
+                            <Button
                                 data-testid="ai-rewrite-cancel"
                                 onClick={handleCancel}
                             >
                                 {microcopy.aiRewrite.cancel}
-                            </TouchButton>
-                        </Space>
+                            </Button>
+                        </div>
                     ) : null}
                 </div>
             ) : null}
@@ -465,21 +450,21 @@ const AiRewritePanel: React.FC<AiRewritePanelProps> = ({
     return (
         <div>
             <SrOnlyLive>{announcement}</SrOnlyLive>
-            <TouchButton
+            <Button
                 aria-controls={open ? panelId : undefined}
                 aria-expanded={open}
                 aria-label={microcopyString(microcopy.aiRewrite.openButtonAria)}
                 data-testid="ai-rewrite-open"
-                icon={<AiSparkleIcon aria-hidden />}
                 onClick={() => {
                     setAnnouncement("");
                     setOpen((prev) => !prev);
                 }}
                 ref={triggerRef}
-                size="small"
+                size="sm"
             >
+                <AiSparkleIcon aria-hidden />
                 {microcopy.aiRewrite.openButton}
-            </TouchButton>
+            </Button>
             {open ? (
                 <RewritePanelBody
                     note={note}

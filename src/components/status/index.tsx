@@ -1,31 +1,19 @@
-import styled from "@emotion/styled";
-import { Button, Spin, Typography } from "antd";
-
 import { microcopy } from "../../constants/microcopy";
-import { fontSize, fontWeight, space } from "../../theme/tokens";
+import { Button } from "../ui/button";
+import { Spinner } from "../ui/spinner";
+import { Text } from "../ui/typography";
 
-const FullPage = styled.div`
-    align-items: center;
-    color: var(--ant-color-text, rgba(15, 23, 42, 0.85));
-    display: flex;
-    flex-direction: column;
-    gap: ${space.md}px;
-    height: 100vh;
-    height: 100dvh;
-    justify-content: center;
-    padding: ${space.lg}px;
-    text-align: center;
-    width: 100%;
-`;
+const FULL_PAGE_CLASS =
+    "flex h-[100dvh] w-full flex-col items-center justify-center gap-md p-lg text-center text-foreground";
 
 const PageSpin: React.FC = () => {
     return (
-        <FullPage role="status" aria-live="polite">
-            <Spin size="large" aria-label={microcopy.a11y.loadingPage} />
-            <Typography.Text type="secondary">
+        <div className={FULL_PAGE_CLASS} role="status" aria-live="polite">
+            <Spinner size="lg" label={microcopy.a11y.loadingPage} />
+            <Text type="secondary">
                 {microcopy.empty.commandPalette.loading}
-            </Typography.Text>
-        </FullPage>
+            </Text>
+        </div>
     );
 };
 
@@ -34,22 +22,16 @@ const PageError: React.FC<{ error: Error | null; onRetry?: () => void }> = ({
     onRetry
 }) => {
     return (
-        <FullPage role="alert">
-            <Typography.Text
-                style={{
-                    fontSize: fontSize.lg,
-                    fontWeight: fontWeight.semibold
-                }}
-                type="danger"
-            >
+        <div className={FULL_PAGE_CLASS} role="alert">
+            <Text className="text-lg font-semibold" type="danger">
                 {error?.message || microcopy.feedback.loadFailed}
-            </Typography.Text>
+            </Text>
             {onRetry ? (
-                <Button onClick={onRetry} type="primary">
+                <Button onClick={onRetry} variant="primary">
                     {microcopy.actions.retry}
                 </Button>
             ) : null}
-        </FullPage>
+        </div>
     );
 };
 

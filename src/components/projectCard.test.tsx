@@ -1,14 +1,25 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe, toHaveNoViolations } from "jest-axe";
-import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 
+import { declaresTouchTarget } from "./ui/testHelpers";
 import useIsPhoneChrome from "../utils/hooks/useIsPhoneChrome";
 import useReducedMotion from "../utils/hooks/useReducedMotion";
 
 import ProjectCard from "./projectCard";
+
+/*
+ * Radix `DropdownMenu` drives its trigger with pointer-capture APIs jsdom
+ * doesn't ship; polyfill them so the row-actions menu can open under
+ * `userEvent`.
+ */
+const installBrowserMocks = () => {
+    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+    Element.prototype.releasePointerCapture = jest.fn();
+};
 
 /*
  * The card warms the board queries on hover/focus via
@@ -71,71 +82,6 @@ const stubRowWidth = (node: HTMLElement, width = 320): void => {
     );
 };
 
-type DropdownMenuItem = {
-    key?: string | number;
-    label?: ReactNode;
-    onClick?: () => void;
-    danger?: boolean;
-};
-
-type DropdownMockProps = {
-    children: ReactNode;
-    menu?: {
-        items?: DropdownMenuItem[];
-    };
-};
-
-/**
- * Lightweight Dropdown mock. The real AntD Dropdown attaches menu
- * items as `role="menuitem"` elements that invoke their `onClick` on
- * both pointer and keyboard activation; this mock mirrors the
- * minimum surface area the tests need:
- *
- *  - Render the trigger (children) untouched.
- *  - Render each `items[]` entry as a `role="menuitem"` button so the
- *    tests can assert keyboard activation (Enter / Space on a
- *    menuitem fires the wired `onClick`, exactly what the production
- *    Dropdown does at the rc-menu layer).
- *  - Wire the per-item `onClick` to the menuitem's `click` handler
- *    rather than calling the production AntD `MenuInfo` callback —
- *    the production handler only needs to fire on activation.
- *
- * Lets the suite assert the QW-rewire contract: each menuitem is a
- * single AT-readable element (no nested `<button>` wrapper anymore)
- * with its own activation handler, and Enter on the menuitem invokes
- * the wired callback.
- */
-jest.mock("antd", () => {
-    const actual = jest.requireActual("antd");
-    const React = jest.requireActual("react");
-
-    return {
-        ...actual,
-        Dropdown: ({ children, menu }: DropdownMockProps) =>
-            React.createElement(
-                "div",
-                { "data-testid": "project-card-actions-dropdown" },
-                children,
-                React.createElement(
-                    "div",
-                    { "data-testid": "dropdown-menu" },
-                    menu?.items?.map((item) =>
-                        React.createElement(
-                            "button",
-                            {
-                                key: item.key,
-                                onClick: item.onClick,
-                                role: "menuitem",
-                                type: "button"
-                            },
-                            item.label
-                        )
-                    )
-                )
-            )
-    };
-});
-
 const manager: IMember = {
     _id: "member-1",
     email: "alice@example.com",
@@ -151,6 +97,8 @@ const sampleProject: IProject = {
 };
 
 describe("ProjectCard", () => {
+    beforeAll(installBrowserMocks);
+
     const renderCard = (
         props?: Partial<React.ComponentProps<typeof ProjectCard>>
     ) => {
@@ -185,24 +133,22 @@ describe("ProjectCard", () => {
         expect(onLike).toHaveBeenCalledTimes(1);
     });
 
-    // Each menu entry now renders as a single AT-readable element
-    // (`role="menuitem"`) with no nested `<button>` wrapper. Clicking
-    // the menuitem fires the wired `onClick` directly — no more
-    // double-announce ("Edit · Edit roadmap") or stopPropagation
-    // gymnastics inside the label.
+    // Each menu entry renders as a single AT-readable `role="menuitem"`
+    // element (Radix `DropdownMenuItem`). Opening the overflow menu and
+    // clicking an item fires its wired `onSelect` — no double-announce or
+    // stopPropagation gymnastics inside the label.
     it("invokes onEdit from the row actions menu on click", async () => {
         const user = userEvent.setup();
         const { onEdit } = renderCard();
 
-        const dropdown = screen.getByTestId("project-card-actions-dropdown");
         await user.click(
-            within(dropdown).getByRole("button", {
+            screen.getByRole("button", {
                 name: /more actions for roadmap/i
             })
         );
 
         await user.click(
-            within(dropdown).getByRole("menuitem", { name: /^edit$/i })
+            await screen.findByRole("menuitem", { name: /^edit$/i })
         );
 
         expect(onEdit).toHaveBeenCalledTimes(1);
@@ -212,111 +158,55 @@ describe("ProjectCard", () => {
         const user = userEvent.setup();
         const { onDelete } = renderCard();
 
-        const dropdown = screen.getByTestId("project-card-actions-dropdown");
         await user.click(
-            within(dropdown).getByRole("button", {
+            screen.getByRole("button", {
                 name: /more actions for roadmap/i
             })
         );
 
         await user.click(
-            within(dropdown).getByRole("menuitem", { name: /^delete$/i })
+            await screen.findByRole("menuitem", { name: /^delete$/i })
         );
 
         expect(onDelete).toHaveBeenCalledTimes(1);
     });
 
-    // Keyboard activation: tabbing to a menuitem and pressing Enter
-    // must fire the wired handler. The new structure routes activation
-    // through the menuitem directly (no inner button to swallow the
-    // event), so Enter triggers `onEdit` without the previously needed
-    // `e.stopPropagation()` workaround.
+    // Keyboard activation: opening the menu and pressing Enter on a
+    // focused menuitem fires the wired handler. Radix routes activation
+    // through the menuitem's `onSelect` directly.
     it("invokes onEdit when Enter is pressed on the menuitem", async () => {
         const user = userEvent.setup();
         const { onEdit } = renderCard();
 
-        const editItem = within(
-            screen.getByTestId("project-card-actions-dropdown")
-        ).getByRole("menuitem", { name: /^edit$/i });
-
-        editItem.focus();
+        await user.click(
+            screen.getByRole("button", {
+                name: /more actions for roadmap/i
+            })
+        );
+        const editItem = await screen.findByRole("menuitem", {
+            name: /^edit$/i
+        });
+        act(() => editItem.focus());
         await user.keyboard("{Enter}");
 
         expect(onEdit).toHaveBeenCalledTimes(1);
     });
 
-    // WCAG 2.5.8 (Target Size, Minimum) requires interactive targets be at
-    // least 24×24 CSS px, with AAA at 44×44. The card's row-action cluster
-    // ("like" + "more actions") wraps AntD's inline `size="small"` icon
-    // buttons, which collapse to ~24 px by default — below the AAA target.
-    // The styled `ActionsCluster` lifts each `.ant-btn-sm` descendant to
-    // `min-height: 44px` / `min-width: 44px` under `@media (pointer: coarse)`
-    // so a thumb can land it. Walk the rendered stylesheet (same approach as
-    // `src/layouts/authLayout.test.tsx` for `AuthButton`) and assert the 44 px
-    // declaration is still emitted — a future style refactor that drops it
-    // below 44 must fail CI.
+    // WCAG 2.5.8 (Target Size, Minimum): the card's row-action cluster
+    // ("like" + "more actions") are `ui/Button` primitives, which thread the
+    // canonical `coarse:min-h-[44px]` touch-target token so a thumb can land
+    // them on touch. Assert the token is present on both controls — a
+    // refactor that drops it must fail CI.
     it("declares a touch-target height of at least 44 px (WCAG 2.5.8)", () => {
         renderCard();
-        // The styled `ActionsCluster` wraps both row-action buttons; grab it
-        // via the like control and walk up the ancestor chain looking for
-        // the nearest element that carries a bare `css-xxx` emotion class
-        // (skipping AntD's `css-var-root` / `css-dev-only-...` markers,
-        // which sit on every AntD descendant under its ConfigProvider).
         const likeButton = screen.getByRole("button", {
             name: /like roadmap/i
         });
-        const isEmotionToken = (tok: string) =>
-            /^css-[a-z0-9]{4,}$/i.test(tok) &&
-            !tok.startsWith("css-var-") &&
-            !tok.startsWith("css-dev-only-");
-        let cluster: HTMLElement | null = likeButton;
-        let styledCls: string | undefined;
-        while (cluster) {
-            styledCls = cluster.className
-                ?.toString()
-                .split(/\s+/)
-                .find(isEmotionToken);
-            if (styledCls) break;
-            cluster = cluster.parentElement;
-        }
-        expect(styledCls).toBeTruthy();
-
-        // Walk every stylesheet's rules — including nested rules inside
-        // `@media (pointer: coarse)` where the touch-target lift lives —
-        // and collect any `(min-)?height: <N>px` declaration on a rule
-        // that mentions the styled class. The descendant selector
-        // `.css-xxx .ant-btn-sm` keeps the same class token in the
-        // selector text, so the same anchor works.
-        const heights: number[] = [];
-        const visit = (rule: CSSRule) => {
-            if (rule instanceof CSSStyleRule) {
-                if (!styledCls || !rule.selectorText.includes(styledCls))
-                    return;
-                const re = /(?:^|[\s;{])(?:min-)?height:\s*(\d+(?:\.\d+)?)px/gi;
-                let m: RegExpExecArray | null = re.exec(rule.cssText);
-                while (m !== null) {
-                    heights.push(parseFloat(m[1] ?? "0"));
-                    m = re.exec(rule.cssText);
-                }
-            } else if ("cssRules" in rule) {
-                for (const child of Array.from(
-                    (rule as CSSGroupingRule).cssRules
-                )) {
-                    visit(child);
-                }
-            }
-        };
-        Array.from(document.styleSheets).forEach((sheet) => {
-            let rules: CSSRuleList;
-            try {
-                rules = sheet.cssRules;
-            } catch {
-                return;
-            }
-            for (const rule of Array.from(rules)) visit(rule);
+        const moreButton = screen.getByRole("button", {
+            name: /more actions for roadmap/i
         });
-
-        expect(heights).toContain(44);
+        expect(declaresTouchTarget(likeButton)).toBe(true);
+        expect(declaresTouchTarget(moreButton)).toBe(true);
     });
 
     // Prefetch-on-hover (ui-todo §2.A.7 / §9). Hovering / focusing the card
@@ -418,6 +308,8 @@ describe("ProjectCard", () => {
 /* -- Phone swipe-to-action ---------------------------------------------- */
 
 describe("ProjectCard — phone swipe-to-action", () => {
+    beforeAll(installBrowserMocks);
+
     const renderPhoneCard = (
         props?: Partial<React.ComponentProps<typeof ProjectCard>>
     ): {
@@ -527,26 +419,20 @@ describe("ProjectCard — phone swipe-to-action", () => {
         await user.click(screen.getByRole("button", { name: /like roadmap/i }));
         expect(onLike).toHaveBeenCalledTimes(1);
 
-        const dropdown = screen.getByTestId("project-card-actions-dropdown");
         await user.click(
-            within(dropdown).getByRole("menuitem", { name: /^delete$/i })
+            screen.getByRole("button", {
+                name: /more actions for roadmap/i
+            })
+        );
+        await user.click(
+            await screen.findByRole("menuitem", { name: /^delete$/i })
         );
         expect(onDelete).toHaveBeenCalledTimes(1);
     });
 
     it("has no axe violations in the phone-swipe render", async () => {
         const { container } = renderPhoneCard();
-        /*
-         * `aria-required-parent` is disabled: the file's lightweight
-         * Dropdown mock renders bare `role="menuitem"` buttons without the
-         * `role="menu"` parent the real AntD Dropdown supplies (it portals a
-         * proper menu), so the violation is a fixture artifact, not a defect
-         * in the swipe render under test. Every other rule (incl. the swipe
-         * panes' `aria-hidden`) is enforced.
-         */
-        const results = await axe(container, {
-            rules: { "aria-required-parent": { enabled: false } }
-        });
+        const results = await axe(container);
         expect(results).toHaveNoViolations();
     });
 });

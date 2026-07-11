@@ -5,21 +5,24 @@ import {
     screen,
     waitFor
 } from "@testing-library/react";
-import { App as AntdApp, message, notification } from "antd";
 import React from "react";
+
+import { message, resetToastersForTests, Toaster } from "@/components/ui/toast";
 
 import { microcopy } from "../../constants/microcopy";
 
 import SwUpdateToast from "./index";
 
 /**
- * The toast surfaces through AntD's notification API; we render it under
- * <AntdApp> so `App.useApp()` returns a real notification instance
- * connected to the DOM (the static `notification` import shares the
- * same internal queue, so we destroy it between tests for hygiene).
+ * The toast surfaces through the sonner-backed `message` seam; we mount
+ * our themed `<Toaster>` alongside the component so `message.*` stops
+ * no-op'ing and the toast renders into the DOM.
  */
 const Harness: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <AntdApp component={false}>{children}</AntdApp>
+    <>
+        <Toaster />
+        {children}
+    </>
 );
 
 interface MockRegistration {
@@ -31,9 +34,12 @@ const buildRegistration = (): MockRegistration => ({
 });
 
 describe("SwUpdateToast", () => {
+    beforeEach(() => {
+        resetToastersForTests();
+    });
+
     afterEach(async () => {
         act(() => {
-            notification.destroy();
             message.destroy();
         });
         await act(async () => {
@@ -52,7 +58,7 @@ describe("SwUpdateToast", () => {
                 />
             </Harness>
         );
-        // AntD opens its notification asynchronously; wait for it.
+        // The toast mounts asynchronously; wait for it.
         await waitFor(() => {
             expect(
                 screen.getByText(microcopy.swUpdate.title)

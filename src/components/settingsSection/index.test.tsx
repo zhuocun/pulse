@@ -79,19 +79,17 @@ describe("SettingsSection", () => {
 
         const header = screen.getByText("Appearance");
         expect(header).toBeInTheDocument();
-        // The uppercase look is a CSS transform; assert the declaration so
-        // the iOS grouped-table context label contract holds.
-        expect(header).toHaveStyle({ textTransform: "uppercase" });
+        // The uppercase look is a Tailwind utility; assert the class so the
+        // iOS grouped-table context label contract holds.
+        expect(header).toHaveClass("uppercase");
 
         expect(screen.getByText("Choose how Pulse looks.")).toBeInTheDocument();
 
         // The grouped container clips its rows so only the outer corners
-        // round — assert the rounding + clip are present.
+        // round (radius.lg) — assert the rounding + clip utilities.
         const group = slots(container)[0]?.parentElement as HTMLElement;
-        expect(group).toHaveStyle({ overflow: "hidden" });
-        // radius.lg (14) on the OUTER corners; clipping squares the inner
-        // row joints.
-        expect(group).toHaveStyle({ borderRadius: "14px" });
+        expect(group).toHaveClass("overflow-hidden");
+        expect(group).toHaveClass("rounded-lg");
     });
 
     it("omits the header and footer when not provided", () => {
@@ -146,7 +144,7 @@ describe("SettingsSection", () => {
         // The control row itself is not a link or a button shell.
         expect(row.tagName).toBe("DIV");
         // No disclosure chevron alongside a control.
-        expect(row.querySelector(".anticon")).toBeNull();
+        expect(row.querySelector("[data-chevron]")).toBeNull();
     });
 
     it("renders a `to` navigating row as a focusable link with an aria-hidden chevron", () => {
@@ -168,7 +166,7 @@ describe("SettingsSection", () => {
         expect(link).toHaveFocus();
 
         // Disclosure chevron present and hidden from the a11y tree.
-        const chevron = link.querySelector(".anticon");
+        const chevron = link.querySelector("[data-chevron]");
         expect(chevron).not.toBeNull();
         expect(chevron).toHaveAttribute("aria-hidden", "true");
     });
@@ -187,7 +185,7 @@ describe("SettingsSection", () => {
 
         const button = screen.getByRole("button", { name: /Manage/ });
         expect(button).toHaveAttribute("type", "button");
-        expect(button.querySelector(".anticon")).not.toBeNull();
+        expect(button.querySelector("[data-chevron]")).not.toBeNull();
 
         button.click();
         expect(onActivate).toHaveBeenCalledTimes(1);
@@ -208,7 +206,7 @@ describe("SettingsSection", () => {
         const button = screen.getByRole("button", { name: /Log out/ });
         expect(button).toHaveAttribute("type", "button");
         // Destructive actions read as a tinted label, not a drill-in.
-        expect(button.querySelector(".anticon")).toBeNull();
+        expect(button.querySelector("[data-chevron]")).toBeNull();
     });
 
     // W1-02 — a wide trailing control (the Theme / Language Segmented
@@ -228,15 +226,12 @@ describe("SettingsSection", () => {
         );
 
         const row = screen.getByTestId("settings-row-theme");
-        expect(row).toHaveStyle({ flexWrap: "wrap" });
+        expect(row).toHaveClass("flex-wrap");
 
         const iconSlot = screen.getByTestId("theme-icon")
             .parentElement as HTMLElement;
-        expect(iconSlot).toHaveStyle({
-            flexGrow: "0",
-            flexShrink: "0",
-            flexBasis: "auto"
-        });
+        // `flex-none` === `flex: 0 0 auto` — the icon slot never shrinks.
+        expect(iconSlot).toHaveClass("flex-none");
     });
 
     it("passes data-testid through on the row element", () => {

@@ -1,7 +1,4 @@
-import styled from "@emotion/styled";
-import { Drawer } from "antd";
-import { AnimatePresence, motion, useDragControls } from "framer-motion";
-import type { PanInfo } from "framer-motion";
+import { X } from "lucide-react";
 import React, {
     useCallback,
     useEffect,
@@ -13,53 +10,46 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { microcopy, microcopyString } from "../../constants/microcopy";
 import {
-    chromeInset,
-    radius,
-    touchTargetCoarse,
-    zIndex
-} from "../../theme/tokens";
+    Sheet as UISheet,
+    SheetClose as UISheetClose,
+    SheetContent as UISheetContent,
+    SheetFooter as UISheetFooter,
+    SheetHeader as UISheetHeader,
+    SheetTitle as UISheetTitle
+} from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
+
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useReducedMotion from "../../utils/hooks/useReducedMotion";
 
 import useFocusTrap from "./useFocusTrap";
 
 /**
- * Phase 6 Wave 3 — multi-detent bottom Sheet primitive.
+ * Multi-detent bottom Sheet primitive.
  *
  * Wraps three rendering branches behind a single React API:
  *
- *   1. Phone + motion-enabled → portal'd animated surface with three
- *      snap detents (peek / medium / large), a grabber handle, a
- *      glass-tinted scrim, drag-to-dismiss, Esc-to-close, and a
- *      focus trap that restores focus on unmount.
+ *   1. Phone + motion-enabled → portal'd surface with three snap detents
+ *      (peek / medium / large), a grabber handle, a scrim, drag-to-dismiss,
+ *      Esc-to-close, and a focus trap that restores focus on unmount. The
+ *      surface positions itself with a CSS `translateY` transform and
+ *      animates snap transitions with a token-timed CSS transition; the
+ *      scrim fades in via `tailwindcss-animate` (`animate-in fade-in-0`).
+ *      No `framer-motion`.
  *
- *   2. Phone + prefers-reduced-motion → AntD `<Drawer placement="bottom">`.
- *      The accessibility fallback; AntD owns chrome, focus trap, and
- *      mask. No grabber, no detent UI.
+ *   2. Phone + prefers-reduced-motion → the shadcn `<Sheet side="bottom">`
+ *      fallback. Radix owns chrome, focus trap, and scrim. No grabber, no
+ *      detent UI.
  *
- *   3. Desktop / tablet / `forceDrawerFallback` → AntD `<Drawer>` with
- *      the consumer-supplied `desktopPlacement` (right by default) +
- *      `desktopSize`. Same content, no animated branch.
+ *   3. Desktop / tablet / `forceDrawerFallback` → the shadcn `<Sheet>` with
+ *      the consumer-supplied `desktopPlacement` (right by default). Same
+ *      content, no animated branch.
  *
- * The prop surface is a strict superset of the AntD Drawer props the
- * three consumer surfaces (activityFeedDrawer, copilotDock,
- * taskDetailPanel) use today so the migration is a straight swap.
- *
- * Detent geometry consumes the `--ant-detent-*` CSS vars emitted by
- * `theme/palettes/cssVars` — `peek=96px`, `medium=50dvh`, `large=92dvh`.
- * Animation timing reads `--ant-motion-detent-snap` (360 ms) and
- * `--ant-easing-detent` (`cubic-bezier(0.32, 0.72, 0, 1)`). Reading
- * the vars at runtime keeps the source of truth in the cssVars file
- * (the Phase 6 Wave 1 test pins) — touching the TS detent token alone
- * would silently drift the Sheet behaviour from the design tokens.
- *
- * Drag-to-dismiss is wired through Framer Motion's `useDragControls`
- * so only the grabber initiates the drag; the body content stays
- * scrollable / tappable without intercepting horizontal swipe
- * gestures (this is the contract that lets `taskDetailPanel` keep
- * its sibling-swipe gesture when it migrates in a later wave).
+ * Detent geometry consumes the `--ant-detent-*` CSS vars — `peek=96px`,
+ * `medium=50dvh`, `large=92dvh`. Reading the vars at runtime keeps the
+ * source of truth in the cssVars layer.
  */
 
 export type SheetDetent = "peek" | "medium" | "large";
@@ -93,7 +83,8 @@ export interface SheetProps {
     mask?: boolean;
     /**
      * Whether clicking the scrim dismisses the sheet. Default `true`.
-     * AntD `<Drawer>` calls this `maskClosable`; we accept both names.
+     * The shadcn `<Sheet>` fallback calls this behavior "interact
+     * outside"; we accept both names.
      */
     maskClosable?: boolean;
     dismissOnScrimClick?: boolean;
@@ -101,9 +92,13 @@ export interface SheetProps {
     /** Default `true` on the animated branch. Ignored elsewhere. */
     showGrabber?: boolean;
 
-    /** Used by the desktop / fallback `<Drawer>`. Default `right`. */
+    /** Used by the desktop / fallback `<Sheet>`. Default `right`. */
     desktopPlacement?: "right" | "bottom";
-    /** AntD `<Drawer>` `size` pass-through. Default `"default"`. */
+    /**
+     * Legacy AntD `<Drawer>` `size` pass-through. Retained for API
+     * compatibility but no longer drives width — the shadcn `<Sheet>`
+     * fallback owns a fixed edge width.
+     */
     desktopSize?: number | "default" | "large";
 
     /**
@@ -116,36 +111,25 @@ export interface SheetProps {
     ariaLabelledBy?: string;
     rootClassName?: string;
 
-    /** Mirror AntD `<Drawer>`'s `styles.body` slot. */
+    /** Mirror the `<Sheet>` body slot. */
     styles?: {
         body?: React.CSSProperties;
     };
 
-    /** Escape hatch — render the AntD Drawer fallback unconditionally. */
+    /** Escape hatch — render the shadcn `<Sheet>` fallback unconditionally. */
     forceDrawerFallback?: boolean;
 }
 
 /* -- Constants --------------------------------------------------------- */
 
-/*
- * Source the Sheet's stacking pair from the central `zIndex.drawer`
- * token rather than hard-coding 1000/1001. AntD's `<Drawer>` mask
- * + content both ride at `drawer` (1000), so any sibling AntD overlay
- * mounted concurrently would z-fight with a literal scrim value. Using
- * `zIndex.drawer` + 1 keeps the surface above the scrim in a single
- * stacking context while staying inside the same tier as Drawer for
- * the rest of the chrome ladder.
- */
-const Z_INDEX_SCRIM = zIndex.drawer;
-const Z_INDEX_SURFACE = zIndex.drawer + 1;
 const DEFAULT_DETENTS: readonly SheetDetent[] = ["medium", "large"];
-const SNAP_DURATION_S = 0.36;
-const SCRIM_DURATION_S = 0.22;
-const DETENT_EASE: [number, number, number, number] = [0.32, 0.72, 0, 1];
+/** Snap transition duration (ms) — mirrors `motion.detentSnap`. */
+const SNAP_DURATION_MS = 360;
+/** Sheet snap curve — mirrors `easing.detent`. */
+const DETENT_EASE_CSS = "cubic-bezier(0.32, 0.72, 0, 1)";
 /**
  * Velocity threshold (px/s) above which a downward fling overrides
- * the distance-based snap and triggers dismiss / step-down. Mirrors
- * Apple's UIKit `UISheetPresentationController` heuristics.
+ * the distance-based snap and triggers dismiss / step-down.
  */
 const DRAG_VELOCITY_DISMISS = 800;
 /** Drag distance fraction toward the next detent that triggers a snap. */
@@ -214,158 +198,6 @@ const detentExposedPx = (d: SheetDetent): number => {
     }
 };
 
-/* -- Styled surfaces --------------------------------------------------- */
-
-const Scrim = styled(motion.div)`
-    background: rgba(0, 0, 0, 0.4);
-    inset: 0;
-    position: fixed;
-    z-index: ${Z_INDEX_SCRIM};
-    /*
-     * The scrim is decorative — role="presentation" keeps it out of
-     * the a11y tree. We still register pointer-events so a click
-     * dismisses (when dismissOnScrimClick is on).
-     */
-    @media (forced-colors: active) {
-        background: rgba(0, 0, 0, 0.6);
-    }
-`;
-
-const Surface = styled(motion.div)`
-    background: var(--pulse-bg-page, #ffffff);
-    border-top: 1px solid var(--glass-border, rgba(15, 23, 42, 0.08));
-    border-radius: ${radius.lg}px ${radius.lg}px 0 0;
-    bottom: 0;
-    box-shadow: var(--ant-shadow-glass-lifted, 0 -8px 24px rgba(0, 0, 0, 0.16));
-    color: var(--ant-color-text, #0f172a);
-    display: flex;
-    flex-direction: column;
-    /*
-     * Surface height matches the "large" detent (92 dvh). Lower
-     * detents are achieved by translating the surface downward so
-     * only the configured "peek" / "medium" height remains visible.
-     * Sitting the surface on "bottom: 0" and translating Y means
-     * the bottom edge stays glued to the viewport bottom — the
-     * Apple "card snapped to the bottom" model.
-     */
-    height: 92dvh;
-    left: 0;
-    max-height: 92dvh;
-    position: fixed;
-    right: 0;
-    z-index: ${Z_INDEX_SURFACE};
-
-    @media (forced-colors: active) {
-        background: Canvas;
-        border-top: 1px solid CanvasText;
-    }
-`;
-
-const GrabberWrap = styled.div`
-    align-items: center;
-    cursor: grab;
-    display: flex;
-    flex: 0 0 auto;
-    justify-content: center;
-    padding: 8px 0 4px;
-    touch-action: none;
-
-    &:active {
-        cursor: grabbing;
-    }
-
-    /*
-     * The visible pill is only ~4px tall; pad the interactive drag
-     * target up to ${touchTargetCoarse}px on coarse pointers (WCAG
-     * 2.5.8 / Apple HIG) without growing the pill itself.
-     */
-    @media (pointer: coarse) {
-        min-height: ${touchTargetCoarse}px;
-    }
-`;
-
-const GrabberPill = styled.div`
-    background: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.5));
-    border-radius: 999px;
-    height: 4px;
-    opacity: 0.4;
-    width: 36px;
-`;
-
-const HeaderRow = styled.div`
-    align-items: center;
-    border-bottom: 1px solid var(--glass-border, rgba(15, 23, 42, 0.08));
-    display: flex;
-    flex: 0 0 auto;
-    gap: 8px;
-    justify-content: space-between;
-    padding: 8px 16px 12px;
-`;
-
-const TitleSlot = styled.div`
-    flex: 1 1 auto;
-    font-size: 16px;
-    font-weight: 600;
-    min-width: 0;
-`;
-
-const CloseButton = styled.button`
-    align-items: center;
-    background: transparent;
-    border: none;
-    border-radius: 999px;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-    cursor: pointer;
-    display: inline-flex;
-    height: 32px;
-    justify-content: center;
-    padding: 0;
-    width: 32px;
-
-    @media (pointer: coarse) {
-        height: 44px;
-        min-height: 44px;
-        min-width: 44px;
-        width: 44px;
-    }
-
-    &:hover {
-        background: var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.04));
-    }
-
-    &:focus-visible {
-        outline: 2px solid var(--ant-color-primary, #ea580c);
-        outline-offset: 1px;
-    }
-`;
-
-const Body = styled.div`
-    flex: 1 1 auto;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: ${chromeInset.mobile}px;
-    /*
-     * iOS Safari: the dvh-based height collapses to the visual
-     * viewport when the URL bar is visible, so we add a safe-area
-     * inset for the home indicator clearance to avoid swallowing
-     * the bottom 34 pt. The keyboard-inset-height term keeps bottom
-     * content clear of the on-screen keyboard when an input in the body
-     * is focused (matches the TaskModal / TaskDetailPanel footers).
-     */
-    padding-bottom: max(
-        ${chromeInset.mobile}px,
-        env(safe-area-inset-bottom),
-        env(keyboard-inset-height, 0px)
-    );
-`;
-
-const Footer = styled.div`
-    border-top: 1px solid var(--glass-border, rgba(15, 23, 42, 0.08));
-    flex: 0 0 auto;
-    padding: 12px 16px;
-    padding-bottom: max(12px, env(safe-area-inset-bottom));
-`;
-
 /* -- Internal: detent y math ------------------------------------------ */
 
 const orderDetents = (
@@ -393,11 +225,10 @@ const surfaceTranslateY = (d: SheetDetent, surfaceHeight: number): number =>
 
 /**
  * Inputs the drag-end decision needs. The component supplies these from
- * the live Framer Motion `PanInfo` + the ordered detent list it already
+ * the live pointer gesture + the ordered detent list it already
  * memoizes; the helper is otherwise pure so it can be unit-tested
  * without standing up a DOM or a pointer-event harness (jsdom can't run
- * Framer's pointer drag, which is what the original brief item G called
- * out).
+ * a real pointer drag).
  *
  * `detentOffsetsPx` is the y-translation each detent in `orderedDetents`
  * sits at — index-aligned. This shape avoids re-computing
@@ -510,6 +341,13 @@ interface AnimatedSheetProps {
     children: React.ReactNode;
 }
 
+interface DragState {
+    startY: number;
+    lastY: number;
+    lastT: number;
+    velocity: number;
+}
+
 const AnimatedSheet: React.FC<AnimatedSheetProps> = ({
     open,
     onClose,
@@ -543,6 +381,14 @@ const AnimatedSheet: React.FC<AnimatedSheetProps> = ({
         typeof window !== "undefined" ? window.innerHeight * 0.92 : 736
     );
 
+    // Slide-up-on-mount: start fully off-screen, flip to the active
+    // detent on the next frame so the CSS transition animates the
+    // entrance without framer-motion's AnimatePresence.
+    const [entered, setEntered] = useState(false);
+    const [dragOffset, setDragOffset] = useState(0);
+    const [isDragging, setIsDragging] = useState(false);
+    const dragStateRef = useRef<DragState | null>(null);
+
     useLayoutEffect(() => {
         const update = () => {
             setSurfaceHeight(
@@ -559,6 +405,11 @@ const AnimatedSheet: React.FC<AnimatedSheetProps> = ({
         return () => window.removeEventListener("resize", update);
     }, []);
 
+    useEffect(() => {
+        const raf = window.requestAnimationFrame(() => setEntered(true));
+        return () => window.cancelAnimationFrame(raf);
+    }, []);
+
     const orderedDetents = useMemo(
         () => orderDetents(detents.length > 0 ? detents : DEFAULT_DETENTS),
         [detents]
@@ -569,8 +420,6 @@ const AnimatedSheet: React.FC<AnimatedSheetProps> = ({
         () => surfaceTranslateY(activeDetent, surfaceHeight),
         [activeDetent, surfaceHeight]
     );
-
-    const dragControls = useDragControls();
 
     // Esc-to-close — single window listener while open.
     useEffect(() => {
@@ -597,17 +446,50 @@ const AnimatedSheet: React.FC<AnimatedSheetProps> = ({
         [activeDetent, detent, onDetentChange]
     );
 
+    const handleScrimClick = useCallback(() => {
+        const allowDismiss = dismissOnScrimClick ?? maskClosable;
+        if (allowDismiss) onClose();
+    }, [dismissOnScrimClick, maskClosable, onClose]);
+
     /**
-     * Decide what to do at drag-end by delegating to the pure
-     * `decideDragEnd` helper. The helper carries the threshold math and
-     * branch table; this thin wrapper packs the Framer Motion `PanInfo`
-     * + the current detent geometry into the helper's input shape and
-     * dispatches `setDetent` / `onClose` based on the tagged result. The
-     * split exists so the helper is unit-testable in jsdom (Framer's
-     * pointer drag can't run there — see `decideDragEnd` doc).
+     * Lightweight pointer drag on the grabber (framer-motion's
+     * `useDragControls` replacement). Tracks the live offset for the
+     * transform and estimates release velocity from the last sample so
+     * `decideDragEnd` — the same pure helper the unit tests exercise —
+     * makes the snap/dismiss call.
      */
-    const handleDragEnd = useCallback(
-        (_event: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
+    const startDrag = useCallback((event: React.PointerEvent<HTMLElement>) => {
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        dragStateRef.current = {
+            startY: event.clientY,
+            lastY: event.clientY,
+            lastT: event.timeStamp,
+            velocity: 0
+        };
+        setIsDragging(true);
+    }, []);
+
+    const moveDrag = useCallback((event: React.PointerEvent<HTMLElement>) => {
+        const drag = dragStateRef.current;
+        if (!drag) return;
+        const dt = event.timeStamp - drag.lastT;
+        if (dt > 0) {
+            drag.velocity = ((event.clientY - drag.lastY) / dt) * 1000;
+        }
+        drag.lastY = event.clientY;
+        drag.lastT = event.timeStamp;
+        setDragOffset(event.clientY - drag.startY);
+    }, []);
+
+    const endDrag = useCallback(
+        (event: React.PointerEvent<HTMLElement>) => {
+            const drag = dragStateRef.current;
+            event.currentTarget.releasePointerCapture?.(event.pointerId);
+            dragStateRef.current = null;
+            setIsDragging(false);
+            const offset = dragOffset;
+            setDragOffset(0);
+            if (!drag) return;
             const detentOffsetsPx = orderedDetents.map((d) =>
                 surfaceTranslateY(d, surfaceHeight)
             );
@@ -615,8 +497,8 @@ const AnimatedSheet: React.FC<AnimatedSheetProps> = ({
                 currentDetent: activeDetent,
                 orderedDetents,
                 detentOffsetsPx,
-                dragOffsetPx: info.offset.y,
-                velocityPx: info.velocity.y
+                dragOffsetPx: offset,
+                velocityPx: drag.velocity
             });
             if (decision.kind === "dismiss") {
                 onClose();
@@ -624,19 +506,14 @@ const AnimatedSheet: React.FC<AnimatedSheetProps> = ({
             }
             if (decision.to !== activeDetent) setDetent(decision.to);
         },
-        [activeDetent, onClose, orderedDetents, setDetent, surfaceHeight]
-    );
-
-    const handleScrimClick = useCallback(() => {
-        const allowDismiss = dismissOnScrimClick ?? maskClosable;
-        if (allowDismiss) onClose();
-    }, [dismissOnScrimClick, maskClosable, onClose]);
-
-    const startDrag = useCallback(
-        (event: React.PointerEvent<HTMLElement>) => {
-            dragControls.start(event, { snapToCursor: false });
-        },
-        [dragControls]
+        [
+            activeDetent,
+            dragOffset,
+            onClose,
+            orderedDetents,
+            setDetent,
+            surfaceHeight
+        ]
     );
 
     const fallbackLabelId = useId();
@@ -646,128 +523,113 @@ const AnimatedSheet: React.FC<AnimatedSheetProps> = ({
     // SSR / jsdom guard — `document.body` exists in jsdom, but bail
     // anyway if the import lands in a non-DOM environment.
     if (typeof document === "undefined") return null;
+    if (!open) return null;
+
+    const translateY = isDragging
+        ? Math.min(surfaceHeight, Math.max(0, activeY + dragOffset))
+        : entered
+          ? activeY
+          : surfaceHeight;
 
     return createPortal(
-        <AnimatePresence>
-            {open ? (
-                <div className={rootClassName} data-testid={dataTestid}>
-                    {mask ? (
-                        <Scrim
-                            data-testid={
-                                dataTestid
-                                    ? `${dataTestid}-scrim`
-                                    : "sheet-scrim"
-                            }
-                            role="presentation"
-                            onClick={handleScrimClick}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{
-                                duration: SCRIM_DURATION_S,
-                                ease: DETENT_EASE
-                            }}
-                        />
-                    ) : null}
-                    <Surface
-                        ref={surfaceRef}
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby={labelledById}
+        <div className={rootClassName} data-testid={dataTestid}>
+            {mask ? (
+                <div
+                    className="fixed inset-0 z-[1000] bg-black/40 animate-in fade-in-0 forced-colors:bg-black/60"
+                    data-testid={
+                        dataTestid ? `${dataTestid}-scrim` : "sheet-scrim"
+                    }
+                    onClick={handleScrimClick}
+                    role="presentation"
+                />
+            ) : null}
+            <div
+                aria-labelledby={labelledById}
+                aria-modal="true"
+                className="fixed inset-x-0 bottom-0 z-[1001] flex h-[92dvh] max-h-[92dvh] flex-col rounded-t-lg border-t border-glass-border bg-page text-page-text shadow-2xl forced-colors:bg-[Canvas]"
+                data-detent={activeDetent}
+                data-testid={
+                    dataTestid ? `${dataTestid}-surface` : "sheet-surface"
+                }
+                ref={surfaceRef}
+                role="dialog"
+                style={{
+                    transform: `translateY(${translateY}px)`,
+                    transition: isDragging
+                        ? "none"
+                        : `transform ${SNAP_DURATION_MS}ms ${DETENT_EASE_CSS}`
+                }}
+                tabIndex={-1}
+            >
+                {showGrabber ? (
+                    <div
+                        aria-hidden="true"
+                        className="flex flex-none cursor-grab touch-none items-center justify-center pb-1 pt-xs active:cursor-grabbing coarse:min-h-[44px]"
                         data-testid={
                             dataTestid
-                                ? `${dataTestid}-surface`
-                                : "sheet-surface"
+                                ? `${dataTestid}-grabber`
+                                : "sheet-grabber"
                         }
-                        data-detent={activeDetent}
-                        tabIndex={-1}
-                        drag="y"
-                        dragControls={dragControls}
-                        dragListener={false}
-                        dragConstraints={{ top: 0, bottom: surfaceHeight }}
-                        dragElastic={0.1}
-                        onDragEnd={handleDragEnd}
-                        initial={{ y: surfaceHeight }}
-                        animate={{ y: activeY }}
-                        exit={{ y: surfaceHeight }}
-                        transition={{
-                            duration: SNAP_DURATION_S,
-                            ease: DETENT_EASE
-                        }}
+                        onPointerCancel={endDrag}
+                        onPointerDown={startDrag}
+                        onPointerMove={moveDrag}
+                        onPointerUp={endDrag}
                     >
-                        {showGrabber ? (
-                            <GrabberWrap
+                        <div className="h-1 w-9 rounded-full bg-muted-foreground/40" />
+                    </div>
+                ) : null}
+                {title || closable ? (
+                    <div className="flex flex-none items-center justify-between gap-xs border-b border-glass-border px-md pb-sm pt-xs">
+                        {/*
+                         * Only stamp the resolved labelled-by id on the
+                         * title wrapper when the consumer did NOT supply
+                         * their own. If they did, their inner heading
+                         * already carries the id — reusing it would
+                         * produce a duplicate id in the DOM and fail axe.
+                         */}
+                        <div
+                            className="min-w-0 flex-1 text-md font-semibold"
+                            id={
+                                ariaLabelledBy === undefined
+                                    ? labelledById
+                                    : undefined
+                            }
+                        >
+                            {title}
+                        </div>
+                        {closable ? (
+                            <button
+                                aria-label={closeAriaLabel}
+                                className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary coarse:size-11 coarse:min-h-[44px] coarse:min-w-[44px]"
                                 data-testid={
                                     dataTestid
-                                        ? `${dataTestid}-grabber`
-                                        : "sheet-grabber"
+                                        ? `${dataTestid}-close`
+                                        : "sheet-close"
                                 }
-                                onPointerDown={startDrag}
-                                aria-hidden="true"
+                                onClick={onClose}
+                                type="button"
                             >
-                                <GrabberPill />
-                            </GrabberWrap>
+                                <X aria-hidden className="size-3.5" />
+                            </button>
                         ) : null}
-                        {title || closable ? (
-                            <HeaderRow>
-                                {/*
-                                 * Only stamp the resolved labelled-by id
-                                 * on the title wrapper when the consumer
-                                 * did NOT supply their own. If they did,
-                                 * their inner heading already carries the
-                                 * id — wrapping with the same id would
-                                 * produce a duplicate id in the DOM and
-                                 * fail jest-axe / WCAG. (P1.2)
-                                 */}
-                                <TitleSlot
-                                    id={
-                                        ariaLabelledBy === undefined
-                                            ? labelledById
-                                            : undefined
-                                    }
-                                >
-                                    {title}
-                                </TitleSlot>
-                                {closable ? (
-                                    <CloseButton
-                                        aria-label={closeAriaLabel}
-                                        data-testid={
-                                            dataTestid
-                                                ? `${dataTestid}-close`
-                                                : "sheet-close"
-                                        }
-                                        onClick={onClose}
-                                        type="button"
-                                    >
-                                        <svg
-                                            aria-hidden="true"
-                                            fill="none"
-                                            height="14"
-                                            stroke="currentColor"
-                                            strokeLinecap="round"
-                                            strokeWidth="2"
-                                            viewBox="0 0 14 14"
-                                            width="14"
-                                        >
-                                            <path d="M2 2 L12 12 M12 2 L2 12" />
-                                        </svg>
-                                    </CloseButton>
-                                ) : null}
-                            </HeaderRow>
-                        ) : null}
-                        <Body
-                            data-testid={
-                                dataTestid ? `${dataTestid}-body` : "sheet-body"
-                            }
-                            style={bodyStyles}
-                        >
-                            {children}
-                        </Body>
-                        {footer ? <Footer>{footer}</Footer> : null}
-                    </Surface>
+                    </div>
+                ) : null}
+                <div
+                    className="flex-1 overflow-y-auto overscroll-contain p-md [padding-bottom:max(theme(spacing.md),env(safe-area-inset-bottom),env(keyboard-inset-height,0px))]"
+                    data-testid={
+                        dataTestid ? `${dataTestid}-body` : "sheet-body"
+                    }
+                    style={bodyStyles}
+                >
+                    {children}
                 </div>
-            ) : null}
-        </AnimatePresence>,
+                {footer ? (
+                    <div className="flex-none border-t border-glass-border px-md py-sm [padding-bottom:max(theme(spacing.sm),env(safe-area-inset-bottom))]">
+                        {footer}
+                    </div>
+                ) : null}
+            </div>
+        </div>,
         document.body
     );
 };
@@ -791,7 +653,6 @@ const Sheet: React.FC<SheetProps> = ({
     dismissOnScrimClick,
     showGrabber = true,
     desktopPlacement = "right",
-    desktopSize = "default",
     "data-testid": dataTestid,
     "aria-labelledby": ariaLabelledByProp,
     ariaLabelledBy,
@@ -806,77 +667,86 @@ const Sheet: React.FC<SheetProps> = ({
         closeAriaLabel ?? microcopyString(microcopy.actions.close);
 
     if (!useAnimatedBranch) {
-        const placement = isPhone ? "bottom" : desktopPlacement;
+        const side = isPhone ? "bottom" : desktopPlacement;
         const resolvedAriaLabelledBy = ariaLabelledByProp ?? ariaLabelledBy;
+        // Only forward `aria-labelledby` when the caller supplied one —
+        // passing `undefined` would clobber Radix's automatic association
+        // with the rendered <SheetTitle>, leaving the dialog unnamed.
+        const labelledByProps = resolvedAriaLabelledBy
+            ? { "aria-labelledby": resolvedAriaLabelledBy }
+            : {};
         return (
-            <Drawer
-                closable={
-                    closable ? { "aria-label": resolvedCloseAriaLabel } : false
-                }
-                mask={mask}
-                maskClosable={maskClosable}
-                onClose={onClose}
+            <UISheet
                 open={open}
-                placement={placement}
-                rootClassName={rootClassName}
-                size={desktopSize}
-                styles={styles}
-                title={title}
-                footer={footer}
-                data-testid={dataTestid}
-                /*
-                 * Forward the consumer-supplied accessible name to the
-                 * underlying dialog so the AntD fallback retains the
-                 * same a11y contract as the animated branch. copilotDock
-                 * (a future Wave 3 migration) wires `aria-labelledby`
-                 * as its ONLY accessible name, so dropping it here would
-                 * silently strip the dialog's name on desktop /
-                 * reduced-motion / forceDrawerFallback. (P1.1)
-                 */
-                aria-labelledby={resolvedAriaLabelledBy}
-                /*
-                 * Honor `prefers-reduced-motion` by disabling AntD's
-                 * own slide / fade transitions. `rc-motion` (which AntD
-                 * Drawer routes its motion through) treats `null` as
-                 * "no motion" — passing `undefined` keeps the default
-                 * spring. Cast via `unknown` because AntD's type
-                 * declares the prop as `MotionProps | undefined` even
-                 * though `null` is the documented disable sentinel.
-                 * Mirrors taskDetailPanel's gating. (P2.1)
-                 */
-                motion={
-                    reducedMotion ? (null as unknown as undefined) : undefined
-                }
-                maskMotion={
-                    reducedMotion ? (null as unknown as undefined) : undefined
-                }
+                onOpenChange={(next) => {
+                    if (!next) onClose();
+                }}
             >
-                {children}
-            </Drawer>
+                <UISheetContent
+                    {...labelledByProps}
+                    className={cn("flex flex-col gap-0 p-0", rootClassName)}
+                    data-testid={dataTestid}
+                    hideClose
+                    // `maskClosable=false` mirrors AntD's masked-but-not-
+                    // dismissible drawer: block scrim / outside-click close
+                    // while Escape and the close button still dismiss.
+                    onInteractOutside={
+                        maskClosable
+                            ? undefined
+                            : (event) => event.preventDefault()
+                    }
+                    side={side}
+                >
+                    {title ? (
+                        <UISheetHeader className="border-b border-border px-lg py-md">
+                            <UISheetTitle>{title}</UISheetTitle>
+                        </UISheetHeader>
+                    ) : null}
+                    <div
+                        className="flex-1 overflow-y-auto p-lg"
+                        style={styles?.body}
+                    >
+                        {children}
+                    </div>
+                    {footer ? (
+                        <UISheetFooter className="border-t border-border px-lg py-md">
+                            {footer}
+                        </UISheetFooter>
+                    ) : null}
+                    {closable ? (
+                        <UISheetClose
+                            aria-label={resolvedCloseAriaLabel}
+                            className="absolute right-md top-md rounded-sm text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
+                        >
+                            <X aria-hidden className="size-4" />
+                        </UISheetClose>
+                    ) : null}
+                </UISheetContent>
+            </UISheet>
         );
     }
 
     // -- Branch 1: animated multi-detent surface ----------------------
     return (
         <AnimatedSheet
-            open={open}
-            onClose={onClose}
-            detent={detent}
-            defaultDetent={defaultDetent}
-            onDetentChange={onDetentChange}
-            detents={detents}
-            title={title}
-            footer={footer}
+            ariaLabelledBy={ariaLabelledByProp ?? ariaLabelledBy}
+            bodyStyles={styles?.body}
             closable={closable}
             closeAriaLabel={resolvedCloseAriaLabel}
+            dataTestid={dataTestid}
+            defaultDetent={defaultDetent}
+            detent={detent}
+            detents={detents}
+            dismissOnScrimClick={dismissOnScrimClick}
+            footer={footer}
             mask={mask}
             maskClosable={maskClosable}
-            dismissOnScrimClick={dismissOnScrimClick}
-            showGrabber={showGrabber}
-            dataTestid={dataTestid}
-            ariaLabelledBy={ariaLabelledByProp ?? ariaLabelledBy}
+            onClose={onClose}
+            onDetentChange={onDetentChange}
+            open={open}
             rootClassName={rootClassName}
-            bodyStyles={styles?.body}
+            showGrabber={showGrabber}
+            title={title}
         >
             {children}
         </AnimatedSheet>

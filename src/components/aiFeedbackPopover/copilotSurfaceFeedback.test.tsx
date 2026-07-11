@@ -1,16 +1,13 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+
+import { declaresTouchTarget } from "@/components/ui/testHelpers";
 
 import {
     ANALYTICS_EVENTS,
     setAnalyticsSink,
     type AnalyticsSink
 } from "../../constants/analytics";
-import {
-    coarseTouchTargetsFor,
-    ruleTextsFor,
-    styledClassFor
-} from "../../testUtils/styleRules";
 
 import AiCopilotSurfaceFeedback from "./copilotSurfaceFeedback";
 
@@ -95,15 +92,15 @@ describe("AiCopilotSurfaceFeedback", () => {
         );
 
         const group = screen.getByRole("group", { name: /rate suggestion/i });
-        const styledClass = styledClassFor(group);
-        expect(styledClass).toBeTruthy();
-
-        const ruleText = ruleTextsFor(styledClass ?? "").join("\n");
-        expect(ruleText).toContain("display: inline-flex");
-        expect(ruleText).toContain("flex-wrap: wrap");
-        const { heights, widths } = coarseTouchTargetsFor(styledClass ?? "");
-        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
-        expect(Math.max(...widths)).toBeGreaterThanOrEqual(44);
+        // The rail is a wrapping inline-flex row; the feedback buttons thread
+        // the canonical 44px coarse touch target from the Button primitive.
+        expect(group.className).toContain("inline-flex");
+        expect(group.className).toContain("flex-wrap");
+        const buttons = within(group).getAllByRole("button");
+        expect(buttons.length).toBeGreaterThan(0);
+        buttons.forEach((button) => {
+            expect(declaresTouchTarget(button)).toBe(true);
+        });
     });
 
     it("emits a 'down' analytics event with selected categories when feedback is submitted", async () => {

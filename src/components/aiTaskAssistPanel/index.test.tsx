@@ -13,10 +13,9 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { ANALYTICS_EVENTS, setAnalyticsSink } from "../../constants/analytics";
 import { store } from "../../store";
-import { mediaRuleTextsFor, styledClassFor } from "../../testUtils/styleRules";
 import AiTaskAssistPanel from ".";
 
-const installAntdMocks = () => {
+const installBrowserMocks = () => {
     Object.defineProperty(window, "matchMedia", {
         writable: true,
         value: () => ({
@@ -166,7 +165,7 @@ const advanceBy = (ms: number) => {
 
 describe("AiTaskAssistPanel", () => {
     beforeAll(() => {
-        installAntdMocks();
+        installBrowserMocks();
     });
 
     beforeEach(() => {
@@ -192,21 +191,20 @@ describe("AiTaskAssistPanel", () => {
         expect(onApplyStoryPoints).toHaveBeenCalledTimes(1);
     });
 
-    it("cross-fades the resolved estimate behind prefers-reduced-motion", async () => {
+    it("cross-fades the resolved estimate with the reveal animation", async () => {
         mountPanel();
         await waitFor(() =>
             expect(jest.getTimerCount()).toBeGreaterThanOrEqual(1)
         );
         advanceBy(1000);
         const reveal = await screen.findByTestId("ai-suggestion-reveal");
-        const cls = styledClassFor(reveal);
-        expect(cls).toBeTruthy();
-        // The reveal only animates under no-preference, so reduced-motion
-        // users get the instant skeleton→content swap with no drift.
-        const revealRules = mediaRuleTextsFor(cls ?? "", "no-preference").join(
-            "\n"
-        );
-        expect(revealRules).toContain("animation");
+        // The reveal rides the tailwindcss-animate `animate-in` fade/slide
+        // enter utility; the global `prefers-reduced-motion: reduce` rule in
+        // App.css silences it so reduced-motion users get the instant
+        // skeleton→content swap with no drift.
+        const revealClasses = reveal.className.split(/\s+/);
+        expect(revealClasses).toContain("animate-in");
+        expect(revealClasses).toContain("fade-in-0");
     });
 
     it("applies a readiness suggestion to the bound field", async () => {

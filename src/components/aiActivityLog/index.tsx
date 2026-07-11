@@ -1,23 +1,34 @@
-import { HistoryOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
-import {
-    Badge,
-    Button,
-    Drawer,
-    List,
-    Modal,
-    Popover,
-    Space,
-    Tooltip,
-    Typography
-} from "antd";
+import { History } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 
+import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger
+} from "@/components/ui/popover";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger
+} from "@/components/ui/tooltip";
+import { Typography } from "@/components/ui/typography";
+
 import { microcopy, microcopyString } from "../../constants/microcopy";
-import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
+import { fontSize } from "../../theme/tokens";
 import { formatRelativeTime } from "../../utils/formatRelativeTime";
 import useAiLedger, { type LedgerEntry } from "../../utils/hooks/useAiLedger";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
+import Sheet from "../sheet";
 
 /**
  * AI activity ledger pill + expandable list (Phase 4 A8).
@@ -34,86 +45,6 @@ import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
  * blocks the underlying input composer; the dock body is a flex column
  * and the pill sits between the tab pane and the composer.
  */
-
-const PillButton = styled.button`
-    align-items: center;
-    background: var(--ant-color-bg-elevated, rgba(255, 255, 255, 0.9));
-    border: 1px solid var(--ant-color-border, rgba(15, 23, 42, 0.1));
-    border-radius: ${radius.pill}px;
-    color: var(--ant-color-text, rgba(15, 23, 42, 0.85));
-    cursor: pointer;
-    display: inline-flex;
-    font-size: ${fontSize.xs}px;
-    font-weight: ${fontWeight.medium};
-    gap: ${space.xs}px;
-    /*
-     * Cap the height at 32 px so the pill never crowds the input
-     * composer mounted underneath inside the dock body. The composer
-     * keeps its own min-height; the pill stays well under the dock's
-     * footer breathing room.
-     */
-    max-height: 32px;
-    padding: 4px ${space.sm}px;
-    transition: background-color 120ms ease-in-out;
-    white-space: nowrap;
-
-    &:hover,
-    &:focus-visible {
-        background: var(--ant-color-bg-text-hover, rgba(0, 0, 0, 0.04));
-    }
-
-    &:focus-visible {
-        outline: 2px solid var(--ant-color-primary, #ea580c);
-        outline-offset: 2px;
-    }
-`;
-
-const ListWrapper = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xs}px;
-    /* Dynamic viewport unit keeps the log from jumping when the iOS Safari
-     * URL bar collapses. The vh declaration stays as a fallback. */
-    max-height: 60vh;
-    max-height: 60dvh;
-    min-width: 280px;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 0;
-`;
-
-const ListHeader = styled.div`
-    align-items: center;
-    display: flex;
-    justify-content: space-between;
-    padding-bottom: ${space.xs}px;
-`;
-
-const Row = styled.div`
-    align-items: flex-start;
-    display: flex;
-    gap: ${space.xs}px;
-    justify-content: space-between;
-    width: 100%;
-`;
-
-const RowMeta = styled.div`
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-`;
-
-const Description = styled(Typography.Text)`
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    line-clamp: 2;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    word-break: break-word;
-`;
 
 /*
  * Inline relative-time formatter. Delegates to the shared
@@ -137,14 +68,14 @@ interface LedgerListBodyProps {
     entries: LedgerEntry[];
     isRevertable: (id: string) => boolean;
     onRevert: (id: string) => Promise<void>;
-    onClear: () => void;
+    onRequestClearAll: () => void;
 }
 
 const LedgerListBody: React.FC<LedgerListBodyProps> = ({
     entries,
     isRevertable,
     onRevert,
-    onClear
+    onRequestClearAll
 }) => {
     const [reverting, setReverting] = useState<string | null>(null);
     /*
@@ -170,113 +101,113 @@ const LedgerListBody: React.FC<LedgerListBodyProps> = ({
         [onRevert]
     );
 
-    const handleClearAll = useCallback(() => {
-        Modal.confirm({
-            title: microcopyString(microcopy.aiActivityLog.clearConfirmTitle),
-            content: microcopyString(microcopy.aiActivityLog.clearConfirmBody),
-            okText: microcopyString(microcopy.aiActivityLog.clearConfirmOk),
-            cancelText: microcopyString(
-                microcopy.aiActivityLog.clearConfirmCancel
-            ),
-            onOk: () => onClear()
-        });
-    }, [onClear]);
-
     return (
-        <ListWrapper data-testid="ai-activity-log-list">
-            <ListHeader>
-                <Typography.Text strong style={{ fontSize: fontSize.sm }}>
-                    {microcopyString(microcopy.aiActivityLog.listTitle)}
-                </Typography.Text>
-                <Button
-                    onClick={handleClearAll}
-                    size="small"
-                    type="text"
-                    disabled={entries.length === 0}
-                >
-                    {microcopyString(microcopy.aiActivityLog.clearAll)}
-                </Button>
-            </ListHeader>
-            {entries.length === 0 ? (
-                <Typography.Paragraph style={{ margin: 0 }} type="secondary">
-                    {microcopyString(microcopy.aiActivityLog.emptyState)}
-                </Typography.Paragraph>
-            ) : (
-                <List
-                    dataSource={[...entries].reverse()}
-                    locale={{ emptyText: " " }}
-                    renderItem={(entry) => {
-                        const revertable = isRevertable(entry.id);
-                        const isBusy = reverting === entry.id;
-                        return (
-                            <List.Item
-                                key={entry.id}
-                                data-testid="ai-activity-log-row"
-                                data-entry-id={entry.id}
-                                style={{
-                                    paddingInline: 0
-                                }}
-                            >
-                                <Row>
-                                    <RowMeta>
-                                        <Tooltip
-                                            placement="top"
-                                            title={entry.description}
-                                        >
-                                            <Description>
-                                                {entry.description}
-                                            </Description>
-                                        </Tooltip>
-                                        <Typography.Text
-                                            style={{ fontSize: fontSize.xs }}
-                                            type="secondary"
-                                        >
-                                            {formatRelative(
-                                                entry.timestamp,
-                                                now
-                                            )}
-                                        </Typography.Text>
-                                    </RowMeta>
-                                    {revertable ? (
-                                        <Button
-                                            aria-label={microcopyString(
-                                                microcopy.aiActivityLog
-                                                    .revertAriaLabel
-                                            ).replace(
-                                                "{description}",
-                                                entry.description
-                                            )}
-                                            data-testid="ai-activity-log-revert"
-                                            loading={isBusy}
-                                            onClick={() =>
-                                                void handleRevert(entry.id)
-                                            }
-                                            size="small"
-                                        >
-                                            {microcopyString(
-                                                microcopy.aiActivityLog.revert
-                                            )}
-                                        </Button>
-                                    ) : (
-                                        <Tooltip
-                                            placement="left"
-                                            title={microcopyString(
-                                                microcopy.aiActivityLog
-                                                    .revertUnavailable
-                                            )}
-                                        >
-                                            <span aria-hidden>—</span>
-                                        </Tooltip>
-                                    )}
-                                </Row>
-                            </List.Item>
-                        );
-                    }}
-                    size="small"
-                    split={false}
-                />
-            )}
-        </ListWrapper>
+        <TooltipProvider>
+            <div
+                className="flex max-h-[60dvh] min-w-[280px] flex-col gap-xs overflow-y-auto [overscroll-behavior:contain]"
+                data-testid="ai-activity-log-list"
+            >
+                <div className="flex items-center justify-between pb-xs">
+                    <Typography.Text strong style={{ fontSize: fontSize.sm }}>
+                        {microcopyString(microcopy.aiActivityLog.listTitle)}
+                    </Typography.Text>
+                    <Button
+                        disabled={entries.length === 0}
+                        onClick={onRequestClearAll}
+                        size="sm"
+                        variant="ghost"
+                    >
+                        {microcopyString(microcopy.aiActivityLog.clearAll)}
+                    </Button>
+                </div>
+                {entries.length === 0 ? (
+                    <Typography.Paragraph
+                        style={{ margin: 0 }}
+                        type="secondary"
+                    >
+                        {microcopyString(microcopy.aiActivityLog.emptyState)}
+                    </Typography.Paragraph>
+                ) : (
+                    <ul className="m-0 flex list-none flex-col gap-xs p-0">
+                        {[...entries].reverse().map((entry) => {
+                            const revertable = isRevertable(entry.id);
+                            const isBusy = reverting === entry.id;
+                            return (
+                                <li
+                                    className="m-0 p-0"
+                                    data-entry-id={entry.id}
+                                    data-testid="ai-activity-log-row"
+                                    key={entry.id}
+                                >
+                                    <div className="flex w-full items-start justify-between gap-xs">
+                                        <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Typography.Text className="line-clamp-2 break-words">
+                                                        {entry.description}
+                                                    </Typography.Text>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="top">
+                                                    {entry.description}
+                                                </TooltipContent>
+                                            </Tooltip>
+                                            <Typography.Text
+                                                className="text-xs"
+                                                type="secondary"
+                                            >
+                                                {formatRelative(
+                                                    entry.timestamp,
+                                                    now
+                                                )}
+                                            </Typography.Text>
+                                        </div>
+                                        {revertable ? (
+                                            <Button
+                                                aria-label={microcopyString(
+                                                    microcopy.aiActivityLog
+                                                        .revertAriaLabel
+                                                ).replace(
+                                                    "{description}",
+                                                    entry.description
+                                                )}
+                                                data-testid="ai-activity-log-revert"
+                                                loading={isBusy}
+                                                onClick={() =>
+                                                    void handleRevert(entry.id)
+                                                }
+                                                size="sm"
+                                            >
+                                                {microcopyString(
+                                                    microcopy.aiActivityLog
+                                                        .revert
+                                                )}
+                                            </Button>
+                                        ) : (
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <span
+                                                        className="text-muted-foreground"
+                                                        aria-hidden
+                                                    >
+                                                        —
+                                                    </span>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="left">
+                                                    {microcopyString(
+                                                        microcopy.aiActivityLog
+                                                            .revertUnavailable
+                                                    )}
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        )}
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
+            </div>
+        </TooltipProvider>
     );
 };
 
@@ -284,6 +215,7 @@ const AiActivityLog: React.FC = () => {
     const { entries, revert, clear, isRevertable } = useAiLedger();
     const isPhone = useIsPhoneChrome();
     const [open, setOpen] = useState(false);
+    const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
     /*
      * Auto-close the surface when the list goes empty so the dock body
@@ -309,69 +241,115 @@ const AiActivityLog: React.FC = () => {
         ? microcopyString(microcopy.aiActivityLog.pillAriaExpanded)
         : microcopyString(microcopy.aiActivityLog.pillAriaCollapsed);
 
-    const pillButton = (
-        <PillButton
+    /*
+     * On desktop the pill is a Radix `PopoverTrigger` (`asChild`), which
+     * owns the open toggle — so we must NOT also attach our own onClick
+     * there or the two handlers would cancel each other out. On phone the
+     * pill drives the Sheet directly and takes an explicit onClick.
+     */
+    const renderPill = (onClick?: () => void) => (
+        <button
             aria-expanded={open}
             aria-label={pillAriaLabel}
+            className="inline-flex max-h-8 items-center gap-xs whitespace-nowrap rounded-pill border border-border bg-card px-sm py-[4px] text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             data-testid="ai-activity-log-pill"
-            onClick={() => setOpen((prev) => !prev)}
+            onClick={onClick}
             type="button"
         >
-            <Badge
-                color="var(--ant-color-primary, #ea580c)"
-                count={entries.length}
-                offset={[0, 0]}
-                size="small"
-                style={{ marginInlineEnd: 2 }}
-            >
-                <HistoryOutlined aria-hidden style={{ marginInlineEnd: 4 }} />
-            </Badge>
-            <Space size={4}>
-                <span>{pillLabel}</span>
-            </Space>
-        </PillButton>
+            <span className="relative inline-flex">
+                <History aria-hidden className="size-4" />
+                <span
+                    aria-hidden
+                    className="pointer-events-none absolute -right-[6px] -top-[6px] inline-flex min-w-4 items-center justify-center rounded-pill bg-primary px-[3px] text-[10px] font-semibold leading-4 text-primary-foreground"
+                >
+                    {entries.length}
+                </span>
+            </span>
+            <span>{pillLabel}</span>
+        </button>
     );
 
     const listBody = (
         <LedgerListBody
             entries={entries}
             isRevertable={isRevertable}
-            onClear={clear}
+            onRequestClearAll={() => setConfirmClearOpen(true)}
             onRevert={revert}
         />
+    );
+
+    const confirmDialog = (
+        <Dialog onOpenChange={setConfirmClearOpen} open={confirmClearOpen}>
+            <DialogContent className="max-w-sm">
+                <DialogHeader>
+                    <DialogTitle>
+                        {microcopyString(
+                            microcopy.aiActivityLog.clearConfirmTitle
+                        )}
+                    </DialogTitle>
+                    <DialogDescription>
+                        {microcopyString(
+                            microcopy.aiActivityLog.clearConfirmBody
+                        )}
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <Button
+                        onClick={() => setConfirmClearOpen(false)}
+                        variant="default"
+                    >
+                        {microcopyString(
+                            microcopy.aiActivityLog.clearConfirmCancel
+                        )}
+                    </Button>
+                    <Button
+                        onClick={() => {
+                            clear();
+                            setConfirmClearOpen(false);
+                        }}
+                        variant="primary"
+                    >
+                        {microcopyString(
+                            microcopy.aiActivityLog.clearConfirmOk
+                        )}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 
     if (isPhone) {
         return (
             <div data-testid="ai-activity-log">
-                {pillButton}
-                <Drawer
+                {renderPill(() => setOpen((prev) => !prev))}
+                <Sheet
                     closable
                     data-testid="ai-activity-log-drawer"
+                    desktopPlacement="bottom"
                     onClose={() => setOpen(false)}
                     open={open}
-                    placement="bottom"
-                    size="default"
                     title={microcopyString(microcopy.aiActivityLog.listTitle)}
                 >
                     {listBody}
-                </Drawer>
+                </Sheet>
+                {confirmDialog}
             </div>
         );
     }
 
     return (
         <div data-testid="ai-activity-log">
-            <Popover
-                content={listBody}
-                onOpenChange={setOpen}
-                open={open}
-                overlayStyle={{ maxWidth: 360 }}
-                placement="topLeft"
-                trigger="click"
-            >
-                {pillButton}
+            <Popover onOpenChange={setOpen} open={open}>
+                <PopoverTrigger asChild>{renderPill()}</PopoverTrigger>
+                <PopoverContent
+                    align="start"
+                    className="w-[360px] max-w-[360px]"
+                    side="top"
+                >
+                    {listBody}
+                </PopoverContent>
             </Popover>
+            {confirmDialog}
         </div>
     );
 };

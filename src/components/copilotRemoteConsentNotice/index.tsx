@@ -1,9 +1,11 @@
-import { Alert, Button, Space } from "antd";
+import { AlertTriangle } from "lucide-react";
 import React from "react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
-import { space as themeSpace } from "../../theme/tokens";
 import {
     acknowledgeRemoteAi,
     useRemoteAiConsent
@@ -56,29 +58,24 @@ const CopilotRemoteConsentNotice: React.FC<CopilotRemoteConsentNoticeProps> = ({
     const onAccept = () => {
         acknowledgeRemoteAi(baseUrl);
     };
-    const description = (
-        <>
-            <p style={{ margin: 0 }}>{body}</p>
-            <Space size={themeSpace.xs} style={{ marginTop: themeSpace.xs }}>
-                <CopilotPrivacyPopover
-                    label={microcopy.ai.remoteConsentLearnMore}
-                    placement="bottomRight"
-                    route={route}
-                />
-                <Button onClick={onAccept} size="small" type="primary">
-                    {microcopy.ai.remoteConsentAccept}
-                </Button>
-            </Space>
-        </>
-    );
     return (
-        <Alert
-            description={description}
-            message={microcopy.ai.remoteConsentTitle}
-            showIcon
-            style={{ marginBottom: themeSpace.sm }}
-            type="warning"
-        />
+        <Alert className="mb-sm" variant="warning">
+            <AlertTriangle aria-hidden />
+            <AlertTitle>{microcopy.ai.remoteConsentTitle}</AlertTitle>
+            <AlertDescription>
+                <p className="m-0">{body}</p>
+                <div className="mt-xs flex flex-wrap items-center gap-xs">
+                    <CopilotPrivacyPopover
+                        label={microcopy.ai.remoteConsentLearnMore}
+                        placement="bottomRight"
+                        route={route}
+                    />
+                    <Button onClick={onAccept} size="sm" variant="primary">
+                        {microcopy.ai.remoteConsentAccept}
+                    </Button>
+                </div>
+            </AlertDescription>
+        </Alert>
     );
 };
 

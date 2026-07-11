@@ -1,11 +1,21 @@
-import styled from "@emotion/styled";
-import { Button, Space, Table, Tag, Typography } from "antd";
 import React, { useEffect, useRef, useState } from "react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow
+} from "@/components/ui/table";
+import { Typography } from "@/components/ui/typography";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import { microcopy, microcopyString } from "../../constants/microcopy";
 import type { MutationProposal, TaskUpdate } from "../../interfaces/agent";
-import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
+import { fontSize, fontWeight } from "../../theme/tokens";
 import useAiLedger from "../../utils/hooks/useAiLedger";
 import useHaptic from "../../utils/hooks/useHaptic";
 import CopilotChip, { type CopilotChipTone } from "../copilotChip";
@@ -19,50 +29,6 @@ import SuccessSparkle from "../successSparkle";
  * `agent.resume({ accepted })` call so they can also clear local state
  * (e.g. close the drawer or focus the next pending proposal).
  */
-const Wrap = styled.div`
-    background: var(--color-copilot-bg-subtle);
-    border: 1px solid var(--color-copilot-bg-medium);
-    border-radius: ${radius.md}px;
-    margin: ${space.xs}px 0;
-    padding: ${space.sm}px;
-    /* Positioning context for the absolutely-positioned success sparkle
-     * burst the card overlays on its committed phase (Wave 8). */
-    position: relative;
-`;
-
-const Heading = styled.div`
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xs}px;
-    margin-bottom: ${space.xs}px;
-`;
-
-const FooterHint = styled.div`
-    color: var(--ant-color-text-secondary, #6b7280);
-    font-size: ${fontSize.xs}px;
-    margin-top: ${space.xs}px;
-`;
-
-const UndoBar = styled.div`
-    align-items: flex-start;
-    background: var(--ant-color-warning-bg, #fffbe6);
-    border: 1px solid var(--ant-color-warning-border, #ffe58f);
-    border-radius: ${radius.sm}px;
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xs}px;
-    margin-top: ${space.sm}px;
-    padding: ${space.xs}px ${space.sm}px;
-`;
-
-const UndoBarRow = styled.div`
-    align-items: center;
-    display: flex;
-    gap: ${space.xs}px;
-    width: 100%;
-`;
-
 interface MutationProposalCardProps {
     proposal: MutationProposal;
     onAccept: () => void;
@@ -449,8 +415,12 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
      * the card stays a `region` inside it.
      */
     return (
-        <Wrap role="region" aria-label={heading}>
-            <Heading>
+        <div
+            aria-label={heading}
+            className="relative my-xs rounded-md border border-[var(--color-copilot-bg-medium)] bg-[var(--color-copilot-bg-subtle)] p-sm"
+            role="region"
+        >
+            <div className="mb-xs flex flex-wrap items-center gap-xs">
                 <Typography.Text strong style={{ fontSize: fontSize.base }}>
                     {heading}
                 </Typography.Text>
@@ -458,62 +428,52 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                     {riskLabel(proposal.risk)}
                 </CopilotChip>
                 {proposal.undoable && phase === "idle" && (
-                    <Tag
-                        color="default"
+                    <Badge
                         style={{ fontWeight: fontWeight.medium }}
+                        variant="secondary"
                     >
                         {microcopy.mutation.undoable}
-                    </Tag>
+                    </Badge>
                 )}
-            </Heading>
+            </div>
             {rows.length > 0 && (
-                <Table
-                    columns={[
-                        {
-                            dataIndex: "field",
-                            key: "field",
-                            title: microcopy.mutation.diffColumns.field,
-                            width: 140
-                        },
-                        {
-                            dataIndex: "from",
-                            key: "from",
-                            title: microcopy.mutation.diffColumns.current,
-                            render: (value) => (
-                                <span
-                                    style={{
-                                        color: "var(--ant-color-error, #EF4444)"
-                                    }}
-                                >
-                                    {value}
-                                </span>
-                            )
-                        },
-                        {
-                            dataIndex: "to",
-                            key: "to",
-                            title: microcopy.mutation.diffColumns.proposed,
-                            render: (value) => (
-                                <span
-                                    style={{
-                                        color: "var(--ant-color-success, #10B981)"
-                                    }}
-                                >
-                                    {value}
-                                </span>
-                            )
-                        }
-                    ]}
-                    dataSource={rows}
-                    pagination={false}
-                    size="small"
-                />
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="w-[140px]">
+                                {microcopy.mutation.diffColumns.field}
+                            </TableHead>
+                            <TableHead>
+                                {microcopy.mutation.diffColumns.current}
+                            </TableHead>
+                            <TableHead>
+                                {microcopy.mutation.diffColumns.proposed}
+                            </TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {rows.map((row) => (
+                            <TableRow key={row.key}>
+                                <TableCell>{row.field}</TableCell>
+                                <TableCell className="text-error">
+                                    {row.from}
+                                </TableCell>
+                                <TableCell className="text-success">
+                                    {row.to}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
             )}
 
             {/* Countdown undo bar — shown while the 10-second window is open */}
             {phase === "countdown" && (
-                <UndoBar role="status">
-                    <UndoBarRow>
+                <div
+                    className="mt-sm flex flex-col items-start gap-xs rounded-sm border border-warning bg-warningBg px-sm py-xs"
+                    role="status"
+                >
+                    <div className="flex w-full items-center gap-xs">
                         <Typography.Text
                             style={{ flex: 1, fontSize: fontSize.sm }}
                         >
@@ -530,28 +490,21 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                                 String(countdown)
                             )}
                             onClick={handleCountdownUndo}
-                            size="small"
+                            size="sm"
                         >
                             {microcopy.mutation.undoCountdown.replace(
                                 "{seconds}",
                                 String(countdown)
                             )}
                         </Button>
-                    </UndoBarRow>
-                </UndoBar>
+                    </div>
+                </div>
             )}
 
             {/* Normal action row — hidden during countdown / after commit */}
             {phase === "idle" && (
                 <>
-                    <Space
-                        size={space.xs}
-                        style={{
-                            justifyContent: "flex-end",
-                            marginTop: space.sm
-                        }}
-                        wrap
-                    >
+                    <div className="mt-sm flex flex-wrap justify-end gap-xs">
                         <Button
                             aria-label={microcopy.a11y.rejectProposal}
                             disabled={isLoading}
@@ -563,14 +516,14 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                             aria-label={microcopy.a11y.acceptProposal}
                             loading={isLoading}
                             onClick={handleAccept}
-                            type="primary"
+                            variant="primary"
                         >
                             {applyVerbLabel(proposal)}
                         </Button>
-                    </Space>
-                    <FooterHint>
+                    </div>
+                    <div className="mt-xs text-xs text-muted-foreground">
                         {microcopy.mutation.undoAvailableAfterAccepting}
-                    </FooterHint>
+                    </div>
                 </>
             )}
 
@@ -596,14 +549,7 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
              * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
              */}
             {phase === "committed" && showCommittedUndo && (
-                <Space
-                    size={space.xs}
-                    style={{
-                        justifyContent: "flex-end",
-                        marginTop: space.sm
-                    }}
-                    wrap
-                >
+                <div className="mt-sm flex flex-wrap justify-end gap-xs">
                     <Button
                         aria-label={microcopy.mutation.undoAriaLabel}
                         disabled={isLoading}
@@ -611,9 +557,9 @@ const MutationProposalCard: React.FC<MutationProposalCardProps> = ({
                     >
                         {microcopy.mutation.undoLabel}
                     </Button>
-                </Space>
+                </div>
             )}
-        </Wrap>
+        </div>
     );
 };
 

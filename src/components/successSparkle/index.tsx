@@ -1,5 +1,3 @@
-import { keyframes } from "@emotion/react";
-import styled from "@emotion/styled";
 import React from "react";
 
 import { accent, easing, motion } from "../../theme/tokens";
@@ -12,7 +10,7 @@ import useReducedMotion from "../../utils/hooks/useReducedMotion";
  * (currently: an AI mutation proposal reaching its committed phase — see
  * `mutationProposalCard`). A handful of small dots scale up, translate
  * radially outward from the centre, and fade over roughly `motion.medium`.
- * Pure CSS keyframes via Emotion `styled` — NO confetti dependency.
+ * Pure CSS keyframes (a scoped `<style>` block) — NO confetti dependency.
  *
  * Decorative-only contract: the burst conveys NO information a screen
  * reader needs (the accept flow already owns its own status / ledger
@@ -30,12 +28,6 @@ import useReducedMotion from "../../utils/hooks/useReducedMotion";
 /** Number of sparkle dots in the burst. A handful — tasteful, not spam. */
 const PARTICLE_COUNT = 8;
 
-/**
- * Per-particle radial vector. Each dot translates from the centre out to
- * its `(x, y)` offset (px) while scaling up and fading. Eight evenly-ish
- * distributed directions read as a symmetric little pop without looking
- * mechanically radial.
- */
 interface ParticleVector {
     x: number;
     y: number;
@@ -59,7 +51,8 @@ const PARTICLE_VECTORS: readonly ParticleVector[] = [
  * properties supplying the radial vector so a single keyframes block
  * drives every dot (each one just sets its own end offset).
  */
-const burst = keyframes`
+const SPARKLE_KEYFRAMES = `
+@keyframes pulse-sparkle-burst {
     0% {
         opacity: 0;
         transform: translate(-50%, -50%) translate(0, 0) scale(0.2);
@@ -74,43 +67,7 @@ const burst = keyframes`
         transform: translate(-50%, -50%)
             translate(var(--sx), var(--sy)) scale(0.6);
     }
-`;
-
-/**
- * The overlay. Absolutely positioned, centred over the host (the host
- * MUST establish a positioning context — the card's `Wrap` is
- * `position: relative` for exactly this). Sits above the card content but
- * lets clicks fall through.
- */
-const Overlay = styled.div`
-    inset: 0;
-    overflow: visible;
-    pointer-events: none;
-    position: absolute;
-    z-index: 1;
-`;
-
-interface ParticleProps {
-    $vector: ParticleVector;
-}
-
-/**
- * A single sparkle dot. Anchored at the centre of the overlay; the
- * keyframes translate it out from there. The accent gradient ties the
- * burst to the AI surface palette (same hue family as `aiSparkleIcon`).
- */
-const Particle = styled.span<ParticleProps>`
-    --sx: ${(p) => p.$vector.x}px;
-    --sy: ${(p) => p.$vector.y}px;
-    animation: ${burst} ${motion.medium}ms ${easing.decelerate} forwards;
-    background: linear-gradient(135deg, ${accent.start}, ${accent.end});
-    border-radius: 50%;
-    height: 6px;
-    left: 50%;
-    position: absolute;
-    top: 50%;
-    width: 6px;
-`;
+}`;
 
 export interface SuccessSparkleProps {
     /**
@@ -133,11 +90,33 @@ const SuccessSparkle: React.FC<SuccessSparkleProps> = ({
     const reducedMotion = useReducedMotion();
     if (reducedMotion) return null;
     return (
-        <Overlay aria-hidden data-testid={dataTestid}>
-            {Array.from({ length: PARTICLE_COUNT }).map((_, index) => (
-                <Particle $vector={PARTICLE_VECTORS[index]} key={index} />
-            ))}
-        </Overlay>
+        <>
+            <style>{SPARKLE_KEYFRAMES}</style>
+            <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 z-[1] overflow-visible"
+                data-testid={dataTestid}
+            >
+                {PARTICLE_VECTORS.slice(0, PARTICLE_COUNT).map(
+                    (vector, index) => (
+                        // Particle wrappers are positional decoration around a
+                        // stable, ordered set; the index is the right identity.
+                        <span
+                            key={index}
+                            className="absolute left-1/2 top-1/2 size-[6px] rounded-full"
+                            style={
+                                {
+                                    "--sx": `${vector.x}px`,
+                                    "--sy": `${vector.y}px`,
+                                    animation: `pulse-sparkle-burst ${motion.medium}ms ${easing.decelerate} forwards`,
+                                    backgroundImage: `linear-gradient(135deg, ${accent.start}, ${accent.end})`
+                                } as React.CSSProperties
+                            }
+                        />
+                    )
+                )}
+            </div>
+        </>
     );
 };
 

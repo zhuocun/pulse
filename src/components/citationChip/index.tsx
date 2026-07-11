@@ -1,12 +1,17 @@
-import styled from "@emotion/styled";
-import { Button, Popover, Typography } from "antd";
 import React from "react";
+
+import { Button } from "@/components/ui/button";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger
+} from "@/components/ui/popover";
+import useAppMessage from "@/components/ui/toast";
+import { Typography } from "@/components/ui/typography";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import { microcopy } from "../../constants/microcopy";
 import type { CitationRef } from "../../interfaces/agent";
-import { space } from "../../theme/tokens";
-import useAppMessage from "../../utils/hooks/useAppMessage";
 import CopilotChip from "../copilotChip";
 
 /**
@@ -29,13 +34,6 @@ import CopilotChip from "../copilotChip";
  * outer margin remain citation-specific so the chip slots inline with body
  * text without floating off the baseline.
  */
-const PopoverBody = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xxs}px;
-    max-width: 18rem;
-`;
-
 interface CitationChipProps {
     /** 1-based index used for the visible label (`[1]`, `[2]`, …). */
     index: number;
@@ -104,71 +102,67 @@ const CitationChip: React.FC<CitationChipProps> = ({
      * the cited entity even though both affordances live in the same
      * overlay.
      */
-    const popoverContent = (
-        <PopoverBody>
-            <Typography.Text strong>
-                {getSourceLabel(citation.source)} · {citation.id}
-            </Typography.Text>
-            <Typography.Text>“{citation.quote}”</Typography.Text>
-            <Button
-                aria-label={microcopy.ai.citationFlagAction}
-                disabled={flagged}
-                onClick={handleFlag}
-                size="small"
-                style={{
-                    marginTop: 4,
-                    paddingInline: 0
-                }}
-                type="link"
-            >
-                {flagged
-                    ? microcopy.ai.citationFlagConfirm
-                    : microcopy.ai.citationFlagAction}
-            </Button>
-        </PopoverBody>
-    );
     return (
-        <Popover
-            content={popoverContent}
-            placement="top"
-            /*
+        <Popover>
+            {/*
              * Click-only trigger (QW#7): hover would re-introduce the
              * keyboard / touch reachability bug, focus would auto-open
              * the popover on tab-through and read the quote into the
-             * screen reader stream mid-document (the same issue we just
-             * silenced on AiSuggestedBadge in QW#12). The chip already
+             * screen reader stream mid-document. The chip already
              * forwards Enter / Space via `interactive` → `role=button`,
              * so keyboard activation still toggles the popover.
-             */
-            trigger="click"
-        >
-            <CopilotChip
-                aria-label={microcopy.ai.citationAriaLabel
-                    .replace("{index}", String(index))
-                    .replace("{source}", getSourceLabel(citation.source))
-                    .replace("{id}", citation.id)}
-                compact
-                interactive={navigable}
-                onClick={handleActivate}
-                onKeyDown={onKeyDown}
-                /*
-                 * Non-navigable chips are inline `[n]` markers, not aside
-                 * document sections — `role="note"` (an aside landmark)
-                 * misrepresents them. `role="img"` pairs with the existing
-                 * `aria-label` so the chip surfaces a single self-contained
-                 * accessible name instead of leaking the `[n]` glyph as
-                 * separate text. The navigable branch keeps `role="button"`.
-                 */
-                role={navigable ? "button" : "img"}
-                style={{
-                    margin: "0 2px",
-                    verticalAlign: "super"
-                }}
-                tabIndex={navigable ? 0 : -1}
-                variant="citation"
+             */}
+            <PopoverTrigger asChild>
+                <CopilotChip
+                    aria-label={microcopy.ai.citationAriaLabel
+                        .replace("{index}", String(index))
+                        .replace("{source}", getSourceLabel(citation.source))
+                        .replace("{id}", citation.id)}
+                    compact
+                    interactive={navigable}
+                    onClick={handleActivate}
+                    onKeyDown={onKeyDown}
+                    /*
+                     * Non-navigable chips are inline `[n]` markers, not
+                     * aside document sections — `role="note"` (an aside
+                     * landmark) misrepresents them. `role="img"` pairs with
+                     * the existing `aria-label` so the chip surfaces a
+                     * single self-contained accessible name instead of
+                     * leaking the `[n]` glyph as separate text. The
+                     * navigable branch keeps `role="button"`.
+                     */
+                    role={navigable ? "button" : "img"}
+                    style={{
+                        margin: "0 2px",
+                        verticalAlign: "super"
+                    }}
+                    tabIndex={navigable ? 0 : -1}
+                    variant="citation"
+                >
+                    [{index}]
+                </CopilotChip>
+            </PopoverTrigger>
+            <PopoverContent
+                aria-label={getSourceLabel(citation.source)}
+                className="flex w-72 max-w-[18rem] flex-col gap-xxs"
+                side="top"
             >
-                [{index}]
-            </CopilotChip>
+                <Typography.Text strong>
+                    {getSourceLabel(citation.source)} · {citation.id}
+                </Typography.Text>
+                <Typography.Text>“{citation.quote}”</Typography.Text>
+                <Button
+                    aria-label={microcopy.ai.citationFlagAction}
+                    className="mt-xxs h-auto justify-start p-0"
+                    disabled={flagged}
+                    onClick={handleFlag}
+                    variant="link"
+                >
+                    {flagged
+                        ? microcopy.ai.citationFlagConfirm
+                        : microcopy.ai.citationFlagAction}
+                </Button>
+            </PopoverContent>
         </Popover>
     );
 };

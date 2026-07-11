@@ -1,6 +1,4 @@
-import { CheckOutlined, HistoryOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
-import { Badge, Button, Empty, Typography } from "antd";
+import { Check, History } from "lucide-react";
 import React, {
     useCallback,
     useEffect,
@@ -9,14 +7,13 @@ import React, {
     useState
 } from "react";
 
+import { Button } from "@/components/ui/button";
+import { Empty } from "@/components/ui/empty";
+import { Typography } from "@/components/ui/typography";
+import { cn } from "@/lib/utils";
+
 import { microcopy, microcopyString } from "../../constants/microcopy";
-import {
-    fontSize,
-    fontWeight,
-    radius,
-    space,
-    touchTargetCoarse
-} from "../../theme/tokens";
+import { space } from "../../theme/tokens";
 import { formatRelativeTime } from "../../utils/formatRelativeTime";
 import useActivityFeed, {
     type ActivityEvent
@@ -56,87 +53,6 @@ import Sheet from "../sheet";
  * which has its own lifecycle.
  */
 const UNDO_WINDOW_MS = 10_000;
-
-const DrawerHeader = styled.div`
-    align-items: center;
-    display: flex;
-    gap: ${space.xs}px;
-    justify-content: space-between;
-    padding-bottom: ${space.xs}px;
-`;
-
-const GroupHeading = styled(Typography.Text)`
-    && {
-        color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.5));
-        font-size: ${fontSize.xs}px;
-        font-weight: ${fontWeight.semibold};
-    }
-`;
-
-const GroupList = styled.ul`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xxs}px;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-`;
-
-const GroupSection = styled.section`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xs}px;
-    margin-top: ${space.md}px;
-
-    &:first-of-type {
-        margin-top: 0;
-    }
-`;
-
-const Row = styled.li<{ $unread: boolean }>`
-    align-items: flex-start;
-    background: ${({ $unread }) =>
-        $unread
-            ? "var(--ant-color-primary-bg, rgba(234, 88, 12, 0.06))"
-            : "transparent"};
-    border-radius: ${radius.md}px;
-    display: flex;
-    gap: ${space.xs}px;
-    padding: ${space.xs}px ${space.sm}px;
-`;
-
-const RowIcon = styled.span`
-    align-items: center;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-    display: inline-flex;
-    flex: 0 0 auto;
-    font-size: ${fontSize.md}px;
-    height: 24px;
-    justify-content: center;
-    width: 24px;
-`;
-
-const RowBody = styled.div`
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-`;
-
-const RowSummary = styled(Typography.Text)`
-    && {
-        font-size: ${fontSize.sm}px;
-        word-break: break-word;
-    }
-`;
-
-const RowMeta = styled(Typography.Text)`
-    && {
-        color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45));
-        font-size: ${fontSize.xs}px;
-    }
-`;
 
 /**
  * Localized relative-time formatter. Delegates to the shared
@@ -282,8 +198,8 @@ const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
 
     const body = (
         <div data-testid="activity-feed-drawer-body">
-            <DrawerHeader>
-                <Typography.Text strong style={{ fontSize: fontSize.sm }}>
+            <div className="flex items-center justify-between gap-xs pb-xs">
+                <Typography.Text className="text-sm" strong>
                     {drawerTitle}
                 </Typography.Text>
                 <Button
@@ -292,40 +208,47 @@ const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
                     )}
                     data-testid="activity-feed-mark-all-read"
                     disabled={events.every((event) => event.isRead)}
-                    icon={<CheckOutlined aria-hidden />}
                     onClick={markAllRead}
-                    size="small"
-                    type="text"
+                    size="sm"
+                    variant="ghost"
                 >
+                    <Check aria-hidden />
                     {microcopyString(microcopy.activityFeed.markAllRead)}
                 </Button>
-            </DrawerHeader>
+            </div>
             {events.length === 0 ? (
                 <Empty
                     data-testid="activity-feed-empty"
                     description={microcopyString(microcopy.activityFeed.empty)}
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
                 />
             ) : (
                 BUCKET_ORDER.map((bucket) => {
                     const list = buckets.get(bucket);
                     if (!list || list.length === 0) return null;
                     return (
-                        <GroupSection
+                        <section
+                            className="mt-md flex flex-col gap-xs first-of-type:mt-0"
                             key={bucket}
                             data-testid={`activity-feed-group-${bucket}`}
                         >
-                            <GroupHeading>{BUCKET_LABEL[bucket]}</GroupHeading>
-                            <GroupList>
+                            <Typography.Text className="text-xs font-semibold [color:var(--ant-color-text-tertiary,rgba(15,23,42,0.5))]">
+                                {BUCKET_LABEL[bucket]}
+                            </Typography.Text>
+                            <ul className="m-0 flex list-none flex-col gap-xxs p-0">
                                 {list.map((event) => {
                                     const inUndoWindow =
                                         now - event.timestamp <= UNDO_WINDOW_MS;
                                     const showUndo =
                                         isUndoable(event.id) && inUndoWindow;
                                     return (
-                                        <Row
+                                        <li
+                                            className={cn(
+                                                "flex items-start gap-xs rounded-md px-sm py-xs",
+                                                event.isRead
+                                                    ? "bg-transparent"
+                                                    : "[background:var(--ant-color-primary-bg,rgba(234,88,12,0.06))]"
+                                            )}
                                             key={event.id}
-                                            $unread={!event.isRead}
                                             data-testid="activity-feed-row"
                                             data-event-id={event.id}
                                             data-kind={event.kind}
@@ -333,22 +256,23 @@ const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
                                                 event.isRead ? "no" : "yes"
                                             }
                                         >
-                                            <RowIcon
+                                            <span
+                                                className="inline-flex size-6 flex-none items-center justify-center text-md [color:var(--ant-color-text-secondary,rgba(15,23,42,0.6))]"
                                                 data-testid={`activity-feed-icon-${event.kind}`}
                                             >
                                                 {KIND_ICON[event.kind]}
-                                            </RowIcon>
-                                            <RowBody>
-                                                <RowSummary>
+                                            </span>
+                                            <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
+                                                <Typography.Text className="text-sm break-words">
                                                     {event.summary}
-                                                </RowSummary>
-                                                <RowMeta>
+                                                </Typography.Text>
+                                                <Typography.Text className="text-xs [color:var(--ant-color-text-tertiary,rgba(15,23,42,0.45))]">
                                                     {formatRelative(
                                                         event.timestamp,
                                                         now
                                                     )}
-                                                </RowMeta>
-                                            </RowBody>
+                                                </Typography.Text>
+                                            </div>
                                             {showUndo ? (
                                                 <Button
                                                     aria-label={microcopyString(
@@ -364,8 +288,8 @@ const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
                                                             event.id
                                                         )
                                                     }
-                                                    size="small"
-                                                    type="text"
+                                                    size="sm"
+                                                    variant="ghost"
                                                 >
                                                     {microcopyString(
                                                         microcopy.activityFeed
@@ -373,11 +297,11 @@ const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
                                                     )}
                                                 </Button>
                                             ) : null}
-                                        </Row>
+                                        </li>
                                     );
                                 })}
-                            </GroupList>
-                        </GroupSection>
+                            </ul>
+                        </section>
                     );
                 })
             )}
@@ -411,11 +335,8 @@ const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
                 }
             }}
             title={
-                <span>
-                    <HistoryOutlined
-                        aria-hidden
-                        style={{ marginInlineEnd: 8 }}
-                    />
+                <span className="inline-flex items-center gap-xs">
+                    <History aria-hidden className="size-4" />
                     {drawerTitle}
                 </span>
             }
@@ -434,25 +355,6 @@ interface BellTriggerProps {
     unreadCount: number;
     onClick: () => void;
 }
-
-const BellButton = styled.button`
-    align-items: center;
-    background: transparent;
-    border: none;
-    border-radius: ${radius.md}px;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-    cursor: pointer;
-    display: inline-flex;
-    height: 36px;
-    justify-content: center;
-    padding: 0;
-    width: 36px;
-
-    @media (pointer: coarse) {
-        height: ${touchTargetCoarse}px;
-        width: ${touchTargetCoarse}px;
-    }
-`;
 
 /**
  * Bell-icon button used by the header. The accessible name follows the
@@ -474,24 +376,26 @@ export const ActivityFeedBell: React.FC<BellTriggerProps> = ({
                       : microcopy.activityFeed.bellAriaLabelOther
               ).replace("{count}", String(unreadCount));
     return (
-        <BellButton
+        <button
             aria-label={ariaLabel}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border-none bg-transparent p-0 cursor-pointer [color:var(--ant-color-text-secondary,rgba(15,23,42,0.65))] coarse:h-[44px] coarse:w-[44px]"
             data-testid="activity-feed-bell"
             onClick={onClick}
             type="button"
         >
-            <Badge
-                count={unreadCount}
-                data-testid="activity-feed-bell-badge"
-                offset={[-2, 2]}
-                size="small"
-            >
-                <HistoryOutlined
-                    aria-hidden
-                    style={{ fontSize: fontSize.md }}
-                />
-            </Badge>
-        </BellButton>
+            <span className="relative inline-flex">
+                <History aria-hidden className="size-[18px]" />
+                {unreadCount > 0 ? (
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute -right-[6px] -top-[6px] inline-flex min-w-4 items-center justify-center rounded-pill bg-destructive px-[4px] text-[10px] font-semibold leading-4 text-destructive-foreground"
+                        data-testid="activity-feed-bell-badge"
+                    >
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                ) : null}
+            </span>
+        </button>
     );
 };
 

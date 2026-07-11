@@ -33,7 +33,7 @@ const mockedUseAiEnabled = useAiEnabled as jest.MockedFunction<
     typeof useAiEnabled
 >;
 
-const installAntdBrowserMocks = () => {
+const installBrowserMocks = () => {
     Object.defineProperty(window, "matchMedia", {
         writable: true,
         value: (query: string) => ({
@@ -83,7 +83,7 @@ const projectContext = {
 
 describe("AiSearchInput", () => {
     beforeAll(() => {
-        installAntdBrowserMocks();
+        installBrowserMocks();
     });
 
     beforeEach(() => {

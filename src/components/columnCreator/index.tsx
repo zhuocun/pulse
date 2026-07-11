@@ -1,23 +1,23 @@
-import { PlusOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
-import { Input, InputNumber, Select } from "antd";
-import type { InputRef } from "antd";
+import { Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
+import { cn } from "@/lib/utils";
+
 import { microcopy, microcopyString } from "../../constants/microcopy";
-import {
-    breakpoints,
-    fontWeight,
-    motion,
-    radius,
-    space
-} from "../../theme/tokens";
 import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useUndoToast from "../../utils/hooks/useUndoToast";
 import newColumnCallback from "../../utils/optimisticUpdate/createColumn";
 import deleteColumnCallback from "../../utils/optimisticUpdate/deleteColumn";
+import { Input } from "../ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from "../ui/select";
 
 // Persisted "done" semantics for a column. ``category`` is the stored
 // source of truth for done-ness (the board echoes a derived ``isDone``);
@@ -28,65 +28,18 @@ const DEFAULT_CATEGORY: ColumnCategory = "todo";
 
 const CATEGORY_OPTIONS: ColumnCategory[] = ["todo", "in_progress", "done"];
 
-const Slot = styled.div<{ $editing?: boolean }>`
-    align-self: flex-start;
-    display: flex;
-    flex: 0 0 auto;
-    margin-right: ${space.md}px;
-    min-width: min(16rem, calc(100vw - ${space.md * 3}px));
-    min-width: min(16rem, calc(100dvw - ${space.md * 3}px));
-    padding: ${space.xs}px 0;
+// The collapsed slot is compact (9rem) on md+; the editing slot widens to
+// 16rem to hold the stacked fields. Below md both fall back to the shared
+// mobile-safe min-width formula (space.md * 3 = 48px gutter).
+const SLOT_BASE_CLASS =
+    "flex flex-[0_0_auto] self-start mr-md py-xs min-w-[min(16rem,calc(100dvw-48px))]";
 
-    @media (min-width: ${breakpoints.md}px) {
-        min-width: ${(props) => (props.$editing ? "16rem" : "9rem")};
-    }
-`;
-
-// Stacks the name input above the category picker while the creator is
-// expanded. The parent ``Slot`` is a row flex container, so the fields
-// need their own column wrapper to sit one above the other and stretch to
-// the slot width.
-const EditingFields = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xs}px;
-    width: 100%;
-`;
-
-const AddColumnButton = styled.button`
-    align-items: center;
-    background: var(--ant-color-fill-quaternary, rgba(15, 23, 42, 0.04));
-    border: 1px dashed var(--ant-color-border, rgba(15, 23, 42, 0.15));
-    border-radius: ${radius.lg}px;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-    cursor: pointer;
-    display: inline-flex;
-    font: inherit;
-    font-weight: ${fontWeight.medium};
-    gap: ${space.xs}px;
-    height: 100%;
-    justify-content: center;
-    min-height: 3rem;
-    padding: ${space.sm}px ${space.md}px;
-    transition:
-        background-color ${motion.short}ms ease-out,
-        border-color ${motion.short}ms ease-out,
-        color ${motion.short}ms ease-out;
-    width: 100%;
-
-    &:hover:not(:disabled),
-    &:focus-visible:not(:disabled) {
-        background: var(--ant-color-primary-bg, rgba(234, 88, 12, 0.08));
-        border-color: var(--ant-color-primary, #ea580c);
-        border-style: solid;
-        color: var(--ant-color-primary, #ea580c);
-    }
-
-    &:disabled {
-        cursor: default;
-        opacity: 0.6;
-    }
-`;
+const ADD_COLUMN_BUTTON_CLASS = cn(
+    "flex h-full min-h-[3rem] w-full items-center justify-center gap-xs rounded-lg border border-dashed border-border bg-muted px-md py-sm font-medium text-muted-foreground transition-colors",
+    "enabled:hover:border-solid enabled:hover:border-primary enabled:hover:bg-primary/10 enabled:hover:text-primary",
+    "enabled:focus-visible:border-solid enabled:focus-visible:border-primary enabled:focus-visible:bg-primary/10 enabled:focus-visible:text-primary",
+    "disabled:cursor-default disabled:opacity-60"
+);
 
 /**
  * Adds a new column to the current board.
@@ -108,7 +61,7 @@ const ColumnCreator: React.FC = () => {
     const [category, setCategory] = useState<ColumnCategory>(DEFAULT_CATEGORY);
     const [wipLimit, setWipLimit] = useState<number>(DEFAULT_WIP_LIMIT);
     const [editing, setEditing] = useState(false);
-    const inputRef = useRef<InputRef>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
     const { projectId } = useParams<{ projectId: string }>();
     const { mutateAsync, isLoading } = useReactMutation<IColumn>(
         "boards",
@@ -196,22 +149,23 @@ const ColumnCreator: React.FC = () => {
 
     if (!editing) {
         return (
-            <Slot>
-                <AddColumnButton
+            <div className={cn(SLOT_BASE_CLASS, "md:min-w-[9rem]")}>
+                <button
                     aria-label={microcopy.actions.addColumn}
+                    className={ADD_COLUMN_BUTTON_CLASS}
                     disabled={isLoading}
                     onClick={() => setEditing(true)}
                     type="button"
                 >
-                    <PlusOutlined aria-hidden /> {microcopy.actions.addColumn}
-                </AddColumnButton>
-            </Slot>
+                    <Plus aria-hidden /> {microcopy.actions.addColumn}
+                </button>
+            </div>
         );
     }
 
     return (
-        <Slot $editing>
-            <EditingFields>
+        <div className={cn(SLOT_BASE_CLASS, "md:min-w-[16rem]")}>
+            <div className="flex w-full flex-col gap-xs">
                 <Input
                     aria-label={microcopy.a11y.newColumnName}
                     autoComplete="off"
@@ -226,41 +180,56 @@ const ColumnCreator: React.FC = () => {
                         if (event.key === "Escape") {
                             event.preventDefault();
                             collapse();
+                        } else if (event.key === "Enter") {
+                            event.preventDefault();
+                            void submit();
                         }
                     }}
-                    onPressEnter={submit}
                     placeholder={microcopy.placeholders.createColumnName}
                     ref={inputRef}
-                    size="large"
                     value={columnName}
                 />
-                <Select<ColumnCategory>
-                    aria-label={microcopy.a11y.newColumnCategory}
+                <Select
                     disabled={isLoading}
-                    onChange={setCategory}
-                    options={CATEGORY_OPTIONS.map((value) => ({
-                        label: microcopy.options.columnCategories[value],
-                        value
-                    }))}
-                    size="large"
+                    onValueChange={(value) =>
+                        setCategory(value as ColumnCategory)
+                    }
                     value={category}
-                />
-                <InputNumber
+                >
+                    <SelectTrigger
+                        aria-label={microcopy.a11y.newColumnCategory}
+                    >
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {CATEGORY_OPTIONS.map((value) => (
+                            <SelectItem key={value} value={value}>
+                                {microcopy.options.columnCategories[value]}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <Input
                     aria-label={microcopy.fields.wipLimit}
+                    className="w-full"
                     disabled={isLoading}
                     inputMode="numeric"
                     min={0}
-                    onChange={(value) =>
-                        setWipLimit(typeof value === "number" ? value : 0)
-                    }
+                    onChange={(e) => {
+                        const parsed = Number(e.target.value);
+                        setWipLimit(
+                            e.target.value === "" || Number.isNaN(parsed)
+                                ? 0
+                                : parsed
+                        );
+                    }}
                     placeholder={microcopy.column.wipLimitPlaceholder}
-                    size="large"
                     step={1}
-                    style={{ width: "100%" }}
+                    type="number"
                     value={wipLimit}
                 />
-            </EditingFields>
-        </Slot>
+            </div>
+        </div>
     );
 };
 

@@ -1,52 +1,54 @@
 import {
-    CheckCircleFilled,
-    ClockCircleOutlined,
-    FlagFilled,
-    HolderOutlined,
-    MoreOutlined,
-    StopOutlined,
-    WarningFilled
-} from "@ant-design/icons";
-import { keyframes } from "@emotion/react";
-import styled from "@emotion/styled";
-import {
-    Badge,
-    Checkbox,
-    Dropdown,
-    Input,
-    InputNumber,
-    type InputRef,
-    MenuProps,
-    Modal,
-    Select,
-    Tag,
-    Tooltip,
-    Typography
-} from "antd";
+    AlertTriangle,
+    Ban,
+    CheckCircle2,
+    Clock,
+    Flag,
+    GripVertical,
+    MoreVertical
+} from "lucide-react";
 import dayjs from "dayjs";
 import React from "react";
 import { useParams } from "react-router-dom";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from "@/components/ui/select";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger
+} from "@/components/ui/tooltip";
+import { Text, Title } from "@/components/ui/typography";
+import { cn } from "@/lib/utils";
 
 import bugIcon from "../../assets/bug.svg";
 import taskIcon from "../../assets/task.svg";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
-import {
-    brand,
-    breakpoints,
-    columnMinWidthRem,
-    easing,
-    fontSize,
-    fontWeight,
-    letterSpacing,
-    motion,
-    radius,
-    shadow,
-    space,
-    touchTargetCoarse,
-    touchTargetMin,
-    zIndex
-} from "../../theme/tokens";
+import { space } from "../../theme/tokens";
 import { getAiSearchStrength } from "../../utils/ai/aiSearchStrength";
 import { labelTagProps } from "../../utils/labelTagColor";
 import normalizeTaskType from "../../utils/normalizeTaskType";
@@ -85,634 +87,105 @@ const formatTemplate = (
     );
 
 /**
- * Phase 4.2 — density-driven CSS custom properties. The column reads
- * the user's preference from Redux via `useBoardDensity()` and writes
- * `data-density` on the container; the variables below cascade into
- * every styled-component child without us having to re-thread the
- * density value through props. Comfortable values mirror the legacy
- * tokens (8 / 12 / 16 / 14 px) so the default UI is byte-identical.
+ * Phase 4.2 — density-driven CSS custom properties. The column reads the
+ * user's preference from Redux via `useBoardDensity()` and writes the
+ * `--density-card-*` custom properties onto the `ColumnContainer` root
+ * (plus a `data-density` marker for tests / debugging). The variables
+ * cascade into every descendant that references them, so a change never
+ * has to re-thread the density value through props.
  *
- * Density deltas vs. comfortable (legacy) baseline:
+ * Comfortable values mirror the legacy tokens (8 / 12 / 16 / 14 px) so the
+ * default UI is byte-identical. Density deltas vs. comfortable:
  *   - --density-card-padding-y     12 → 8  (−33%)
  *   - --density-card-padding-x     16 → 12 (−25%)
  *   - --density-card-gap            8 → 4  (−50%)
  *   - --density-card-title-mb       8 → 4  (−50%)
  *   - --density-card-title-fs       14 → 13 (−7%)
  *   - --density-card-footer-fs      12 → 11 (−8%)
- *
- * Tightening padding ~25–30% (the brief), title margin & inter-card gap
- * by 50%, and trimming the title down a step gives ~3 more cards per
- * 720 px-tall column without compromising hit targets (the click target
- * is still a 44+px button thanks to the 8 px top/bottom + line-height
- * 1.4 of the title).
  */
-export const ColumnContainer = styled.div`
-    --density-card-padding-y: ${space.sm}px;
-    --density-card-padding-x: ${space.md}px;
-    --density-card-gap: ${space.xs}px;
-    --density-card-title-mb: ${space.xs}px;
-    --density-card-title-fs: ${fontSize.base}px;
-    --density-card-footer-fs: ${fontSize.xs}px;
+const densityVars = (density: "comfortable" | "compact"): React.CSSProperties =>
+    (density === "compact"
+        ? {
+              "--density-card-padding-y": `${space.xs}px`,
+              "--density-card-padding-x": `${space.sm}px`,
+              "--density-card-gap": `${space.xxs}px`,
+              "--density-card-title-mb": `${space.xxs}px`,
+              "--density-card-title-fs": "13px",
+              "--density-card-footer-fs": "11px"
+          }
+        : {
+              "--density-card-padding-y": `${space.sm}px`,
+              "--density-card-padding-x": `${space.md}px`,
+              "--density-card-gap": `${space.xs}px`,
+              "--density-card-title-mb": `${space.xs}px`,
+              "--density-card-title-fs": "14px",
+              "--density-card-footer-fs": "12px"
+          }) as React.CSSProperties;
 
-    &[data-density="compact"] {
-        --density-card-padding-y: ${space.xs}px;
-        --density-card-padding-x: ${space.sm}px;
-        --density-card-gap: ${space.xxs}px;
-        --density-card-title-mb: ${space.xxs}px;
-        --density-card-title-fs: ${fontSize.sm}px;
-        --density-card-footer-fs: 11px;
-    }
-
-    background: var(--ant-color-fill-quaternary, rgba(15, 23, 42, 0.04));
-    border: 1px solid transparent;
-    border-radius: ${radius.lg}px;
-    display: flex;
-    flex-direction: column;
-    margin-right: ${space.md}px;
-    /* Fix the column at 18rem so a single ultra-wide task card cannot
-     * stretch the lane past its lane-mates. min-width alone is a floor —
-     * flex-basis: auto resolves to the card's max-content and the column
-     * grew to ~780px when a 120-char single-token task name appeared. */
-    width: ${columnMinWidthRem}rem;
-    flex: 0 0 ${columnMinWidthRem}rem;
-    min-width: ${columnMinWidthRem}rem;
-    padding: ${space.sm}px;
-    transition: background-color 200ms ease-out;
-
-    /*
-     * On phone-sized viewports a full desktop column overflows the screen.
-     * BoardShell uses 16 px horizontal padding on mobile (16 + 16 = 32)
-     * and the column carries its own 16 px margin-right. The previous
-     * formula calc(100dvw - 48px) exactly filled that chrome, leaving the
-     * next column with only the column's own margin (≈ 8 px after the
-     * fade gradient) — readable text from the next column's header still
-     * poked through, looking like a clipped layout. We now reserve an
-     * extra space.xl (32 px) peek budget so ~32 px of the next column is
-     * visible (column dot + first word of header), and we cap the column
-     * at 17 rem on mobile (down from 18 rem on desktop) so even devices
-     * just under the md breakpoint keep a visible peek.
-     */
-    @media (max-width: ${breakpoints.md - 1}px) {
-        min-width: min(
-            ${columnMinWidthRem - 1}rem,
-            calc(100vw - ${space.md * 2 + space.md + space.xl}px)
-        );
-        min-width: min(
-            ${columnMinWidthRem - 1}rem,
-            calc(100dvw - ${space.md * 2 + space.md + space.xl}px)
-        );
-        width: min(
-            ${columnMinWidthRem - 1}rem,
-            calc(100vw - ${space.md * 2 + space.md + space.xl}px)
-        );
-        width: min(
-            ${columnMinWidthRem - 1}rem,
-            calc(100dvw - ${space.md * 2 + space.md + space.xl}px)
-        );
-    }
-`;
+/**
+ * Fix the column at 18rem so a single ultra-wide task card cannot stretch
+ * the lane past its lane-mates. On phone-sized viewports (< md, 768px) the
+ * column shrinks to leave a ~32px peek of the next column's header.
+ */
+const COLUMN_CONTAINER_CLASS = cn(
+    "mr-md flex flex-col rounded-lg border border-transparent bg-muted/50 p-sm transition-colors",
+    "w-[18rem] min-w-[18rem] flex-[0_0_18rem]",
+    "max-md:w-[min(17rem,calc(100dvw-80px))] max-md:min-w-[min(17rem,calc(100dvw-80px))]"
+);
 
 /**
  * The column's vertical scroll context. The ColumnHeader lives *inside*
  * this container as its first child so `position: sticky` on the header
- * pins it against this exact scroll port; if the header were a sibling
- * outside, sticky would degenerate to plain relative because the
- * nearest scroll ancestor would be the page itself (or the BoardShell
- * flex item, which doesn't scroll).
- *
- * `display: flex; flex-direction: column; gap: ${space.xs}` preserves
- * the original 8-px rhythm between every task card. The header used to
- * carry its own `margin-bottom: ${space.sm}` (12 px) as a sibling
- * above; that's dropped now that the flex gap supplies the 8-px
- * separator between the header and the first card. Net visual delta
- * is 4 px tighter — well within the "calm board" rhythm.
+ * pins it against this exact scroll port. The dnd placeholder gets a
+ * dashed brand outline so the drop target reads clearly mid-drag.
  */
-const TaskContainer = styled.div`
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    /* Density: var falls back to the legacy 8 px (space.xs) rhythm. */
-    gap: var(--density-card-gap, ${space.xs}px);
-    overflow-y: auto;
-    padding-bottom: ${space.xs}px;
-
-    [data-rfd-placeholder-context-id] {
-        background: ${brand.primaryBg};
-        border: 1px dashed var(--ant-color-primary);
-        border-radius: ${radius.sm}px;
-        box-sizing: border-box;
-        min-height: 40px;
-
-        @media (prefers-reduced-motion: reduce) {
-            transition: none !important;
-        }
-    }
-`;
-
-/*
- * Optimistic-insert reveal. A freshly created task lands in the column as
- * an optimistic placeholder card BEFORE the server confirms it; a plain
- * instant insert reads as a jump. This slide-and-fade eases the new card
- * in so the create flow feels connected to the click. It runs once on
- * mount (the shell only carries `data-optimistic` while the id is a
- * placeholder), and is gated behind `prefers-reduced-motion: no-preference`
- * so reduced-motion users get the instant insert with no transform.
- */
-const cardInsert = keyframes`
-    from {
-        opacity: 0;
-        transform: translateY(-6px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-`;
-
-const TaskRowDragShell = styled.div`
-    width: 100%;
-
-    .task-card-lift-surface {
-        transition:
-            border-color 120ms ease-out,
-            box-shadow 120ms ease-out,
-            transform 120ms ease-out;
-    }
-
-    &[data-optimistic="true"] {
-        @media (prefers-reduced-motion: no-preference) {
-            animation: ${cardInsert} ${motion.medium}ms ${easing.decelerate}
-                both;
-        }
-    }
-
-    &[data-dragging="true"] .task-card-lift-surface {
-        box-shadow: ${shadow.lift};
-
-        @media (prefers-reduced-motion: no-preference) {
-            transform: scale(1.02);
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-            transition: none;
-        }
-    }
-`;
-
-const FilteredEmpty = styled.div`
-    align-items: center;
-    background: var(--ant-color-fill-quaternary, rgba(15, 23, 42, 0.04));
-    border: 1px dashed var(--ant-color-border-secondary, rgba(15, 23, 42, 0.12));
-    border-radius: ${radius.md}px;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.55));
-    display: flex;
-    flex-direction: column;
-    font-size: ${fontSize.xs}px;
-    gap: ${space.xxs}px;
-    padding: ${space.sm}px ${space.md}px;
-    text-align: center;
-`;
-
-const FilteredEmptyButton = styled.button`
-    background: transparent;
-    border: 0;
-    border-radius: ${radius.sm}px;
-    color: var(--ant-color-primary, #ea580c);
-    cursor: pointer;
-    font-size: ${fontSize.xs}px;
-    font-weight: ${fontWeight.medium};
-    padding: ${space.xxs}px ${space.xs}px;
-
-    &:hover {
-        background: var(--ant-color-primary-bg, rgba(234, 88, 12, 0.1));
-    }
-
-    &:focus-visible {
-        background: var(--ant-color-primary-bg, rgba(234, 88, 12, 0.1));
-        box-shadow: ${shadow.focus};
-        outline: 2px solid transparent;
-        outline-offset: 2px;
-    }
-
-    /* The "Reset filters" CTA is the recovery path out of an empty filtered
-     * column — fingers must land it without zoom. Lift to the 44 px touch
-     * floor (Apple HIG, WCAG 2.5.8) on coarse pointers without disturbing the
-     * dense desktop rhythm. */
-    @media (pointer: coarse) {
-        min-height: 44px;
-        padding: ${space.xs}px ${space.sm}px;
-    }
-`;
-
-const TaskCardOuter = styled.button<{
-    $dragDisabledByFilters?: boolean;
-    $selectable?: boolean;
-}>`
-    background: var(--ant-color-bg-container, #fff);
-    border: 1px solid var(--ant-color-border-secondary, rgba(15, 23, 42, 0.06));
-    border-radius: ${radius.md}px;
-    box-shadow: ${shadow.xs};
-    /*
-     * not-allowed signals that reordering is paused while filters are
-     * active; the card itself stays clickable to open the task.
-     */
-    cursor: ${({ $dragDisabledByFilters }) =>
-        $dragDisabledByFilters ? "not-allowed" : "pointer"};
-    display: block;
-    /* Density-driven padding. Comfortable resolves the var to the
-     * legacy 12 / 16 px (space.sm / space.md) rhythm; compact tightens
-     * to 8 / 12 px (~33% / 25% reduction). The fallback after the
-     * comma keeps a card rendered outside the ColumnContainer (e.g.
-     * the storybook in column-dnd.test) looking like before. */
-    padding: var(--density-card-padding-y, ${space.sm}px)
-        var(--density-card-padding-x, ${space.md}px);
-    text-align: left;
-    transition:
-        border-color 120ms ease-out,
-        box-shadow 120ms ease-out,
-        transform 120ms ease-out;
-    width: 100%;
-
-    &:hover:not(:disabled) {
-        /* Restrained hover: a single 1 px brand-accent ring + soft
-         * ambient drop. No background gradient — the white card stays
-         * white, the brand colour only signals intent at the edge.
-         * Uses the palette-derived --glass-border-strong so a palette
-         * swap re-tints the ring with no edits here. */
-        border-color: var(--glass-border-strong);
-        box-shadow:
-            ${shadow.md},
-            0 0 0 1px var(--glass-border-strong);
-        transform: translateY(-1px);
-    }
-
-    &:focus-visible {
-        border-color: var(--ant-color-primary);
-        outline: none;
-        box-shadow: ${shadow.focus}, ${shadow.md};
-    }
-
-    &:active:not(:disabled) {
-        transform: translateY(0);
-    }
-
-    &:disabled {
-        cursor: default;
-        opacity: 0.7;
-    }
-
-    /* On touch devices the hover lift feels janky and never triggers; skip
-     * it so finger taps don't get a stale outline. */
-    @media (hover: none) {
-        &:hover:not(:disabled) {
-            border-color: var(
-                --ant-color-border-secondary,
-                rgba(15, 23, 42, 0.06)
-            );
-            box-shadow: ${shadow.xs};
-            transform: none;
-        }
-    }
-
-    @media (pointer: coarse) {
-        ${({ $selectable }) =>
-            $selectable
-                ? `
-            padding-left: calc(${space.xs}px + ${touchTargetCoarse}px);
-            padding-top: calc(${space.xs}px + ${touchTargetCoarse}px);
-        `
-                : ""}
-    }
-`;
+const TASK_CONTAINER_CLASS = cn(
+    "flex flex-1 flex-col overflow-y-auto pb-xs [gap:var(--density-card-gap,8px)]",
+    "[&_[data-rfd-placeholder-context-id]]:box-border [&_[data-rfd-placeholder-context-id]]:min-h-[40px]",
+    "[&_[data-rfd-placeholder-context-id]]:rounded-sm [&_[data-rfd-placeholder-context-id]]:border",
+    "[&_[data-rfd-placeholder-context-id]]:border-dashed [&_[data-rfd-placeholder-context-id]]:border-primary",
+    "[&_[data-rfd-placeholder-context-id]]:bg-primary/10"
+);
 
 /**
- * Wrapper that hosts the multi-select checkbox alongside the card button
- * (PRD-GAP-008). A native checkbox cannot live INSIDE the `<button>` card
- * (invalid HTML + the dnd library blocks drags off interactive elements),
- * so the checkbox is a sibling overlay and this relative shell positions
- * it over the card's top-left corner. Rendered only under a
- * `BulkSelectionProvider`; without one the card returns the bare button.
+ * Per-row drag shell. Carries the optimistic-insert reveal (a guarded
+ * slide-and-fade that only runs for the placeholder card and only when
+ * the user hasn't opted out of motion) and the drag-lift treatment on
+ * the inner `.task-card-lift-surface` while a drag snapshot is active.
  */
-const SelectableShell = styled.div`
-    position: relative;
-    width: 100%;
+const TASK_ROW_DRAG_SHELL_CLASS = cn(
+    "w-full",
+    "[&_.task-card-lift-surface]:transition-[border-color,box-shadow,transform] [&_.task-card-lift-surface]:duration-[120ms] [&_.task-card-lift-surface]:ease-out",
+    "motion-safe:data-[optimistic=true]:animate-in motion-safe:data-[optimistic=true]:fade-in motion-safe:data-[optimistic=true]:slide-in-from-top-2",
+    "data-[dragging=true]:[&_.task-card-lift-surface]:shadow-[0_6px_16px_rgba(15,23,42,0.12),0_0_0_1px_rgba(15,23,42,0.06)]",
+    "motion-safe:data-[dragging=true]:[&_.task-card-lift-surface]:scale-[1.02]"
+);
 
-    &:hover [data-select-slot],
-    &:focus-within [data-select-slot] {
-        opacity: 1;
-    }
-`;
+const FILTERED_EMPTY_CLASS = cn(
+    "flex flex-col items-center gap-xxs rounded-md border border-dashed border-border bg-muted/40",
+    "px-md py-sm text-center text-xs text-muted-foreground"
+);
 
-/**
- * Selection checkbox overlay. Hidden by default and revealed on
- * hover / keyboard focus of the card, or whenever the card is selected, so
- * the calm board isn't littered with checkboxes at rest. On coarse pointers
- * (no hover) it is always visible and lifts to a 44 px hit target (WCAG
- * 2.5.8). The wrapping click/mousedown guards stop the toggle from also
- * opening the task or starting a drag.
- */
-const SelectionCheckboxSlot = styled.span<{ $selected: boolean }>`
-    align-items: center;
-    background: var(--ant-color-bg-container, #fff);
-    border-radius: ${radius.sm}px;
-    display: inline-flex;
-    justify-content: center;
-    left: ${space.xs}px;
-    opacity: ${(p) => (p.$selected ? 1 : 0)};
-    padding: 2px;
-    position: absolute;
-    top: ${space.xs}px;
-    transition: opacity 120ms ease-out;
-    z-index: 2;
+const FILTERED_EMPTY_BUTTON_CLASS = cn(
+    "cursor-pointer rounded-sm border-0 bg-transparent px-xs py-xxs text-xs font-medium text-primary",
+    "hover:bg-primary/10 focus-visible:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-transparent",
+    "coarse:min-h-[44px] coarse:px-sm coarse:py-xs"
+);
 
-    @media (pointer: coarse) {
-        align-items: center;
-        justify-content: center;
-        min-height: ${touchTargetCoarse}px;
-        min-width: ${touchTargetCoarse}px;
-        opacity: 1;
-        padding: 0;
+const CARD_META_CLASS = "inline-flex items-center gap-xs";
 
-        /* Stretch the AntD checkbox's clickable label to fill the whole
-         * 44 x 44 slot so the tap target matches the visible hit area —
-         * the bare checkbox glyph is only ~22 x 24 px, well under the
-         * WCAG 2.5.8 floor. The glyph stays centred; only the label's
-         * hit region grows. */
-        .ant-checkbox-wrapper {
-            align-items: center;
-            height: 100%;
-            justify-content: center;
-            width: 100%;
-        }
-    }
-`;
+const CARD_TITLE_CLASS = cn(
+    "line-clamp-2 font-medium leading-[1.4] text-foreground [word-break:break-word]",
+    "[font-size:var(--density-card-title-fs,14px)] [margin-bottom:var(--density-card-title-mb,8px)]"
+);
 
-const CardTitle = styled.div`
-    color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
-    display: -webkit-box;
-    /* Density-driven title size — comfortable resolves to 14 px
-     * (legacy), compact to 13 px (fontSize.sm). */
-    font-size: var(--density-card-title-fs, ${fontSize.base}px);
-    font-weight: ${fontWeight.medium};
-    line-height: 1.4;
-    margin-bottom: var(--density-card-title-mb, ${space.xs}px);
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-
-    /* Inline-edit Input (Wave 3) needs to mirror the title's density —
-     * AntD's default Input padding/font ignore the surrounding CSS
-     * custom properties, so without this override the edit affordance
-     * stays comfortable-sized even when the board is compact. The
-     * size="small" prop already trims AntD's vertical padding; we
-     * just need to align the font with the title above it. */
-    & .ant-input {
-        font-size: var(--density-card-title-fs, ${fontSize.base}px);
-        line-height: 1.4;
-    }
-    /* A 120-char single-token name (URL, commit hash) has no natural break
-     * points, so the line-clamp can't truncate and the unbreakable run grows
-     * the column past 18rem, distorting the whole kanban. break-word lets the
-     * run split mid-character so the clamp engages and the column stays at
-     * its min-width. */
-    word-break: break-word;
-`;
-
-const CardFooter = styled.div`
-    align-items: center;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.55));
-    display: flex;
-    /* Density: 12 px (comfortable) / 11 px (compact). */
-    font-size: var(--density-card-footer-fs, ${fontSize.xs}px);
-    gap: ${space.xs}px;
-    justify-content: space-between;
-`;
-
-const TaskTypeBadge = styled.span<{ $isBug: boolean }>`
-    align-items: center;
-    color: ${(p) =>
-        p.$isBug ? "#DB2777" : "var(--pulse-brand-primary, #EA580C)"};
-    display: inline-flex;
-    font-weight: ${fontWeight.medium};
-    gap: ${space.xxs}px;
-
-    img {
-        height: 14px;
-        width: 14px;
-    }
-`;
-
-const CardMeta = styled.span`
-    align-items: center;
-    display: inline-flex;
-    gap: ${space.xs}px;
-`;
-
-const StoryPointsTag = styled(Tag)`
-    && {
-        font-variant-numeric: tabular-nums;
-        font-weight: ${fontWeight.semibold};
-        margin: 0;
-    }
-`;
-
-const EpicTag = styled(Tag)`
-    && {
-        font-size: ${fontSize.xs}px;
-        font-weight: ${fontWeight.medium};
-        margin-bottom: ${space.xs}px;
-        max-width: 100%;
-        padding-inline: ${space.xs}px;
-        white-space: normal;
-        word-break: break-word;
-    }
-`;
-
-/**
- * Row of label chips above the card title. Wraps so a task with several
- * labels stacks cleanly inside the column width instead of overflowing.
- */
-const LabelRow = styled.div`
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xxs}px;
-    margin-bottom: ${space.xs}px;
-`;
-
-const LabelChip = styled(Tag)`
-    && {
-        font-size: ${fontSize.xs}px;
-        font-weight: ${fontWeight.medium};
-        margin: 0;
-        max-width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-`;
-
-/**
- * Overdue indicator on the card footer. Deliberately NOT colour-only: it
- * pairs a clock glyph with the visible word "Overdue" (and an aria-label
- * carrying the missed due date) so it reads for colour-blind and
- * screen-reader users alike (WCAG 1.4.1). The danger tint is a secondary,
- * reinforcing signal — never the sole carrier of meaning.
- */
-const OverdueChip = styled.span`
-    align-items: center;
-    color: var(--ant-color-error, #dc2626);
-    display: inline-flex;
-    font-weight: ${fontWeight.semibold};
-    gap: ${space.xxs}px;
-    white-space: nowrap;
-`;
-
-/**
- * WIP-limit display on the column header (PRD §5.5). Renders the live
- * count against the column's `wipLimit` as a compact `{count} / {limit}`
- * chip. The chip itself is a neutral count read-out; the over-limit ALARM
- * is carried by the separate `OverLimitChip` below (a glyph + visible word),
- * so the indicator is never colour-only (WCAG 1.4.1, matching the overdue
- * chip). Only rendered when `wipLimit > 0` — a `0` limit means "no limit".
- */
-const WipLimitBadge = styled.span<{ $over: boolean }>`
-    align-items: center;
-    color: ${(p) =>
-        p.$over
-            ? "var(--ant-color-error, #dc2626)"
-            : "var(--ant-color-text-secondary, rgba(15, 23, 42, 0.55))"};
-    display: inline-flex;
-    font-size: ${fontSize.xs}px;
-    font-variant-numeric: tabular-nums;
-    font-weight: ${(p) => (p.$over ? fontWeight.semibold : fontWeight.medium)};
-    gap: ${space.xxs}px;
-    white-space: nowrap;
-`;
-
-/**
- * Over-limit indicator on the column header (PRD §5.5). Deliberately NOT
- * colour-only: a warning glyph pairs with the visible word "Over limit" and
- * an `aria-label` carrying the count / limit / overflow so the signal reads
- * for colour-blind and screen-reader users alike (WCAG 1.4.1) — the exact
- * recipe the card's `OverdueChip` uses. Rendered only when the column's task
- * count strictly exceeds a positive `wipLimit`.
- */
-const OverLimitChip = styled.span`
-    align-items: center;
-    color: var(--ant-color-error, #dc2626);
-    display: inline-flex;
-    font-size: ${fontSize.xs}px;
-    font-weight: ${fontWeight.semibold};
-    gap: ${space.xxs}px;
-    white-space: nowrap;
-`;
-
-/**
- * Priority indicator on the card footer (PRD §3.4). Like `OverdueChip`, it is
- * deliberately NOT colour-only: a flag glyph pairs with the visible priority
- * label and an `aria-label` so the signal reads for colour-blind and
- * screen-reader users alike (WCAG 1.4.1). The tint is a secondary, reinforcing
- * cue that scales with urgency. `priority === "none"` (or absent) renders
- * nothing — the badge only appears once a task is deliberately prioritised.
- */
-const PriorityBadge = styled.span<{ $tint: string }>`
-    align-items: center;
-    color: ${(p) => p.$tint};
-    display: inline-flex;
-    font-weight: ${fontWeight.semibold};
-    gap: ${space.xxs}px;
-    white-space: nowrap;
-`;
-
-/**
- * Per-priority tint, escalating low → urgent. `none` is absent from the map
- * because that branch renders no badge at all. The glyph is identical across
- * levels (a flag); the visible label + aria-label disambiguate, so colour is
- * never the sole carrier of meaning.
- */
-const PRIORITY_TINT: Record<Exclude<TaskPriorityLevel, "none">, string> = {
-    low: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45))",
-    medium: "var(--ant-color-info, #2563eb)",
-    // `--ant-color-warning` (#F59E0B) reads at ~2.2:1 on the white card;
-    // `--pulse-priority-high` is the AA-safe, mode-aware amber (see cssVars).
-    high: "var(--pulse-priority-high, #b45309)",
-    urgent: "var(--ant-color-error, #dc2626)"
-};
-
-/**
- * Blocked indicator on the card footer (PRD §4.5). Like `PriorityBadge` and
- * `OverdueChip`, it is deliberately NOT colour-only: a stop glyph pairs with
- * the visible "Blocked" label and an `aria-label` so the signal reads for
- * colour-blind and screen-reader users alike (WCAG 1.4.1). The badge renders
- * only when the server-derived `task.blockedBy` array is non-empty — i.e. the
- * task has ≥1 unfinished prerequisite — so a task with no dependencies (or one
- * whose prerequisites are all done) shows nothing.
- */
-const BlockedBadge = styled.span`
-    align-items: center;
-    color: var(--ant-color-error, #dc2626);
-    display: inline-flex;
-    font-weight: ${fontWeight.semibold};
-    gap: ${space.xxs}px;
-    white-space: nowrap;
-`;
-
-/**
- * Completed indicator on the card footer (PRD §3 lifecycle). Like its sibling
- * badges it is NOT colour-only: a filled check glyph pairs with the visible
- * "Completed" label and a dated `aria-label` so the signal reads for colour-
- * blind and screen-reader users alike (WCAG 1.4.1). The badge renders only
- * when the server-managed `task.completedAt` is set — i.e. the task currently
- * sits in a done-category column; the server clears the field the moment the
- * task leaves, so the card and the badge stay in lockstep. A completed task
- * supersedes the "Blocked"/"Overdue" chips (a finished task is neither), so
- * those are gated off below when `completed` is true.
- */
-const CompletedBadge = styled.span`
-    align-items: center;
-    color: var(--ant-color-success, #16a34a);
-    display: inline-flex;
-    font-weight: ${fontWeight.semibold};
-    gap: ${space.xxs}px;
-    white-space: nowrap;
-`;
-
-/**
- * Milestone indicator on the card footer (PRD milestones). Unlike the
- * priority / overdue / blocked chips it is NOT an alarm — a milestone is a
- * neutral planning grouping, so it uses a restrained secondary tint (no
- * danger / warning colour). A flag glyph pairs with the visible milestone
- * name and an `aria-label` so the signal still reads for colour-blind and
- * screen-reader users alike (WCAG 1.4.1). The badge renders only when
- * `task.milestoneId` resolves against a passed milestone — an unset or
- * dangling id shows nothing (see the gate on the card). The name can be
- * long, so it truncates with an ellipsis rather than wrapping the footer.
- */
-const MilestoneBadge = styled.span`
-    align-items: center;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.55));
-    display: inline-flex;
-    font-weight: ${fontWeight.medium};
-    gap: ${space.xxs}px;
-    max-width: 12ch;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-
-    > span {
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-`;
+const CARD_FOOTER_CLASS =
+    "flex items-center justify-between gap-xs text-muted-foreground [font-size:var(--density-card-footer-fs,12px)]";
 
 /**
  * Overdue rule: the task carries a `dueDate` whose LOCAL calendar date is
  * strictly before today. We compare date-only (`YYYY-MM-DD`), matching the
- * lens predicates, so a task due "today" is NOT overdue and a midnight-
- * straddling timestamp can't flip the verdict by timezone. A task with no
- * `dueDate` (or an unparsable one) is never overdue. Done-column semantics
- * aren't modeled on `IColumn` (no `isDone` flag), so we use the brief's
- * simpler date-only rule.
+ * lens predicates, so a task due "today" is NOT overdue.
  */
 const isTaskOverdue = (
     dueDate: string | null | undefined,
@@ -723,228 +196,6 @@ const isTaskOverdue = (
     if (!due.isValid()) return false;
     return due.startOf("day").isBefore(dayjs(now).startOf("day"));
 };
-
-/**
- * Column header — sticky-pinned against the parent TaskContainer so a
- * user scrolling a tall task list always sees the column name + count
- * + readiness pill + more-actions menu. Phase 4.6 of `ui-todo.md`.
- *
- * `position: sticky` requires a positioned ancestor that scrolls; the
- * direct parent (`TaskContainer`) is `overflow-y: auto` so the header
- * snaps to its top edge.
- *
- * `z-index: ${zIndex.sticky}` (10) sits above every task card (which
- * paint at the default `0`) so card text never bleeds through the
- * header during the cross-fade as a card scrolls beneath it. The pill's
- * AntD Popover (`zIndex.dropdown` = 1050) and the more-actions Dropdown
- * (same) both ride well above the sticky tier, so neither clips behind
- * the header — verified by the contract test in `index.test.tsx`.
- *
- * The dnd drag clone is painted at z-index 5000 on `document.body` via
- * React's createPortal (see `tokens.ts` § dndDragClone), so a card in
- * flight always paints over this header on every browser including iOS.
- *
- * backdrop-filter: var(--ant-backdrop-filter-glass) adds a soft
- * frost so task text scrolling underneath gets a subtle smear
- * instead of a hard crop (Wave 2 T4 — was the literal blur.sm
- * recipe before the global intensity migration);
- * paired with a translucent background tint so the header reads as a
- * pane, not a hole. Both fall back gracefully on `forced-colors` /
- * `prefers-reduced-transparency` (the browser drops backdrop-filter
- * and we paint the page background underneath).
- */
-const ColumnHeader = styled(Row)`
-    align-items: center;
-    /*
-     * Solid-ish pane that lets a touch of the column's fill-quaternary
-     * tint show through. Falls back to the column's own background
-     * (set at the ColumnContainer level) on browsers that don't
-     * support backdrop-filter (no blur, no shimmer — still readable).
-     */
-    background: var(--ant-color-bg-container, rgba(255, 255, 255, 0.86));
-    /*
-     * Phase 6 W1 — iOS 26 concentricity: the sticky header sits flush
-     * against the ColumnContainer's inner padding edge (top: 0 inside
-     * TaskContainer, which itself sits inside ColumnContainer's
-     * padding: space.sm = 12 px). The container's outer corner is
-     * radius.lg (14 px); the concentric inner radius is therefore
-     * 14 − 12 = 2 px so the header's rounded corners trace the
-     * ColumnContainer's inner curve instead of pinching it. Previously
-     * shipped at radius.sm (6 px), which read as a 4 px flared corner
-     * against the container's rounded edge.
-     */
-    border-radius: 2px;
-    /* Wave 2 T4 — consume the SUBTLE intensity-toggle var. The column
-     * header is sticky over dense scrolling tasks; the original 12 px
-     * blur kept text legible underneath. The subtle var defaults to
-     * the same 12 px / 180% recipe but scales down under "clear" and
-     * to none under "solid" so the user toggle still reaches this
-     * surface. Three-var system reconciles parity (12 px today) with
-     * the global lever (toggle works). */
-    backdrop-filter: var(--ant-backdrop-filter-glass-subtle);
-    -webkit-backdrop-filter: var(--ant-backdrop-filter-glass-subtle);
-    padding: ${space.xxs}px ${space.xs}px;
-    position: sticky;
-    top: 0;
-    /*
-     * zIndex.sticky (= 10) — above task cards (which paint at the
-     * default z-index 0), below all AntD overlays (Dropdown / Popover
-     * ride at 1050+) so the readiness-pill popover and column-actions
-     * dropdown render above this header without a stacking-context
-     * trap. The dnd drag clone (z-index 5000 via body portal) also
-     * paints above this, so a dragged card stays visible while
-     * crossing the pinned header.
-     */
-    z-index: ${zIndex.sticky};
-
-    /*
-     * Phase 5 "Liquid Glass" Wave 2 — top-leading specular rim. The
-     * column header is sticky inside the column's scroll port, so the
-     * highlight rides with the pinned pane and reads as the same
-     * tilted glass edge whether the column is scrolled or at rest.
-     * No scroll-edge dissolve here — the column scroll port already
-     * carries its own edge fade in board.tsx, so adding one here
-     * would double-feather the boundary.
-     *
-     * No gel-flex on the children either: the column-name (inline
-     * edit) and more-actions trigger don't follow the press-flex
-     * interaction model — they're editing / popover triggers — and
-     * the ColumnDragHandleButton lives inside @hello-pangea/dnd's
-     * transform tree, so a scale-on-press would fight the drag
-     * transform.
-     */
-    &::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        background: var(--glass-specular-top);
-        pointer-events: none;
-        z-index: 0;
-    }
-
-    &::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        background: var(--glass-specular-bottom);
-        pointer-events: none;
-        z-index: 0;
-    }
-
-    /*
-     * Children sit above the rim pseudo-elements. The header's two
-     * direct children (the title cluster span + DeleteDropDown) lift
-     * onto z-index 1 so the rim paints behind, not over.
-     */
-    > * {
-        position: relative;
-        z-index: 1;
-    }
-
-    /*
-     * Honour the user's reduced-transparency preference: collapse the
-     * frosted backdrop to a solid surface so the column doesn't look
-     * smeared in environments that disable transparency (Windows
-     * high-contrast, macOS "Reduce Transparency"). Mirrors the recipe
-     * the main page header uses. Drop the rim too — the achromatic
-     * highlight reads as noise on an opaque body.
-     */
-    @media (prefers-reduced-transparency: reduce) {
-        background: var(--ant-color-bg-container, #ffffff);
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-
-        &::before,
-        &::after {
-            background: none;
-        }
-    }
-
-    /*
-     * Forced-colors mode (Windows high-contrast) replaces every author
-     * colour with system tokens. Drop the translucent background so the
-     * system colour wins; keep the sticky positioning intact because
-     * pinning the header is still useful in high-contrast. Drop the
-     * rim layers so they don't compete with Canvas / CanvasText.
-     */
-    @media (forced-colors: active) {
-        background: Canvas;
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-
-        &::before,
-        &::after {
-            background: none;
-        }
-    }
-
-    /*
-     * Lift the column-level "more actions" trigger to a 32 × 32 hit target
-     * on touch viewports so a thumb can land it without zooming. The icon
-     * stays visually small but the surrounding padding grows, satisfying
-     * WCAG 2.5.5 (24 × 24 minimum, 44 × 44 recommended on coarse pointers).
-     */
-    @media (pointer: coarse) {
-        > button:last-child,
-        > div:last-child > button {
-            min-height: 44px;
-            min-width: 44px;
-        }
-    }
-`;
-
-const ColumnDragHandleButton = styled.button`
-    align-items: center;
-    background: transparent;
-    border: 0;
-    border-radius: ${radius.sm}px;
-    color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45));
-    cursor: grab;
-    display: inline-flex;
-    flex: 0 0 auto;
-    justify-content: center;
-    margin-inline-end: ${space.xxs}px;
-    min-height: ${touchTargetMin}px;
-    min-width: ${touchTargetMin}px;
-    padding: ${space.xxs}px;
-
-    &:active {
-        cursor: grabbing;
-    }
-
-    &:focus-visible {
-        box-shadow: ${shadow.focus};
-        outline: 2px solid transparent;
-        outline-offset: 2px;
-    }
-
-    @media (pointer: coarse) {
-        min-height: ${touchTargetCoarse}px;
-        min-width: ${touchTargetCoarse}px;
-    }
-`;
-
-const ColumnTitle = styled(Typography.Title)`
-    && {
-        color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-        font-size: ${fontSize.xs}px;
-        font-weight: ${fontWeight.semibold};
-        letter-spacing: ${letterSpacing.wide};
-        margin: 0;
-    }
-`;
-
-const ColumnDot = styled.span<{ statusColor: string }>`
-    background: ${(props) => props.statusColor};
-    border-radius: 50%;
-    box-shadow: 0 0 0 4px ${(props) => `${props.statusColor}33`};
-    display: inline-block;
-    flex: 0 0 auto;
-    height: 8px;
-    width: 8px;
-`;
 
 const STATUS_PALETTE = [
     "#94A3B8",
@@ -965,8 +216,21 @@ const dotForColumn = (id: string): string => {
     return STATUS_PALETTE[Math.abs(hash) % STATUS_PALETTE.length];
 };
 
-// Column "done" categories shown in the edit picker — same source of truth
-// the creator uses. Listed explicitly so the order is stable across renders.
+/**
+ * Per-priority tint, escalating low → urgent. `none` is absent from the map
+ * because that branch renders no badge at all. The glyph is identical across
+ * levels (a flag); the visible label + aria-label disambiguate, so colour is
+ * never the sole carrier of meaning.
+ */
+const PRIORITY_TINT: Record<Exclude<TaskPriorityLevel, "none">, string> = {
+    low: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45))",
+    medium: "var(--ant-color-info, #2563eb)",
+    high: "var(--pulse-priority-high, #b45309)",
+    urgent: "var(--ant-color-error, #dc2626)"
+};
+
+// Column categories shown in the edit picker — same source of truth the
+// creator uses. Listed explicitly so the order is stable across renders.
 const COLUMN_CATEGORY_OPTIONS: NonNullable<IColumn["category"]>[] = [
     "todo",
     "in_progress",
@@ -974,13 +238,12 @@ const COLUMN_CATEGORY_OPTIONS: NonNullable<IColumn["category"]>[] = [
 ];
 
 /**
- * Column-edit modal (PRD §5.5 — the first real settings surface for
- * `columnName`, `category`, and `wipLimit`). The board PUT accepts exactly
+ * Column-edit modal (PRD §5.5). The board PUT accepts exactly
  * `{columnName, wipLimit, category}` keyed by `_id`; we send all three so a
- * single save can rename, re-categorise, and re-cap the column. The optimistic
- * `updateColumnCallback` patches the cached column instantly and
+ * single save can rename, re-categorise, and re-cap the column. The
+ * optimistic `updateColumnCallback` patches the cached column instantly and
  * `useReactMutation` rolls back on error. `wipLimit` is a non-negative int
- * (`0` = no limit, AC-C11), matched by the `InputNumber` `min={0}`.
+ * (`0` = no limit, AC-C11).
  */
 const ColumnEditModal: React.FC<{
     column: IColumn;
@@ -1050,80 +313,100 @@ const ColumnEditModal: React.FC<{
         });
     };
     return (
-        <Modal
-            centered
-            confirmLoading={isLoading}
-            okButtonProps={{ disabled: !trimmed }}
-            okText={microcopy.actions.save}
-            cancelText={microcopy.actions.cancel}
-            onCancel={onClose}
-            onOk={onSave}
+        <Dialog
+            onOpenChange={(next) => (next ? undefined : onClose())}
             open={open}
-            title={microcopy.column.editTitle}
         >
-            <label
-                style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: space.xxs,
-                    marginBottom: space.sm
-                }}
-            >
-                <span>{microcopy.a11y.newColumnName}</span>
-                <Input
-                    aria-label={microcopy.a11y.newColumnName}
-                    autoComplete="off"
-                    autoFocus
-                    enterKeyHint="done"
-                    inputMode="text"
-                    onChange={(e) => setName(e.target.value)}
-                    onPressEnter={onSave}
-                    value={name}
-                />
-            </label>
-            <label
-                style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: space.xxs,
-                    marginBottom: space.sm
-                }}
-            >
-                <span>{microcopy.a11y.newColumnCategory}</span>
-                <Select<NonNullable<IColumn["category"]>>
-                    aria-label={microcopy.a11y.newColumnCategory}
-                    onChange={setCategory}
-                    options={COLUMN_CATEGORY_OPTIONS.map((value) => ({
-                        label: microcopy.options.columnCategories[value],
-                        value
-                    }))}
-                    value={category}
-                />
-            </label>
-            <label
-                style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: space.xxs
-                }}
-            >
-                <span>{microcopy.fields.wipLimit}</span>
-                <InputNumber
-                    aria-label={microcopy.fields.wipLimit}
-                    inputMode="numeric"
-                    min={0}
-                    onChange={(value) =>
-                        setWipLimit(typeof value === "number" ? value : 0)
-                    }
-                    step={1}
-                    style={{ width: "100%" }}
-                    value={wipLimit}
-                />
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    {microcopy.column.wipLimitHelp}
-                </Typography.Text>
-            </label>
-        </Modal>
+            <DialogContent aria-describedby={undefined} className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{microcopy.column.editTitle}</DialogTitle>
+                </DialogHeader>
+                <div className="flex flex-col gap-sm">
+                    <label className="flex flex-col gap-xxs">
+                        <span>{microcopy.a11y.newColumnName}</span>
+                        <Input
+                            aria-label={microcopy.a11y.newColumnName}
+                            autoComplete="off"
+                            autoFocus
+                            enterKeyHint="done"
+                            inputMode="text"
+                            onChange={(e) => setName(e.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                    event.preventDefault();
+                                    onSave();
+                                }
+                            }}
+                            value={name}
+                        />
+                    </label>
+                    <label className="flex flex-col gap-xxs">
+                        <span>{microcopy.a11y.newColumnCategory}</span>
+                        <Select
+                            onValueChange={(value) =>
+                                setCategory(
+                                    value as NonNullable<IColumn["category"]>
+                                )
+                            }
+                            value={category}
+                        >
+                            <SelectTrigger
+                                aria-label={microcopy.a11y.newColumnCategory}
+                            >
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {COLUMN_CATEGORY_OPTIONS.map((value) => (
+                                    <SelectItem key={value} value={value}>
+                                        {
+                                            microcopy.options.columnCategories[
+                                                value
+                                            ]
+                                        }
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </label>
+                    <label className="flex flex-col gap-xxs">
+                        <span>{microcopy.fields.wipLimit}</span>
+                        <Input
+                            aria-label={microcopy.fields.wipLimit}
+                            inputMode="numeric"
+                            min={0}
+                            onChange={(e) => {
+                                const parsed = Number(e.target.value);
+                                setWipLimit(
+                                    e.target.value === "" ||
+                                        Number.isNaN(parsed)
+                                        ? 0
+                                        : parsed
+                                );
+                            }}
+                            step={1}
+                            type="number"
+                            value={wipLimit}
+                        />
+                        <Text className="text-xs" type="secondary">
+                            {microcopy.column.wipLimitHelp}
+                        </Text>
+                    </label>
+                </div>
+                <DialogFooter>
+                    <Button onClick={onClose} variant="default">
+                        {microcopy.actions.cancel}
+                    </Button>
+                    <Button
+                        disabled={!trimmed}
+                        loading={isLoading}
+                        onClick={onSave}
+                        variant="primary"
+                    >
+                        {microcopy.actions.save}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 };
 
@@ -1134,13 +417,10 @@ const DeleteDropDown: React.FC<{
     column: IColumn;
     /**
      * Whether the column currently holds any tasks. Column deletion
-     * cascades server-side (`board_service.delete` runs
-     * `delete_many(TASKS, { columnId })`) and the re-create POST mints a
-     * fresh column without those tasks — so a non-empty column delete has
-     * no honorable inverse. We gate on this to keep the §2.A.4 contract
-     * honest: empty columns get the optimistic-delete + Undo toast;
-     * non-empty columns fall back to a Modal.confirm (same reasoning that
-     * keeps project deletion on Modal.confirm).
+     * cascades server-side and the re-create POST mints a fresh column
+     * without those tasks — so a non-empty column delete has no honorable
+     * inverse. Empty columns get the optimistic-delete + Undo toast;
+     * non-empty columns fall back to a confirm dialog.
      */
     hasTasks: boolean;
 }> = ({ columnId, columnName, column, hasTasks }) => {
@@ -1156,9 +436,7 @@ const DeleteDropDown: React.FC<{
     );
     // Companion POST mutation used purely as the Undo closure: it
     // re-creates the just-deleted column with the captured snapshot so an
-    // accidental delete is recoverable. Fire-and-forget — the empty
-    // onError keeps useReactMutation's auto-toast suppressed because the
-    // user already initiated the Undo deliberately.
+    // accidental delete is recoverable.
     const { mutateAsync: undoDelete } = useReactMutation(
         "boards",
         "POST",
@@ -1168,40 +446,21 @@ const DeleteDropDown: React.FC<{
     );
     const { show: showUndoToast } = useUndoToast();
     const [editOpen, setEditOpen] = React.useState(false);
-    const onDelete = (id: string) => {
-        if (hasTasks) {
-            // Non-empty column: the server cascade-deletes every task in
-            // the column and re-create cannot restore them, so an Undo we
-            // can't honor would lie to the user. Confirm instead (§2.A.4 —
-            // Modal.confirm is reserved for irreversible operations).
-            Modal.confirm({
-                centered: true,
-                okText: microcopy.confirm.deleteColumn.confirmLabel,
-                cancelText: microcopy.actions.cancel,
-                okButtonProps: { danger: true },
-                title: microcopy.confirm.deleteColumn.title,
-                content: microcopy.confirm.deleteColumn.description,
-                onOk() {
-                    remove({ columnId: id });
-                }
-            });
-            return;
-        }
+    const [confirmOpen, setConfirmOpen] = React.useState(false);
+    const disabled = isOptimisticPlaceholderId(columnId);
+    const performEmptyDelete = () => {
         // Capture the full column payload BEFORE removal so the Undo
         // closure can POST it back. After the optimistic prune the cache
         // no longer carries it.
         const beforeState = column;
-        // Empty column — the delete is reversible (nothing cascades), so
-        // optimistic delete + Undo toast (§2.A.4), no Modal.confirm.
-        remove({ columnId: id });
+        remove({ columnId });
         showUndoToast({
             description: microcopy.feedback.columnDeleted,
             analyticsTag: "column.delete",
             // The optimistic delete prunes this column from the board, so
             // this Column instance unmounts on the same action; keep the
             // toast alive past unmount so the user still gets their Undo
-            // window. The inverse re-create runs through the persistent
-            // react-query client.
+            // window.
             dismissOnUnmount: false,
             undo: async () => {
                 await undoDelete(
@@ -1210,67 +469,89 @@ const DeleteDropDown: React.FC<{
             }
         });
     };
-    const items: MenuProps["items"] = [
-        {
-            key: "edit",
-            label: (
-                <NoPaddingButton
-                    aria-label={formatTemplate(
-                        microcopy.a11y.editColumnNamed as string,
-                        {
-                            name: columnName
-                        }
-                    )}
-                    disabled={isOptimisticPlaceholderId(columnId)}
-                    onClick={() => setEditOpen(true)}
-                    size="small"
-                    type="text"
-                >
-                    {microcopy.actions.edit}
-                </NoPaddingButton>
-            )
-        },
-        {
-            key: "delete",
-            label: (
-                <NoPaddingButton
-                    aria-label={formatTemplate(
-                        microcopy.a11y.deleteColumnNamed as string,
-                        {
-                            name: columnName
-                        }
-                    )}
-                    danger
-                    disabled={isOptimisticPlaceholderId(columnId)}
-                    onClick={() => onDelete(columnId)}
-                    size="small"
-                    type="text"
-                >
-                    {microcopy.actions.delete}
-                </NoPaddingButton>
-            )
+    const onDelete = () => {
+        if (hasTasks) {
+            // Non-empty column: the server cascade-deletes every task and
+            // re-create cannot restore them, so an Undo we can't honor
+            // would lie to the user. Confirm instead (§2.A.4).
+            setConfirmOpen(true);
+            return;
         }
-    ];
+        performEmptyDelete();
+    };
     return (
         <>
-            <Dropdown menu={{ items }}>
-                <NoPaddingButton
-                    aria-label={formatTemplate(
-                        microcopy.a11y.moreActionsForColumn as string,
-                        {
-                            name: columnName
-                        }
-                    )}
-                    icon={<MoreOutlined />}
-                    size="small"
-                    type="text"
-                />
-            </Dropdown>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <NoPaddingButton
+                        aria-label={formatTemplate(
+                            microcopy.a11y.moreActionsForColumn as string,
+                            { name: columnName }
+                        )}
+                        icon={<MoreVertical aria-hidden />}
+                    />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                        aria-label={formatTemplate(
+                            microcopy.a11y.editColumnNamed as string,
+                            { name: columnName }
+                        )}
+                        disabled={disabled}
+                        onSelect={() => setEditOpen(true)}
+                    >
+                        {microcopy.actions.edit}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                        aria-label={formatTemplate(
+                            microcopy.a11y.deleteColumnNamed as string,
+                            { name: columnName }
+                        )}
+                        className="text-destructive focus:text-destructive"
+                        disabled={disabled}
+                        onSelect={onDelete}
+                    >
+                        {microcopy.actions.delete}
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
             <ColumnEditModal
                 column={column}
                 onClose={() => setEditOpen(false)}
                 open={editOpen}
             />
+            <Dialog onOpenChange={setConfirmOpen} open={confirmOpen}>
+                <DialogContent
+                    aria-describedby={undefined}
+                    className="max-w-md"
+                >
+                    <DialogHeader>
+                        <DialogTitle>
+                            {microcopy.confirm.deleteColumn.title}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-muted-foreground">
+                        {microcopy.confirm.deleteColumn.description}
+                    </p>
+                    <DialogFooter>
+                        <Button
+                            onClick={() => setConfirmOpen(false)}
+                            variant="default"
+                        >
+                            {microcopy.actions.cancel}
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                remove({ columnId });
+                                setConfirmOpen(false);
+                            }}
+                            variant="destructive"
+                        >
+                            {microcopy.confirm.deleteColumn.confirmLabel}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 };
@@ -1307,6 +588,7 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
             isMock,
             dragDisabledByFilters,
             "aria-label": ariaLabel,
+            className,
             ...rest
         },
         ref
@@ -1324,8 +606,7 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
         const isBug = normalizeTaskType(task.type) === "Bug";
         // Resolve the task's label ids to the project's label objects (name
         // + colour). Unknown ids (a label deleted since the task was tagged)
-        // are dropped rather than rendered as a blank chip. Order follows
-        // `task.labelIds` so the chips are stable across renders.
+        // are dropped rather than rendered as a blank chip.
         const taskLabels = (task.labelIds ?? [])
             .map((id) => (labels ?? []).find((label) => label._id === id))
             .filter((label): label is ILabel => Boolean(label));
@@ -1335,27 +616,17 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                   date: task.dueDate
               })
             : "";
-        // Priority badge (PRD §3.4): `none` / absent renders nothing, so the
-        // badge only surfaces once a task is deliberately prioritised. The
-        // label is read from the localized `options.priorities` dictionary
-        // and reinforced by `PRIORITY_TINT`. Narrowing to the non-`none`
-        // union here lets both maps index the priority safely (single-source
-        // `TaskPriorityLevel`).
+        // Priority badge (PRD §3.4): `none` / absent renders nothing.
         const priority: TaskPriorityLevel | undefined = task.priority;
         const activePriority: Exclude<TaskPriorityLevel, "none"> | null =
             priority !== undefined && priority !== "none" ? priority : null;
-        // Blocked badge (PRD §4.5): the server returns `blockedBy` — the ids of
-        // this task's UNFINISHED prerequisites — on `GET /tasks`. A non-empty
-        // array means the task can't start yet, so the badge surfaces; an
-        // empty/absent array renders nothing. Read-only signal in this slice.
+        // Blocked badge (PRD §4.5): a non-empty server-derived `blockedBy`
+        // array means the task has ≥1 unfinished prerequisite.
         const blocked =
             Array.isArray(task.blockedBy) && task.blockedBy.length > 0;
-        // Completed badge (PRD §3 lifecycle): the server sets `completedAt`
-        // (an ISO timestamp) while the task sits in a done-category column and
-        // clears it on exit, so a truthy value is an authoritative "this task
-        // is done" signal. Guard `Boolean(task.completedAt)` BEFORE handing the
-        // value to dayjs — `dayjs(undefined)` is "now" and would render a bogus
-        // date — then validate it parses before formatting.
+        // Completed badge (PRD §3 lifecycle): `completedAt` is a
+        // server-managed timestamp. Guard truthiness BEFORE dayjs —
+        // `dayjs(undefined)` is "now" and would render a bogus date.
         const completed =
             Boolean(task.completedAt) && dayjs(task.completedAt).isValid();
         const completedLabel = completed
@@ -1363,11 +634,8 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                   date: dayjs(task.completedAt).format("YYYY-MM-DD")
               })
             : "";
-        // Milestone badge (PRD milestones): resolve `task.milestoneId` against
-        // the project's milestones (threaded board → column → card, same as
-        // labels). An unset id — or one that no longer resolves (the milestone
-        // was deleted since assignment) — renders nothing, so the chip is
-        // gated on both the id AND a resolved milestone below.
+        // Milestone badge: resolve `task.milestoneId` against the project's
+        // milestones. An unset or dangling id renders nothing.
         const milestone = (milestones ?? []).find(
             (m) => m._id === task.milestoneId
         );
@@ -1377,34 +645,18 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
               })
             : "";
         // Read per-result strength from the AI search cache (P1-2). Returns
-        // null when no semantic filter is active, so the badge stays out of
-        // the way during normal browsing.
+        // null when no semantic filter is active.
         const strength = getAiSearchStrength("tasks", task._id);
         /*
-         * Inline-edit title (Phase 4.5 of `docs/todo/ui-todo.md`):
-         * double-click the title to swap it for an Input that mutates the
-         * task in place. We reuse the SAME ``tasks PUT`` mutation that
-         * `taskModal` uses so optimistic update + cache invalidation work
-         * identically across both surfaces — the rename flows through
-         * `/api/v1/tasks` like any modal save.
+         * Inline-edit title (Phase 4.5): double-click the title to swap it
+         * for an Input that mutates the task in place. We reuse the SAME
+         * `tasks PUT` mutation that `taskModal` uses so optimistic update +
+         * cache invalidation work identically across both surfaces.
          *
-         * Why double-click instead of single-click? Single-click is
-         * already bound to "open the task" (modal or routed panel). The
-         * cross-cutting `e` shortcut in `docs/todo/ui-todo.md` §2.A.9
-         * also opens the modal, so trading "e" for inline-rename would
-         * silently break a global affordance. Double-click is a Linear /
-         * Notion / GitHub project convention for "I meant the title,
-         * not the row," so users familiar with those tools find it
-         * intuitively.
-         *
-         * Why blur → commit? Two reasons. (1) Linear is the dominant
-         * convention for task-card inline edits, and committing on blur
-         * matches the user's mental model of "I clicked away, save what
-         * I typed." (2) The alternative — revert on blur — silently
-         * eats typed edits when the user thinks they've already
-         * committed; that's a worse failure mode than an accidental
-         * commit (Enter / Esc are both available to disambiguate
-         * deliberately).
+         * Why blur → commit? Linear is the dominant convention for
+         * task-card inline edits, and committing on blur matches the user's
+         * "I clicked away, save what I typed" mental model. Enter / Esc are
+         * available to disambiguate deliberately.
          */
         const { mutate: updateTask, isLoading: isUpdating } = useReactMutation(
             "tasks",
@@ -1414,28 +666,19 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
         const [editing, setEditing] = React.useState(false);
         const [draft, setDraft] = React.useState(task.taskName);
         const cardRef = React.useRef<HTMLButtonElement | null>(null);
-        const inputRef = React.useRef<InputRef | null>(null);
+        const inputRef = React.useRef<HTMLInputElement | null>(null);
         /*
-         * Browsers fire `click → click → dblclick` for a real
-         * double-click. Stopping propagation on `dblclick` alone is
-         * not enough — both preceding `click` events would still
-         * bubble to TaskCardOuter and trigger `onOpen()`, opening
-         * the modal underneath the inline-edit Input. We defer the
-         * outer-card open by ~250 ms; if a `dblclick` lands inside
-         * that window, `enterEditing` cancels the pending timer and
-         * the modal never fires. The timeout id is kept in a ref so
-         * the cancellation path can find it across renders.
-         *
-         * 250 ms matches the OS-level dblclick threshold on macOS /
-         * Windows (Linear / Notion use the same envelope). Lower
-         * values race against slow-finger users; higher values add
-         * perceptible lag to a plain single click.
+         * Browsers fire `click → click → dblclick` for a real double-click.
+         * Stopping propagation on `dblclick` alone isn't enough — the two
+         * preceding `click` events would still bubble to the card and open
+         * the modal underneath the inline-edit Input. We defer the outer
+         * open by ~250 ms; a `dblclick` inside that window cancels the
+         * pending timer so the modal never fires. 250 ms matches the OS
+         * dblclick threshold (Linear / Notion use the same envelope).
          */
         const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
             null
         );
-        // Cancel any pending open timer on unmount so we don't open
-        // a modal for a card that has scrolled out of the column.
         React.useEffect(
             () => () => {
                 if (openTimerRef.current !== null) {
@@ -1460,13 +703,8 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
             },
             [ref]
         );
-        /*
-         * Sync `draft` to upstream renames (server roundtrip finishes,
-         * react-query refetch, or another client edits the same task).
-         * Compare against the source of truth — `task.taskName` — and
-         * only mirror it back into the draft when the user is NOT
-         * actively editing, otherwise we'd clobber in-flight keystrokes.
-         */
+        // Sync `draft` to upstream renames unless the user is actively
+        // editing (so we don't clobber in-flight keystrokes).
         React.useEffect(() => {
             if (!editing) setDraft(task.taskName);
         }, [editing, task.taskName]);
@@ -1474,9 +712,6 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
             (opts?: { restoreFocus?: boolean }) => {
                 setEditing(false);
                 if (opts?.restoreFocus !== false) {
-                    // Defer until after the Input has unmounted so React
-                    // doesn't fight the focus-on-mount of the next card
-                    // when the user tabs away.
                     queueMicrotask(() => cardRef.current?.focus());
                 }
             },
@@ -1484,9 +719,8 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
         );
         const commitDraft = React.useCallback(() => {
             const trimmed = draft.trim();
-            // No-op commit when the trimmed value equals the current
-            // server value — saves a request AND avoids react-query
-            // invalidating a list that didn't actually change.
+            // No-op commit when the trimmed value equals the current server
+            // value — saves a request AND avoids a needless invalidation.
             if (!trimmed || trimmed === task.taskName) {
                 exitEditing();
                 return;
@@ -1500,12 +734,9 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
         }, [exitEditing, task.taskName]);
         const enterEditing = React.useCallback(
             (event: React.MouseEvent<HTMLDivElement>) => {
-                // Double-click on the title — stop propagation so the
-                // outer `onClick={onOpen}` doesn't also fire and open
-                // the modal underneath our Input. Stopping propagation
-                // suppresses the `dblclick` bubble; the click-timer
-                // cancellation below handles the two preceding `click`
-                // events that already fired before this handler runs.
+                // Double-click on the title — stop propagation so the outer
+                // open handler doesn't also fire, and cancel the pending
+                // single-click open timer.
                 event.stopPropagation();
                 if (openTimerRef.current !== null) {
                     clearTimeout(openTimerRef.current);
@@ -1514,25 +745,16 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                 if (isMock) return;
                 setDraft(task.taskName);
                 setEditing(true);
-                // Defer the focus so AntD Input's own autoFocus path
-                // has time to mount the underlying <input>.
-                queueMicrotask(() =>
-                    inputRef.current?.focus({ cursor: "all" })
-                );
+                queueMicrotask(() => {
+                    const node = inputRef.current;
+                    if (node) {
+                        node.focus();
+                        node.select();
+                    }
+                });
             },
             [isMock, task.taskName]
         );
-        /*
-         * Outer card click → deferred `onOpen`. The first `click` of
-         * a real double-click sequence lands here ~10–30 ms before
-         * the matching `dblclick` reaches `enterEditing` on the
-         * title; the 250 ms timer gives `enterEditing` a window to
-         * cancel before the modal opens. A plain single click
-         * resolves the timer normally — there's a ~250 ms perceived
-         * lag, but it sits below the 300 ms threshold most users
-         * register as "delayed" and matches Linear's behaviour for
-         * card rows that support inline edit.
-         */
         const handleCardClick = React.useCallback(() => {
             if (!onOpen) return;
             if (openTimerRef.current !== null) {
@@ -1544,16 +766,27 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
             }, 250);
         }, [onOpen]);
         const cardButton = (
-            <TaskCardOuter
-                $dragDisabledByFilters={dragDisabledByFilters}
-                $selectable={selectable}
+            <button
+                aria-keyshortcuts="Space ArrowUp ArrowDown ArrowLeft ArrowRight Escape"
                 aria-label={
                     ariaLabel ??
                     formatTemplate(microcopy.a11y.openTask as string, {
                         name: task.taskName
                     })
                 }
-                aria-keyshortcuts="Space ArrowUp ArrowDown ArrowLeft ArrowRight Escape"
+                className={cn(
+                    "block w-full rounded-md border border-border bg-card text-left text-card-foreground",
+                    "shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-[border-color,box-shadow,transform] duration-[120ms] ease-out",
+                    "[padding:var(--density-card-padding-y,12px)_var(--density-card-padding-x,16px)]",
+                    "hover:enabled:-translate-y-px hover:enabled:border-[color:var(--glass-border-strong)] hover:enabled:shadow-md",
+                    "focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "active:enabled:translate-y-0 disabled:cursor-default disabled:opacity-70",
+                    dragDisabledByFilters
+                        ? "cursor-not-allowed"
+                        : "cursor-pointer",
+                    selectable && "coarse:pl-[52px] coarse:pt-[52px]",
+                    className
+                )}
                 disabled={isMock}
                 onClick={handleCardClick}
                 ref={setCardRef}
@@ -1566,34 +799,47 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                 {...rest}
             >
                 {task.epic ? (
-                    <EpicTag
-                        color={isBug ? "magenta" : "geekblue"}
-                        variant="filled"
+                    <Badge
+                        className={cn(
+                            "mb-xs max-w-full whitespace-normal border-transparent px-xs text-xs font-medium [word-break:break-word]",
+                            isBug
+                                ? "bg-[#DB2777]/10 text-[#DB2777]"
+                                : "bg-[#2f54eb]/10 text-[#2f54eb]"
+                        )}
                     >
                         {task.epic}
-                    </EpicTag>
+                    </Badge>
                 ) : null}
                 {taskLabels.length > 0 ? (
-                    <LabelRow aria-label={microcopy.fields.labels}>
-                        {taskLabels.map((label) => (
-                            <LabelChip
-                                key={label._id}
-                                variant="filled"
-                                {...labelTagProps(label.color)}
-                            >
-                                {label.name}
-                            </LabelChip>
-                        ))}
-                    </LabelRow>
+                    <div
+                        aria-label={microcopy.fields.labels}
+                        className="mb-xs flex flex-wrap gap-xxs"
+                    >
+                        {taskLabels.map((label) => {
+                            const { style: labelStyle } = labelTagProps(
+                                label.color
+                            );
+                            return (
+                                <Badge
+                                    className="m-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap border-transparent bg-secondary text-xs font-medium text-secondary-foreground"
+                                    key={label._id}
+                                    style={labelStyle}
+                                >
+                                    {label.name}
+                                </Badge>
+                            );
+                        })}
+                    </div>
                 ) : null}
                 {editing ? (
-                    <CardTitle
-                        // The Input is a button child — every pointer/
-                        // key event has to be quarantined or the parent
-                        // <button> would treat typing as a click and
-                        // open the modal underneath. The CardTitle is
-                        // already non-interactive so wrapping the Input
-                        // in it preserves the card's vertical rhythm.
+                    // Pure event-quarantine wrapper, not an interactive
+                    // control — a role would mislead assistive tech.
+                    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+                    <div
+                        className={CARD_TITLE_CLASS}
+                        // The Input is a button child — every pointer/key
+                        // event has to be quarantined or the parent
+                        // <button> would treat typing as a click.
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
                         onMouseDown={(e) => e.stopPropagation()}
@@ -1602,6 +848,7 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                             aria-label={microcopy.a11y.renameTask as string}
                             autoComplete="off"
                             autoFocus
+                            className="h-auto [font-size:var(--density-card-title-fs,14px)] leading-[1.4]"
                             data-testid="task-card-title-input"
                             disabled={isUpdating}
                             enterKeyHint="done"
@@ -1610,11 +857,9 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                             onChange={(e) => setDraft(e.target.value)}
                             onClick={(e) => e.stopPropagation()}
                             /*
-                             * Enter / Esc are handled in `onKeyDown`
-                             * rather than AntD's `onPressEnter` so a
-                             * single commit fires per keypress — using
-                             * both raises the mutation twice on the same
-                             * Enter event.
+                             * Enter / Esc are handled here rather than via a
+                             * separate onPressEnter so a single commit fires
+                             * per keypress.
                              */
                             onKeyDown={(e) => {
                                 e.stopPropagation();
@@ -1627,31 +872,35 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                                 }
                             }}
                             ref={inputRef}
-                            size="small"
                             value={draft}
                         />
-                    </CardTitle>
+                    </div>
                 ) : (
-                    <CardTitle
+                    // Double-click-to-rename lives on the card <button>; this
+                    // div only widens the hit area, so no separate role.
+                    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+                    <div
+                        className={CARD_TITLE_CLASS}
                         data-testid="task-card-title"
                         onDoubleClick={enterEditing}
                     >
                         {task.taskName}
-                    </CardTitle>
+                    </div>
                 )}
-                <CardFooter>
+                <div className={CARD_FOOTER_CLASS}>
                     {/* The label "Bug"/"Task" reads as the visible text and
-                     * the icon is decorative, so no Tooltip is needed —
-                     * the previous Tooltip duplicated the label and
-                     * announced it twice to screen readers. */}
-                    <TaskTypeBadge $isBug={isBug}>
-                        {/* Explicit width/height attributes lock the badge's
-                         * aspect ratio so the card row never shifts while
-                         * the SVG asset is loading (CLS red flag, doc §3 —
-                         * Layout shift). The styled-component CSS still wins
-                         * for visual sizing, but the HTML hint prevents the
-                         * brief 0×0 reservation that would otherwise jump
-                         * neighbouring cards on slow networks. */}
+                     * the icon is decorative, so no Tooltip is needed. */}
+                    <span
+                        className="inline-flex items-center gap-xxs font-medium"
+                        style={{
+                            color: isBug
+                                ? "#DB2777"
+                                : "var(--pulse-brand-primary, #EA580C)"
+                        }}
+                    >
+                        {/* Explicit width/height locks the badge's aspect
+                         * ratio so the row never shifts while the SVG loads
+                         * (CLS). */}
                         <img
                             alt=""
                             aria-hidden
@@ -1665,31 +914,32 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                                 ? microcopy.options.taskTypes.bug
                                 : microcopy.options.taskTypes.task}
                         </span>
-                    </TaskTypeBadge>
-                    <CardMeta>
+                    </span>
+                    <span className={CARD_META_CLASS}>
                         {completed ? (
-                            <CompletedBadge
+                            <span
                                 aria-label={completedLabel}
+                                className="inline-flex items-center gap-xxs whitespace-nowrap font-semibold text-success [&_svg]:size-4"
                                 data-testid="task-card-completed"
                             >
-                                <CheckCircleFilled aria-hidden />
+                                <CheckCircle2 aria-hidden />
                                 <span>{microcopy.taskCard.completed}</span>
-                            </CompletedBadge>
+                            </span>
                         ) : null}
                         {blocked && !completed ? (
-                            <BlockedBadge
+                            <span
                                 aria-label={
                                     microcopy.a11y.blockedTask as string
                                 }
+                                className="inline-flex items-center gap-xxs whitespace-nowrap font-semibold text-destructive [&_svg]:size-4"
                                 data-testid="task-card-blocked"
                             >
-                                <StopOutlined aria-hidden />
+                                <Ban aria-hidden />
                                 <span>{microcopy.taskCard.blocked}</span>
-                            </BlockedBadge>
+                            </span>
                         ) : null}
                         {activePriority ? (
-                            <PriorityBadge
-                                $tint={PRIORITY_TINT[activePriority]}
+                            <span
                                 aria-label={formatTemplate(
                                     microcopy.a11y.priorityTask as string,
                                     {
@@ -1699,9 +949,11 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                                             ]
                                     }
                                 )}
+                                className="inline-flex items-center gap-xxs whitespace-nowrap font-semibold [&_svg]:size-4"
                                 data-testid="task-card-priority"
+                                style={{ color: PRIORITY_TINT[activePriority] }}
                             >
-                                <FlagFilled aria-hidden />
+                                <Flag aria-hidden />
                                 <span>
                                     {
                                         microcopy.options.priorities[
@@ -1709,62 +961,69 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                                         ]
                                     }
                                 </span>
-                            </PriorityBadge>
+                            </span>
                         ) : null}
                         {overdue && !completed ? (
-                            <OverdueChip
+                            <span
                                 aria-label={overdueLabel}
+                                className="inline-flex items-center gap-xxs whitespace-nowrap font-semibold text-destructive [&_svg]:size-4"
                                 data-testid="task-card-overdue"
                             >
-                                <ClockCircleOutlined aria-hidden />
+                                <Clock aria-hidden />
                                 <span>{microcopy.taskCard.overdue}</span>
-                            </OverdueChip>
+                            </span>
                         ) : null}
                         {task.milestoneId && milestone ? (
-                            <MilestoneBadge
+                            <span
                                 aria-label={milestoneLabel}
+                                className="inline-flex min-w-0 max-w-[12ch] items-center gap-xxs overflow-hidden whitespace-nowrap font-medium text-muted-foreground [&>span]:overflow-hidden [&>span]:text-ellipsis [&_svg]:size-4"
                                 data-testid="task-card-milestone"
                                 title={milestone.name}
                             >
-                                <FlagFilled aria-hidden />
+                                <Flag aria-hidden />
                                 <span>{milestone.name}</span>
-                            </MilestoneBadge>
+                            </span>
                         ) : null}
                         {strength ? (
                             <AiMatchStrengthBadge strength={strength} />
                         ) : null}
                         {typeof task.storyPoints === "number" ? (
-                            <StoryPointsTag variant="filled">
+                            <Badge
+                                className="m-0 font-semibold tabular-nums"
+                                variant="secondary"
+                            >
                                 {microcopy.brief.markdownStoryPoints.replace(
                                     "{count}",
                                     String(task.storyPoints)
                                 )}
-                            </StoryPointsTag>
+                            </Badge>
                         ) : null}
                         {coordinator ? (
-                            <Tooltip
-                                title={formatTemplate(
-                                    microcopy.a11y.assignedTo as string,
-                                    {
-                                        name: coordinator.username
-                                    }
-                                )}
-                            >
-                                <UserAvatar
-                                    aria-label={formatTemplate(
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="inline-flex">
+                                        <UserAvatar
+                                            aria-label={formatTemplate(
+                                                microcopy.a11y
+                                                    .assignedTo as string,
+                                                { name: coordinator.username }
+                                            )}
+                                            id={coordinator._id}
+                                            name={coordinator.username}
+                                        />
+                                    </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    {formatTemplate(
                                         microcopy.a11y.assignedTo as string,
-                                        {
-                                            name: coordinator.username
-                                        }
+                                        { name: coordinator.username }
                                     )}
-                                    id={coordinator._id}
-                                    name={coordinator.username}
-                                />
+                                </TooltipContent>
                             </Tooltip>
                         ) : null}
-                    </CardMeta>
-                </CardFooter>
-            </TaskCardOuter>
+                    </span>
+                </div>
+            </button>
         );
         if (!selectable) {
             return cardButton;
@@ -1776,9 +1035,23 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
             { name: task.taskName }
         );
         return (
-            <SelectableShell data-selected={selected ? "true" : "false"}>
-                <SelectionCheckboxSlot
-                    $selected={Boolean(selected)}
+            <div
+                className={cn(
+                    "relative w-full",
+                    "[&:focus-within_[data-select-slot]]:opacity-100 [&:hover_[data-select-slot]]:opacity-100"
+                )}
+                data-selected={selected ? "true" : "false"}
+            >
+                {/* Event-quarantine wrapper for the Checkbox; not itself
+                    interactive, so a role would mislead assistive tech. */}
+                {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+                <span
+                    className={cn(
+                        "absolute left-xs top-xs z-[2] inline-flex items-center justify-center rounded-sm bg-card p-[2px] transition-opacity",
+                        selected ? "opacity-100" : "opacity-0",
+                        "coarse:min-h-[44px] coarse:min-w-[44px] coarse:p-0 coarse:opacity-100",
+                        "coarse:[&_[role=checkbox]]:size-full"
+                    )}
                     data-select-slot
                     // Quarantine pointer events so toggling selection never
                     // bubbles to the card's open handler or kicks off a drag.
@@ -1789,11 +1062,11 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                         aria-label={selectLabel}
                         checked={Boolean(selected)}
                         data-testid="task-card-select"
-                        onChange={() => selection.toggle(task._id)}
+                        onCheckedChange={() => selection.toggle(task._id)}
                     />
-                </SelectionCheckboxSlot>
+                </span>
                 {cardButton}
-            </SelectableShell>
+            </div>
         );
     }
 );
@@ -1801,11 +1074,11 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
 TaskCard.displayName = "TaskCard";
 
 /**
- * Column props extend the native `<div>` HTML attributes so the
- * Drag wrapper (which spreads its `draggableProps` / `dragHandleProps`
- * onto the cloned child) and the BoardMinimap (which threads a
- * `data-minimap-column-id` identifier through for its in-view lookup)
- * can both attach data-attrs without per-attr forwarding plumbing.
+ * Column props extend the native `<div>` HTML attributes so the Drag
+ * wrapper (which spreads its `draggableProps` / `dragHandleProps` onto the
+ * cloned child) and the BoardMinimap (which threads a
+ * `data-minimap-column-id` identifier through) can both attach data-attrs
+ * without per-attr forwarding plumbing.
  */
 type ColumnComponentProps = React.HTMLAttributes<HTMLDivElement> & {
     tasks: ITask[];
@@ -1819,10 +1092,9 @@ type ColumnComponentProps = React.HTMLAttributes<HTMLDivElement> & {
      */
     taskDragDisabled?: boolean;
     /**
-     * True when row drag is disabled SOLELY because filters are active
-     * (not by an in-flight reorder). Surfaces a tooltip + `aria-disabled`
-     * affordance on the cards so the user understands why reordering is
-     * paused. Does not itself disable drag — `taskDragDisabled` does that.
+     * True when row drag is disabled SOLELY because filters are active.
+     * Surfaces a tooltip + affordance on the cards so the user understands
+     * why reordering is paused. Does not itself disable drag.
      */
     dragDisabledByFilters?: boolean;
     boardAiOn?: boolean;
@@ -1848,22 +1120,17 @@ const ColumnComponent = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
             labels = [],
             milestones = [],
             onResetFilters,
+            className,
+            style,
             ...props
         },
         ref
     ) => {
         /*
-         * Demonstration callsite for the Phase 3 A2 routed task
-         * panel. When `environment.taskPanelRouted` is on, the card
-         * click navigates to `/projects/:projectId/board/task/:taskId`
-         * (URL state, deep-linkable, browser-back-friendly) via
-         * `useTaskPanelNavigation`. When the flag is off, the click
-         * dispatches the Redux overlay action through `useTaskModal`
-         * exactly as before — this PR only flips ONE callsite so
-         * users can toggle the flag and validate both paths end-to-
-         * end. The follow-up cleanup PR migrates remaining callsites
-         * (palette, triage nudge, AI assist's "open similar task"
-         * link) and removes `TaskModal` once validated.
+         * Routed vs. modal task open. When `environment.taskPanelRouted` is
+         * on, the card click navigates to a deep-linkable URL via
+         * `useTaskPanelNavigation`; off, it dispatches the Redux overlay
+         * action through `useTaskModal`.
          */
         const { startEditing: openViaModal } = useTaskModal();
         const { openTask: openViaPanel } = useTaskPanelNavigation();
@@ -1872,14 +1139,11 @@ const ColumnComponent = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
             : openViaModal;
         const columnDragHandleProps = useDetachedDragHandleProps();
         /*
-         * Phase 4.2 — apply the user's board-density preference as a
-         * `data-density` data-attr on `ColumnContainer`. The styled
-         * component above writes the density-aware CSS custom
-         * properties under `&[data-density="compact"]`; reading the
-         * hook here lets the CSS cascade do the rest without
-         * threading the value through every styled child. The hook
-         * subscribes to Redux so a toggle in `taskSearchPanel`
-         * re-renders every column in lockstep.
+         * Phase 4.2 — apply the user's board-density preference. The
+         * `densityVars` helper writes the density-aware CSS custom
+         * properties onto the container root; descendants reference them,
+         * so no per-child threading is needed. The hook subscribes to Redux
+         * so a toggle re-renders every column in lockstep.
          */
         const { density } = useBoardDensity();
         const filteredTasks = tasks.filter(
@@ -1898,23 +1162,17 @@ const ColumnComponent = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
             tasks.length > 0 && filteredTasks.length === 0;
         /*
          * WIP limit (PRD §5.5). The over-limit verdict is a property of the
-         * column's REAL load, not of whatever search filter is active, so it
-         * reads the unfiltered `tasks.length` (same reasoning as the
-         * readiness pill above). `wipLimit === 0` (or absent) means "no
-         * limit" per the drift-detector contract, so the indicator only
-         * surfaces for a positive cap.
+         * column's REAL load, so it reads the unfiltered `tasks.length`.
+         * `wipLimit === 0` (or absent) means "no limit".
          */
         const wipLimit = column.wipLimit ?? 0;
         const wipCount = tasks.length;
         const overLimit = wipLimit > 0 && wipCount > wipLimit;
         /*
          * Column-readiness batch (Phase 4 W3). Runs the deterministic
-         * readiness engine over the (unfiltered) task list — the score
-         * is a property of the column's actual work, not of whatever
-         * filter the user has typed into the search bar. The hook
-         * short-circuits to a neutral report when the env flag is off,
-         * and `<ColumnReadinessPill>` renders nothing for the neutral
-         * state, so the header stays empty by default.
+         * readiness engine over the (unfiltered) task list. Short-circuits
+         * to a neutral report when the env flag is off; the pill renders
+         * nothing for the neutral state.
          */
         const readinessReport = useColumnReadiness({
             tasks,
@@ -1922,198 +1180,254 @@ const ColumnComponent = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
             enabled: environment.aiColumnReadinessEnabled
         });
         return (
-            <ColumnContainer data-density={density} {...props} ref={ref}>
+            <div
+                className={cn(COLUMN_CONTAINER_CLASS, className)}
+                data-density={density}
+                ref={ref}
+                style={{ ...densityVars(density), ...style }}
+                {...props}
+            >
                 {/*
-                 * Phase 4.6 — the ColumnHeader is now rendered *inside*
-                 * TaskContainer so its `position: sticky` pins against
-                 * that scroll port. As a sibling it would have
-                 * degenerated to plain relative (no nearest scrollable
-                 * ancestor) and not stuck at all.
+                 * Phase 4.6 — the ColumnHeader renders *inside* TaskContainer
+                 * so its sticky positioning pins against that scroll port.
                  */}
-                <TaskContainer data-testid="column-task-container">
-                    <ColumnHeader
-                        between
-                        data-glass-context="true"
-                        data-testid="column-header"
-                    >
-                        <span
+                <div
+                    className={TASK_CONTAINER_CLASS}
+                    data-testid="column-task-container"
+                >
+                    <TooltipProvider>
+                        <Row
+                            between
+                            className={cn(
+                                "rounded-[2px] bg-card/85 px-xs py-xxs",
+                                "[backdrop-filter:var(--ant-backdrop-filter-glass-subtle)] [-webkit-backdrop-filter:var(--ant-backdrop-filter-glass-subtle)]",
+                                "before:pointer-events-none before:absolute before:inset-0 before:z-0 before:rounded-[inherit] before:content-[''] before:[background:var(--glass-specular-top)]",
+                                "after:pointer-events-none after:absolute after:inset-0 after:z-0 after:rounded-[inherit] after:content-[''] after:[background:var(--glass-specular-bottom)]",
+                                "[&>*]:relative [&>*]:z-[1]",
+                                "[@media(prefers-reduced-transparency:reduce)]:bg-card [@media(prefers-reduced-transparency:reduce)]:[backdrop-filter:none] [@media(prefers-reduced-transparency:reduce)]:[-webkit-backdrop-filter:none] [@media(prefers-reduced-transparency:reduce)]:before:[background:none] [@media(prefers-reduced-transparency:reduce)]:after:[background:none]",
+                                "forced-colors:bg-[Canvas] forced-colors:[backdrop-filter:none] forced-colors:[-webkit-backdrop-filter:none] forced-colors:before:[background:none] forced-colors:after:[background:none]",
+                                "coarse:[&>button:last-child]:min-h-[44px] coarse:[&>button:last-child]:min-w-[44px] coarse:[&>div:last-child>button]:min-h-[44px] coarse:[&>div:last-child>button]:min-w-[44px]"
+                            )}
+                            data-glass-context="true"
+                            data-testid="column-header"
                             style={{
-                                alignItems: "center",
-                                display: "inline-flex",
-                                gap: space.xs,
-                                minWidth: 0
+                                position: "sticky",
+                                top: 0,
+                                zIndex: 10
                             }}
                         >
-                            {columnDragHandleProps ? (
-                                <ColumnDragHandleButton
-                                    type="button"
-                                    {...columnDragHandleProps}
-                                    aria-label={
-                                        microcopy.dragHints.columnDragHandle
-                                    }
-                                >
-                                    <HolderOutlined aria-hidden />
-                                </ColumnDragHandleButton>
-                            ) : null}
-                            <ColumnDot
-                                aria-hidden
-                                statusColor={dotForColumn(column._id)}
-                            />
-                            <ColumnTitle level={4}>
-                                {column.columnName}
-                            </ColumnTitle>
-                            <Badge
-                                aria-label={`${filteredTasks.length} tasks in ${column.columnName}`}
-                                color="default"
-                                count={filteredTasks.length}
-                                showZero
-                                style={{
-                                    backgroundColor:
-                                        "var(--ant-color-fill-secondary, rgba(15, 23, 42, 0.06))",
-                                    color: "var(--ant-color-text-secondary, rgba(15, 23, 42, 0.55))",
-                                    fontWeight: 600
-                                }}
-                            />
-                            {wipLimit > 0 ? (
-                                <WipLimitBadge
-                                    $over={overLimit}
-                                    aria-label={formatTemplate(
-                                        (overLimit
-                                            ? microcopy.a11y.columnOverLimit
-                                            : microcopy.a11y
-                                                  .columnWipCount) as string,
-                                        {
-                                            count: wipCount,
-                                            limit: wipLimit,
-                                            over: wipCount - wipLimit
+                            <span className="inline-flex min-w-0 items-center gap-xs">
+                                {columnDragHandleProps ? (
+                                    <button
+                                        type="button"
+                                        {...columnDragHandleProps}
+                                        aria-label={
+                                            microcopy.dragHints.columnDragHandle
                                         }
-                                    )}
-                                    data-testid="column-wip-badge"
-                                >
-                                    {wipCount} / {wipLimit}
-                                </WipLimitBadge>
-                            ) : null}
-                            {overLimit ? (
-                                <OverLimitChip
-                                    aria-hidden
-                                    data-testid="column-wip-over"
-                                >
-                                    <WarningFilled aria-hidden />
-                                    <span>{microcopy.column.overLimit}</span>
-                                </OverLimitChip>
-                            ) : null}
-                            <ColumnReadinessPill report={readinessReport} />
-                        </span>
-                        <DeleteDropDown
-                            column={column}
-                            columnId={column._id}
-                            columnName={column.columnName}
-                            hasTasks={tasks.length > 0}
-                        />
-                    </ColumnHeader>
-                    <Drop
-                        type="ROW"
-                        direction="vertical"
-                        droppableId={String(column._id)}
-                    >
-                        <DropChild>
-                            {filteredTasks.map((task, index) => {
-                                const hasPersistedTaskId =
-                                    Boolean(task._id) &&
-                                    !isOptimisticPlaceholderId(task._id);
-                                const taskDragId = task._id
-                                    ? `task${task._id}`
-                                    : `task-unsaved-${index}`;
-                                // Only persisted cards are reorderable, so the
-                                // filter-paused affordance only applies there.
-                                const showFilterPausedHint =
-                                    dragDisabledByFilters && hasPersistedTaskId;
-
-                                const card = (
-                                    <TaskCard
-                                        className="task-card-lift-surface"
-                                        dragDisabledByFilters={
-                                            showFilterPausedHint
-                                        }
-                                        isMock={!hasPersistedTaskId}
-                                        labels={labels}
-                                        members={members}
-                                        milestones={milestones}
-                                        onOpen={
-                                            hasPersistedTaskId
-                                                ? () => startEditing(task._id)
-                                                : undefined
-                                        }
-                                        task={task}
-                                    />
-                                );
-
-                                return (
-                                    <Drag
-                                        key={task._id || taskDragId}
-                                        index={index}
-                                        draggableId={taskDragId}
-                                        isDragDisabled={
-                                            taskDragDisabled ||
-                                            !hasPersistedTaskId
-                                        }
-                                        // TaskCard renders a <button>, which @hello-pangea/dnd
-                                        // refuses to drag from by default; opt out of that block.
-                                        disableInteractiveElementBlocking
+                                        className={cn(
+                                            "mr-xxs inline-flex min-h-[24px] min-w-[24px] flex-none cursor-grab items-center justify-center rounded-sm border-0 bg-transparent p-xxs text-muted-foreground",
+                                            "active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                            "coarse:min-h-[44px] coarse:min-w-[44px] [&_svg]:size-4"
+                                        )}
                                     >
-                                        {/*
-                                         * The drag shell stays the direct child
-                                         * of <Drag> so dnd attaches its ref /
-                                         * draggable props to the real DOM node;
-                                         * the tooltip only wraps the inner card.
-                                         */}
-                                        <TaskRowDragShell
-                                            data-optimistic={
-                                                hasPersistedTaskId
-                                                    ? undefined
-                                                    : "true"
+                                        <GripVertical aria-hidden />
+                                    </button>
+                                ) : null}
+                                <span
+                                    aria-hidden
+                                    className="inline-block size-2 flex-none rounded-full"
+                                    style={{
+                                        background: dotForColumn(column._id),
+                                        boxShadow: `0 0 0 4px ${dotForColumn(
+                                            column._id
+                                        )}33`
+                                    }}
+                                />
+                                <Title
+                                    className="m-0 text-xs font-semibold tracking-wide text-muted-foreground"
+                                    level={4}
+                                >
+                                    {column.columnName}
+                                </Title>
+                                <Badge
+                                    aria-label={`${filteredTasks.length} tasks in ${column.columnName}`}
+                                    className="font-semibold"
+                                    variant="secondary"
+                                >
+                                    {filteredTasks.length}
+                                </Badge>
+                                {wipLimit > 0 ? (
+                                    <span
+                                        aria-label={formatTemplate(
+                                            (overLimit
+                                                ? microcopy.a11y.columnOverLimit
+                                                : microcopy.a11y
+                                                      .columnWipCount) as string,
+                                            {
+                                                count: wipCount,
+                                                limit: wipLimit,
+                                                over: wipCount - wipLimit
                                             }
-                                        >
-                                            {showFilterPausedHint ? (
-                                                <Tooltip
-                                                    title={
-                                                        microcopy.dragHints
-                                                            .reorderDisabledByFilters
-                                                    }
-                                                >
-                                                    {card}
-                                                </Tooltip>
-                                            ) : (
-                                                card
-                                            )}
-                                        </TaskRowDragShell>
-                                    </Drag>
-                                );
-                            })}
-                            <TaskCreator
-                                boardAiOn={boardAiOn}
-                                columnId={column._id}
-                                disabled={isDragDisabled}
-                            />
-                            {hasTasksHiddenByFilter ? (
-                                <FilteredEmpty aria-live="polite" role="status">
-                                    <span>
-                                        {microcopy.empty.filteredColumn.title}
+                                        )}
+                                        className={cn(
+                                            "inline-flex items-center gap-xxs whitespace-nowrap text-xs tabular-nums",
+                                            overLimit
+                                                ? "font-semibold text-destructive"
+                                                : "font-medium text-muted-foreground"
+                                        )}
+                                        data-testid="column-wip-badge"
+                                    >
+                                        {wipCount} / {wipLimit}
                                     </span>
-                                    {onResetFilters ? (
-                                        <FilteredEmptyButton
-                                            onClick={onResetFilters}
-                                            type="button"
+                                ) : null}
+                                {overLimit ? (
+                                    <span
+                                        aria-hidden
+                                        className="inline-flex items-center gap-xxs whitespace-nowrap text-xs font-semibold text-destructive [&_svg]:size-4"
+                                        data-testid="column-wip-over"
+                                    >
+                                        <AlertTriangle aria-hidden />
+                                        <span>
+                                            {microcopy.column.overLimit}
+                                        </span>
+                                    </span>
+                                ) : null}
+                                <ColumnReadinessPill report={readinessReport} />
+                            </span>
+                            <DeleteDropDown
+                                column={column}
+                                columnId={column._id}
+                                columnName={column.columnName}
+                                hasTasks={tasks.length > 0}
+                            />
+                        </Row>
+                        <Drop
+                            type="ROW"
+                            direction="vertical"
+                            droppableId={String(column._id)}
+                        >
+                            <DropChild>
+                                {filteredTasks.map((task, index) => {
+                                    const hasPersistedTaskId =
+                                        Boolean(task._id) &&
+                                        !isOptimisticPlaceholderId(task._id);
+                                    const taskDragId = task._id
+                                        ? `task${task._id}`
+                                        : `task-unsaved-${index}`;
+                                    const showFilterPausedHint =
+                                        dragDisabledByFilters &&
+                                        hasPersistedTaskId;
+
+                                    const card = (
+                                        <TaskCard
+                                            className="task-card-lift-surface"
+                                            dragDisabledByFilters={
+                                                showFilterPausedHint
+                                            }
+                                            isMock={!hasPersistedTaskId}
+                                            labels={labels}
+                                            members={members}
+                                            milestones={milestones}
+                                            onOpen={
+                                                hasPersistedTaskId
+                                                    ? () =>
+                                                          startEditing(task._id)
+                                                    : undefined
+                                            }
+                                            task={task}
+                                        />
+                                    );
+
+                                    return (
+                                        <Drag
+                                            key={task._id || taskDragId}
+                                            index={index}
+                                            draggableId={taskDragId}
+                                            isDragDisabled={
+                                                taskDragDisabled ||
+                                                !hasPersistedTaskId
+                                            }
+                                            // TaskCard renders a <button>, which
+                                            // @hello-pangea/dnd refuses to drag
+                                            // from by default; opt out of that
+                                            // block.
+                                            disableInteractiveElementBlocking
                                         >
-                                            {microcopy.empty.filteredColumn.cta}
-                                        </FilteredEmptyButton>
-                                    ) : null}
-                                </FilteredEmpty>
-                            ) : null}
-                        </DropChild>
-                    </Drop>
-                </TaskContainer>
-            </ColumnContainer>
+                                            {/*
+                                             * The drag shell stays the direct
+                                             * child of <Drag> so dnd attaches
+                                             * its ref / draggable props to the
+                                             * real DOM node; the tooltip only
+                                             * wraps the inner card.
+                                             */}
+                                            <div
+                                                className={
+                                                    TASK_ROW_DRAG_SHELL_CLASS
+                                                }
+                                                data-optimistic={
+                                                    hasPersistedTaskId
+                                                        ? undefined
+                                                        : "true"
+                                                }
+                                            >
+                                                {showFilterPausedHint ? (
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            {card}
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            {
+                                                                microcopy
+                                                                    .dragHints
+                                                                    .reorderDisabledByFilters
+                                                            }
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                ) : (
+                                                    card
+                                                )}
+                                            </div>
+                                        </Drag>
+                                    );
+                                })}
+                                <TaskCreator
+                                    boardAiOn={boardAiOn}
+                                    columnId={column._id}
+                                    disabled={isDragDisabled}
+                                />
+                                {hasTasksHiddenByFilter ? (
+                                    <div
+                                        aria-live="polite"
+                                        className={FILTERED_EMPTY_CLASS}
+                                        role="status"
+                                    >
+                                        <span>
+                                            {
+                                                microcopy.empty.filteredColumn
+                                                    .title
+                                            }
+                                        </span>
+                                        {onResetFilters ? (
+                                            <button
+                                                className={
+                                                    FILTERED_EMPTY_BUTTON_CLASS
+                                                }
+                                                onClick={onResetFilters}
+                                                type="button"
+                                            >
+                                                {
+                                                    microcopy.empty
+                                                        .filteredColumn.cta
+                                                }
+                                            </button>
+                                        ) : null}
+                                    </div>
+                                ) : null}
+                            </DropChild>
+                        </Drop>
+                    </TooltipProvider>
+                </div>
+            </div>
         );
     }
 );
@@ -2122,17 +1436,10 @@ ColumnComponent.displayName = "Column";
 
 /**
  * Memoized so board-level state changes that don't touch a column's own
- * props — opening the Copilot drawer, toggling project AI, the refresh
- * spinner, the swipe-hint dismissal — don't re-render every column (and,
- * transitively, every task card) on the board. The board now hands each
- * column stable prop refs: the per-column `tasks` bucket comes from a
- * memoized `Map`, `members` is the shared `EMPTY_MEMBERS` fallback or the
- * stable query ref, `param` is `useMemo`'d in `useUrl`, and
- * `onResetFilters` is `useCallback`'d. A real change — a search keystroke
- * (new `param`), a drag reorder (new `tasks`), or a member load — still
- * flows through because those refs genuinely change. The DnD `Drag`
- * wrapper spreads its own props onto the cloned element, but those are
- * forwarded via `...props` and only change when drag state actually does.
+ * props don't re-render every column (and, transitively, every task card).
+ * The board hands each column stable prop refs; a real change (search
+ * keystroke, drag reorder, member load) still flows through because those
+ * refs genuinely change.
  */
 const Column = React.memo(ColumnComponent);
 Column.displayName = "Column";

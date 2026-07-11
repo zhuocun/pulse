@@ -1,13 +1,8 @@
-import styled from "@emotion/styled";
 import React, { useEffect, useRef, useState } from "react";
 
-import {
-    easing,
-    fontSize,
-    fontWeight,
-    motion,
-    space
-} from "../../theme/tokens";
+import { cn } from "@/lib/utils";
+
+import { easing, motion } from "../../theme/tokens";
 import useHaptic from "../../utils/hooks/useHaptic";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useReducedMotion from "../../utils/hooks/useReducedMotion";
@@ -185,84 +180,30 @@ export const resolveSwipe = ({
         : { kind: "snap-back" };
 };
 
-/* -- Styled surfaces --------------------------------------------------- */
+/* -- Surface class fragments ------------------------------------------ */
 
 /**
- * Gesture-mode clip box. `overflow: hidden` keeps the action panes tucked
- * behind the foreground row from spilling out, `position: relative`
- * anchors the absolutely-positioned panes, and `touch-action: pan-y` lets
- * the browser keep vertical scroll everywhere except while we actively
- * `preventDefault` a claimed horizontal swipe.
+ * Gesture-mode clip box. `overflow-hidden` keeps the action panes tucked
+ * behind the foreground row from spilling out, `relative` anchors the
+ * absolutely-positioned panes, and `touch-pan-y` lets the browser keep
+ * vertical scroll everywhere except while we actively `preventDefault` a
+ * claimed horizontal swipe.
  */
-const Viewport = styled.div`
-    overflow: hidden;
-    position: relative;
-    touch-action: pan-y;
-`;
-
-interface ActionPaneProps {
-    $side: "leading" | "trailing";
-    $background: string;
-    $foreground: string;
-}
+const VIEWPORT_CLASS = "relative overflow-hidden touch-pan-y";
 
 /**
  * A revealed action pane, pinned to its edge and sitting BEHIND the
  * foreground row (which slides aside to reveal it). Pointer-only visual
  * enhancement that duplicates controls available elsewhere, so it is
  * `aria-hidden` and never focusable — the icon + label are decorative.
+ * The pane's background / foreground are consumer-supplied colors, so they
+ * ride as inline styles rather than utilities.
  */
-const ActionPane = styled.div<ActionPaneProps>`
-    align-items: center;
-    background: ${(p) => p.$background};
-    bottom: 0;
-    color: ${(p) => p.$foreground};
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xxs}px;
-    justify-content: center;
-    ${(p) => (p.$side === "leading" ? "left: 0;" : "right: 0;")}
-    padding-inline: ${space.lg}px;
-    position: absolute;
-    top: 0;
-`;
+const ACTION_PANE_CLASS =
+    "absolute bottom-0 top-0 flex flex-col items-center justify-center gap-xxs px-lg";
 
-const ActionIcon = styled.span`
-    align-items: center;
-    display: inline-flex;
-    font-size: ${fontSize.lg}px;
-    justify-content: center;
-`;
-
-const ActionLabel = styled.span`
-    font-size: ${fontSize.xs}px;
-    font-weight: ${fontWeight.medium};
-`;
-
-interface ForegroundProps {
-    $offset: number;
-    $settling: boolean;
-    $reducedMotion: boolean;
-}
-
-/**
- * The foreground row — translated horizontally by the live clamped offset
- * while dragging, then transitioned to its resting / committed position on
- * release. The transition runs ONLY while settling so the live
- * finger-tracking stays 1:1; reduced-motion users never reach this branch,
- * but the guard keeps the surface honest if that ever changes.
- */
-const Foreground = styled.div<ForegroundProps>`
-    background: var(--ant-color-bg-container, #ffffff);
-    position: relative;
-    transform: translate3d(${(p) => p.$offset}px, 0, 0);
-    transition: ${(p) =>
-        p.$reducedMotion || !p.$settling
-            ? "none"
-            : `transform ${motion.medium}ms ${easing.standard}`};
-    will-change: transform;
-    z-index: 1;
-`;
+const ACTION_ICON_CLASS = "inline-flex items-center justify-center text-lg";
+const ACTION_LABEL_CLASS = "text-xs font-medium";
 
 /* -- Component --------------------------------------------------------- */
 
@@ -515,49 +456,66 @@ const SwipeableRow: React.FC<SwipeableRowProps> = ({
     const showTrailing = offset < 0 && Boolean(trailingAction);
 
     return (
-        <Viewport data-testid={dataTestid} ref={viewportRef}>
+        <div
+            className={VIEWPORT_CLASS}
+            data-testid={dataTestid}
+            ref={viewportRef}
+        >
             {leadingAction && (
-                <ActionPane
-                    $background={leadingAction.background}
-                    $foreground={leadingAction.foreground ?? "#fff"}
-                    $side="leading"
+                <div
                     aria-hidden="true"
+                    className={cn(ACTION_PANE_CLASS, "left-0")}
                     data-testid={
                         dataTestid ? `${dataTestid}-leading` : undefined
                     }
-                    style={{ opacity: showLeading ? 1 : 0 }}
+                    style={{
+                        background: leadingAction.background,
+                        color: leadingAction.foreground ?? "#fff",
+                        opacity: showLeading ? 1 : 0
+                    }}
                 >
-                    <ActionIcon aria-hidden="true">
+                    <span aria-hidden="true" className={ACTION_ICON_CLASS}>
                         {leadingAction.icon}
-                    </ActionIcon>
-                    <ActionLabel>{leadingAction.label}</ActionLabel>
-                </ActionPane>
+                    </span>
+                    <span className={ACTION_LABEL_CLASS}>
+                        {leadingAction.label}
+                    </span>
+                </div>
             )}
             {trailingAction && (
-                <ActionPane
-                    $background={trailingAction.background}
-                    $foreground={trailingAction.foreground ?? "#fff"}
-                    $side="trailing"
+                <div
                     aria-hidden="true"
+                    className={cn(ACTION_PANE_CLASS, "right-0")}
                     data-testid={
                         dataTestid ? `${dataTestid}-trailing` : undefined
                     }
-                    style={{ opacity: showTrailing ? 1 : 0 }}
+                    style={{
+                        background: trailingAction.background,
+                        color: trailingAction.foreground ?? "#fff",
+                        opacity: showTrailing ? 1 : 0
+                    }}
                 >
-                    <ActionIcon aria-hidden="true">
+                    <span aria-hidden="true" className={ACTION_ICON_CLASS}>
                         {trailingAction.icon}
-                    </ActionIcon>
-                    <ActionLabel>{trailingAction.label}</ActionLabel>
-                </ActionPane>
+                    </span>
+                    <span className={ACTION_LABEL_CLASS}>
+                        {trailingAction.label}
+                    </span>
+                </div>
             )}
-            <Foreground
-                $offset={offset}
-                $reducedMotion={reducedMotion}
-                $settling={settling}
+            <div
+                className="relative z-[1] bg-background [will-change:transform]"
+                style={{
+                    transform: `translate3d(${offset}px, 0, 0)`,
+                    transition:
+                        reducedMotion || !settling
+                            ? "none"
+                            : `transform ${motion.medium}ms ${easing.standard}`
+                }}
             >
                 {children}
-            </Foreground>
-        </Viewport>
+            </div>
+        </div>
     );
 };
 

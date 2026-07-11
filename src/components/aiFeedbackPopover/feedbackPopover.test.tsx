@@ -1,11 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import {
-    coarseTouchTargetsFor,
-    ruleTextsFor,
-    styledClassFor
-} from "../../testUtils/styleRules";
+import { declaresTouchTarget } from "@/components/ui/testHelpers";
 
 import AiFeedbackPopover, {
     FEEDBACK_CATEGORIES,
@@ -120,23 +116,20 @@ describe("AiFeedbackPopover", () => {
 
     it("clamps the popover width and gives action buttons mobile touch targets", () => {
         render(<Harness />);
-        const contentClass = styledClassFor(
-            screen.getByTestId("ai-feedback-popover-content")
-        );
-        const actionsClass = styledClassFor(
-            screen.getByTestId("ai-feedback-popover-actions")
-        );
-        expect(contentClass).toBeTruthy();
-        expect(actionsClass).toBeTruthy();
+        const content = screen.getByTestId("ai-feedback-popover-content");
+        // The Tailwind primitives express the width clamp as an arbitrary
+        // utility (compiled stylesheet is not loaded in jsdom), so assert
+        // the class carries the responsive `min(320px, …)` / `100dvw` clamp.
+        expect(content.className).toContain("min(320px");
+        expect(content.className).toContain("100dvw");
 
-        const contentRules = ruleTextsFor(contentClass ?? "").join("\n");
-        expect(contentRules).toContain("100dvw");
-        expect(contentRules).toContain("max-width: min(320px");
-
-        const actionRules = ruleTextsFor(actionsClass ?? "").join("\n");
-        expect(actionRules).toContain("flex-wrap: wrap");
-        const { heights, widths } = coarseTouchTargetsFor(actionsClass ?? "");
-        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
-        expect(Math.max(...widths)).toBeGreaterThanOrEqual(44);
+        const actions = screen.getByTestId("ai-feedback-popover-actions");
+        expect(actions.className).toContain("flex-wrap");
+        // Every action button threads the canonical 44px coarse touch target.
+        const buttons = within(actions).getAllByRole("button");
+        expect(buttons.length).toBeGreaterThan(0);
+        buttons.forEach((button) => {
+            expect(declaresTouchTarget(button)).toBe(true);
+        });
     });
 });

@@ -1,4 +1,11 @@
-import { Modal } from "antd";
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import Sheet, { type SheetDetent } from "../sheet";
@@ -14,41 +21,44 @@ export type { SheetDetent };
  *     at the MEDIUM detent and draggable up to LARGE. The grabber, glass
  *     surface, scrim, and focus trap come from the Sheet primitive — this
  *     wrapper adds no chrome of its own.
- *   - Desktop / tablet / fine pointer → the AntD `<Modal>` unchanged, so
- *     the existing focused-edit experience is byte-for-byte preserved.
+ *   - Desktop / tablet / fine pointer → the shadcn `<Dialog>` (Radix), so
+ *     the existing focused-edit experience is preserved.
  *
  * Exactly one of the two renders per platform — never both — so the two
  * focus traps (the Sheet's `useFocusTrap` on the animated branch, the
- * Modal's own trap) can't fight over the same dialog.
+ * Dialog's own trap) can't fight over the same dialog.
  *
- * Mount behavior caveat: the phone Sheet does NOT honor `forceRender` /
- * `destroyOnHidden` and unmounts (or hides) its children when `open=false`,
- * whereas the desktop `<Modal>` honors them and can keep the subtree
- * mounted while hidden. For create/edit forms that reset
- * their fields on every open (the `projectModal` pattern) this divergence
- * is unobservable — the form is repopulated on open either way. Do NOT
- * route a form that relies on persisted-across-close field state through
- * this wrapper on phone without revisiting that assumption.
+ * Mount behavior caveat: BOTH branches now unmount their children when
+ * `open=false` (the phone Sheet always did; the Radix `<Dialog>` unmounts
+ * on close too). `forceRender` / `destroyOnHidden` are still accepted for
+ * source compatibility but no longer keep the subtree mounted while
+ * hidden. For create/edit forms that reset their fields on every open (the
+ * `projectModal` pattern) this is unobservable — the form is repopulated on
+ * open either way. Do NOT route a form that relies on persisted-across-close
+ * field state through this wrapper without revisiting that assumption.
  */
 export interface ResponsiveFormSheetProps {
     open: boolean;
-    /** Wired to BOTH the Modal `onCancel` and the Sheet `onClose`. */
+    /** Wired to BOTH the Dialog close and the Sheet `onClose`. */
     onClose: () => void;
     title?: React.ReactNode;
     children: React.ReactNode;
     /**
      * Footer slot — a plain node forwarded verbatim to both branches.
-     * (Pass already-rendered buttons; the AntD footer render-prop form
-     * is intentionally NOT supported so the same node serves the Sheet.)
+     * (Pass already-rendered buttons; a render-prop footer is intentionally
+     * NOT supported so the same node serves the Sheet.)
      */
     footer?: React.ReactNode;
 
-    /* -- Desktop-Modal-only (ignored on phone) ------------------------- */
+    /* -- Desktop-Dialog-only (ignored on phone) ------------------------ */
     width?: number | string;
+    /** Accepted for source compatibility; the Dialog is always centered. */
     centered?: boolean;
+    /** Accepted for source compatibility; see the mount-behavior caveat. */
     forceRender?: boolean;
+    /** Accepted for source compatibility; see the mount-behavior caveat. */
     destroyOnHidden?: boolean;
-    /** Desktop Modal only; the phone Sheet is styled via `rootClassName`. */
+    /** Desktop Dialog only; the phone Sheet is styled via `rootClassName`. */
     className?: string;
 
     /* -- Phone-Sheet-only (ignored on desktop) ------------------------- */
@@ -77,9 +87,6 @@ const ResponsiveFormSheet: React.FC<ResponsiveFormSheetProps> = ({
     children,
     footer,
     width,
-    centered,
-    forceRender,
-    destroyOnHidden,
     detents = DEFAULT_FORM_DETENTS,
     defaultDetent = "medium",
     showGrabber,
@@ -97,57 +104,70 @@ const ResponsiveFormSheet: React.FC<ResponsiveFormSheetProps> = ({
     if (isPhone) {
         return (
             <Sheet
-                open={open}
-                onClose={onClose}
-                detents={detents}
-                defaultDetent={defaultDetent}
-                showGrabber={showGrabber}
-                title={title}
-                footer={footer}
+                ariaLabelledBy={ariaLabelledBy}
                 closable={closable}
                 closeAriaLabel={closeAriaLabel}
-                maskClosable={maskClosable}
                 data-testid={dataTestid}
-                ariaLabelledBy={ariaLabelledBy}
+                defaultDetent={defaultDetent}
+                detents={detents}
+                footer={footer}
+                maskClosable={maskClosable}
+                onClose={onClose}
+                open={open}
                 rootClassName={rootClassName}
+                showGrabber={showGrabber}
                 styles={styles}
+                title={title}
             >
                 {children}
             </Sheet>
         );
     }
 
+    const labelledByProps = ariaLabelledBy
+        ? { "aria-labelledby": ariaLabelledBy }
+        : {};
+
     return (
-        <Modal
+        <Dialog
             open={open}
-            onCancel={onClose}
-            title={title}
-            footer={footer}
-            width={width}
-            centered={centered}
-            forceRender={forceRender}
-            destroyOnHidden={destroyOnHidden}
-            closable={closable}
-            /*
-             * AntD v6 deprecated the flat `maskClosable` prop in favour
-             * of `mask.closable`, and its deprecation check keys off the
-             * prop's PRESENCE (`'maskClosable' in props`), not its value —
-             * so forwarding `maskClosable={undefined}` would still emit a
-             * console warning. Route through the `mask` object shape and
-             * only when the consumer actually set it; otherwise omit it so
-             * AntD's default (mask shown, closable) stands untouched.
-             */
-            {...(maskClosable === undefined
-                ? {}
-                : { mask: { closable: maskClosable } })}
-            data-testid={dataTestid}
-            aria-labelledby={ariaLabelledBy}
-            className={className}
-            rootClassName={rootClassName}
-            styles={styles}
+            onOpenChange={(next) => {
+                if (!next) onClose();
+            }}
         >
-            {children}
-        </Modal>
+            <DialogContent
+                {...labelledByProps}
+                className={cn(className, rootClassName)}
+                data-testid={dataTestid}
+                hideClose={closable === false}
+                // `maskClosable=false` mirrors AntD's non-dismissible mask:
+                // block outside-click close while Escape / the close button
+                // still dismiss.
+                onInteractOutside={
+                    maskClosable === false
+                        ? (event) => event.preventDefault()
+                        : undefined
+                }
+                style={
+                    width === undefined
+                        ? undefined
+                        : {
+                              maxWidth:
+                                  typeof width === "number"
+                                      ? `${width}px`
+                                      : width
+                          }
+                }
+            >
+                {title ? (
+                    <DialogHeader>
+                        <DialogTitle>{title}</DialogTitle>
+                    </DialogHeader>
+                ) : null}
+                <div style={styles?.body}>{children}</div>
+                {footer ? <DialogFooter>{footer}</DialogFooter> : null}
+            </DialogContent>
+        </Dialog>
     );
 };
 

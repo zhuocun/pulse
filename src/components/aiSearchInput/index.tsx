@@ -1,6 +1,4 @@
-import { CloseCircleFilled, InfoCircleOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
-import { Alert, Button, Input, Space, Tag, Tooltip, Typography } from "antd";
+import { Info, X } from "lucide-react";
 import React, {
     useCallback,
     useEffect,
@@ -10,14 +8,22 @@ import React, {
     useState
 } from "react";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger
+} from "@/components/ui/tooltip";
+import { Typography } from "@/components/ui/typography";
+
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
-import {
-    breakpoints,
-    maxLineLengthCh,
-    space as themeSpace
-} from "../../theme/tokens";
+import { maxLineLengthCh, space as themeSpace } from "../../theme/tokens";
 import {
     clearAiSearchStrengths,
     setAiSearchStrengths
@@ -117,41 +123,16 @@ interface MatchStrengthSummary {
  * next row so the AI block reads as a single cohesive unit (mirrors
  * `ResetButtonSlot` in `taskSearchPanel`).
  */
-const SearchRow = styled.div`
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${themeSpace.xs}px;
+const SEARCH_ROW_CLASS = "flex flex-wrap items-center gap-xs";
+const SEARCH_INPUT_SLOT_CLASS =
+    "ai-search-input relative flex min-w-0 basis-[14rem] grow items-center max-sm:basis-full";
+const SEARCH_ACTION_CLASS = "flex-none max-sm:flex-1";
 
-    .ai-search-input {
-        flex: 1 1 14rem;
-        min-width: 0;
-    }
-
-    .ai-search-submit,
-    .ai-search-clear {
-        flex: 0 0 auto;
-    }
-
-    @media (max-width: ${breakpoints.sm - 1}px) {
-        .ai-search-input {
-            flex-basis: 100%;
-        }
-        .ai-search-submit,
-        .ai-search-clear {
-            flex: 1 1 0;
-        }
-    }
-`;
-
-const ReformulationTag =
-    Tag.CheckableTag as unknown as React.ForwardRefExoticComponent<
-        Omit<React.HTMLAttributes<HTMLSpanElement>, "onChange"> & {
-            checked: boolean;
-            onChange?: (checked: boolean) => void;
-            children?: React.ReactNode;
-        } & React.RefAttributes<HTMLSpanElement>
-    >;
+type ErrorSeverity = "error" | "warning" | "info";
+const severityVariant = (
+    severity: ErrorSeverity
+): "destructive" | "warning" | "info" =>
+    severity === "error" ? "destructive" : severity;
 
 const summarizeMatches = (
     matches: IAiSearchMatch[] | undefined
@@ -193,6 +174,10 @@ const AiSearchInput: React.FC<Props> = (props) => {
         useState<MatchStrengthSummary | null>(null);
     const [expandedTerms, setExpandedTerms] = useState<string[]>([]);
     const [boardHasItems, setBoardHasItems] = useState(true);
+    // The Alert primitive has no internal dismiss state, so track the
+    // dismissed error's message here and re-show when a distinct error
+    // arrives.
+    const [dismissedError, setDismissedError] = useState<string | null>(null);
     const announcerId = useId();
     const semanticActive = hasActiveSemanticFilter(props.semanticIds);
     const abortRef = useRef<AbortController | null>(null);
@@ -402,9 +387,13 @@ const AiSearchInput: React.FC<Props> = (props) => {
 
     const busy = isRemote ? remoteIsStreaming : searchAi.isLoading;
     const activeError = isRemote ? remoteError : searchAi.error;
-    const errorView = activeError
-        ? aiErrorView(activeError, microcopy.feedback.searchFailedTitle)
+    const activeErrorKey = activeError
+        ? String((activeError as Error).message ?? activeError)
         : null;
+    const errorView =
+        activeError && activeErrorKey !== dismissedError
+            ? aiErrorView(activeError, microcopy.feedback.searchFailedTitle)
+            : null;
     const labels =
         props.kind === "tasks"
             ? {
@@ -428,62 +417,72 @@ const AiSearchInput: React.FC<Props> = (props) => {
     return (
         <div style={{ marginBottom: themeSpace.md }}>
             <CopilotRemoteConsentNotice route="search" />
-            <SearchRow>
-                <Input
-                    allowClear={{ clearIcon: <CloseCircleFilled /> }}
-                    aria-describedby={`${announcerId}-helper`}
-                    aria-label={labels.aria}
-                    autoComplete="off"
-                    className="ai-search-input"
-                    enterKeyHint="search"
-                    inputMode="search"
-                    onChange={(e) => setDraft(e.target.value)}
-                    onPressEnter={() => void performSearch(draft)}
-                    placeholder={labels.placeholder}
-                    /*
+            <div className={SEARCH_ROW_CLASS}>
+                <div className={SEARCH_INPUT_SLOT_CLASS}>
+                    {/*
                      * Sparkle prefix is the only thing that visually separates
                      * this AI input from the plain text filter that often sits
                      * directly below it. Without it the two inputs read as
                      * duplicate search boxes and users couldn't tell which one
                      * accepts a natural-language question.
-                     */
-                    prefix={
-                        <AiSparkleIcon
-                            aria-hidden
-                            style={{
-                                color: "var(--ant-color-primary, #EA580C)"
-                            }}
-                        />
-                    }
-                    suffix={
-                        busy ? (
-                            <Tag color="processing">
+                     */}
+                    <span className="pointer-events-none absolute left-sm inline-flex text-primary">
+                        <AiSparkleIcon aria-hidden />
+                    </span>
+                    <Input
+                        aria-describedby={`${announcerId}-helper`}
+                        aria-label={labels.aria}
+                        autoComplete="off"
+                        className="pl-[2rem] pr-[6rem]"
+                        enterKeyHint="search"
+                        inputMode="search"
+                        onChange={(e) => setDraft(e.target.value)}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                                void performSearch(draft);
+                            }
+                        }}
+                        placeholder={labels.placeholder}
+                        value={draft}
+                    />
+                    <div className="absolute right-sm flex items-center gap-xxs">
+                        {busy ? (
+                            <Badge variant="info">
                                 {microcopy.feedback.searchingTag}
-                            </Tag>
-                        ) : null
-                    }
-                    value={draft}
-                />
+                            </Badge>
+                        ) : null}
+                        {draft ? (
+                            <button
+                                aria-label={microcopy.actions.clear}
+                                className="inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                onClick={() => setDraft("")}
+                                type="button"
+                            >
+                                <X aria-hidden className="size-4" />
+                            </button>
+                        ) : null}
+                    </div>
+                </div>
                 <Button
-                    className="ai-search-submit"
+                    className={SEARCH_ACTION_CLASS}
                     disabled={!draft.trim()}
-                    icon={<AiSparkleIcon aria-hidden />}
                     loading={busy}
                     onClick={() => void performSearch(draft)}
-                    type="default"
+                    variant="default"
                 >
+                    <AiSparkleIcon aria-hidden />
                     {labels.submit}
                 </Button>
                 {semanticActive ? (
                     <Button
                         aria-label={microcopy.actions.clearAiSearch}
-                        className="ai-search-clear"
+                        className={SEARCH_ACTION_CLASS}
                         onClick={onClear}
                     >
                         {microcopy.actions.clearAiSearch}
                     </Button>
                 ) : null}
-            </SearchRow>
+            </div>
             <div
                 style={{
                     alignItems: "center",
@@ -518,50 +517,39 @@ const AiSearchInput: React.FC<Props> = (props) => {
                       : (noMatchHint ?? "")}
             </SrOnlyLive>
             {matchSummary && matchSummary.total > 0 && (
-                <div
-                    style={{
-                        alignItems: "center",
-                        display: "flex",
-                        flexWrap: "wrap",
-                        gap: themeSpace.xs,
-                        marginTop: themeSpace.xs
-                    }}
-                >
+                <div className="mt-xs flex flex-wrap items-center gap-xs">
                     {matchSummary.strong > 0 && (
-                        <Tag
+                        <Badge
                             aria-label={microcopy.ai.searchMatchStrengthAria.replace(
                                 "{strength}",
                                 microcopy.ai.searchMatchStrength.strong
                             )}
-                            color="green"
-                            style={{ marginInlineEnd: 0 }}
+                            variant="success"
                         >
                             {`${microcopy.ai.searchMatchStrength.strong}: ${matchSummary.strong}`}
-                        </Tag>
+                        </Badge>
                     )}
                     {matchSummary.moderate > 0 && (
-                        <Tag
+                        <Badge
                             aria-label={microcopy.ai.searchMatchStrengthAria.replace(
                                 "{strength}",
                                 microcopy.ai.searchMatchStrength.moderate
                             )}
-                            color="orange"
-                            style={{ marginInlineEnd: 0 }}
+                            variant="warning"
                         >
                             {`${microcopy.ai.searchMatchStrength.moderate}: ${matchSummary.moderate}`}
-                        </Tag>
+                        </Badge>
                     )}
                     {matchSummary.weak > 0 && (
-                        <Tag
+                        <Badge
                             aria-label={microcopy.ai.searchMatchStrengthAria.replace(
                                 "{strength}",
                                 microcopy.ai.searchMatchStrength.weak
                             )}
-                            color="default"
-                            style={{ marginInlineEnd: 0 }}
+                            variant="secondary"
                         >
                             {`${microcopy.ai.searchMatchStrength.weak}: ${matchSummary.weak}`}
-                        </Tag>
+                        </Badge>
                     )}
                 </div>
             )}
@@ -589,64 +577,54 @@ const AiSearchInput: React.FC<Props> = (props) => {
                 </Typography.Paragraph>
             )}
             {matchRationale && (
-                <Tooltip title={matchRationale}>
-                    <Typography.Paragraph
-                        style={{
-                            marginBottom: 0,
-                            marginTop: themeSpace.xs,
-                            maxWidth: `${maxLineLengthCh}ch` // Applied to rationale prose
-                        }}
-                        type="secondary"
-                    >
-                        <InfoCircleOutlined
-                            aria-hidden
-                            style={{ marginInlineEnd: 4 }}
-                        />
-                        {microcopy.ai.whyThisResult}{" "}
-                        <Button
-                            onClick={() =>
-                                track(
-                                    ANALYTICS_EVENTS.SEARCH_RESULT_RATIONALE_VIEWED
-                                )
-                            }
-                            size="small"
-                            style={{
-                                borderBottom: "1px dotted currentColor",
-                                borderRadius: 0,
-                                height: "auto",
-                                padding: 0
-                            }}
-                            type="link"
-                        >
-                            {microcopy.actions.showReasoning}
-                        </Button>
-                    </Typography.Paragraph>
-                </Tooltip>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Typography.Paragraph
+                                style={{
+                                    marginBottom: 0,
+                                    marginTop: themeSpace.xs,
+                                    maxWidth: `${maxLineLengthCh}ch` // Applied to rationale prose
+                                }}
+                                type="secondary"
+                            >
+                                <Info
+                                    aria-hidden
+                                    className="mr-[4px] inline size-4 align-text-bottom"
+                                />
+                                {microcopy.ai.whyThisResult}{" "}
+                                <Button
+                                    className="h-auto rounded-none border-b border-dotted border-current p-0"
+                                    onClick={() =>
+                                        track(
+                                            ANALYTICS_EVENTS.SEARCH_RESULT_RATIONALE_VIEWED
+                                        )
+                                    }
+                                    size="sm"
+                                    variant="link"
+                                >
+                                    {microcopy.actions.showReasoning}
+                                </Button>
+                            </Typography.Paragraph>
+                        </TooltipTrigger>
+                        <TooltipContent>{matchRationale}</TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
             )}
             {noMatchHint ? (
-                <Alert
-                    action={
-                        <Button
-                            onClick={() => void performSearch(draft)}
-                            size="small"
-                            type="link"
-                        >
-                            {microcopy.ai.retryLabel}
-                        </Button>
-                    }
-                    closable
-                    description={
-                        reformulations.length > 0 ? (
-                            <Space size={themeSpace.xs} wrap>
+                <Alert className="relative mt-sm max-w-[40rem]" variant="info">
+                    <Info aria-hidden />
+                    <AlertTitle>{noMatchHint}</AlertTitle>
+                    <AlertDescription>
+                        {reformulations.length > 0 ? (
+                            <div className="mt-xxs flex flex-wrap items-center gap-xs">
                                 <span>{microcopy.ai.didYouMean}</span>
                                 {reformulations.map((alt) => (
-                                    <ReformulationTag
-                                        checked={false}
+                                    <button
+                                        className="inline-flex items-center rounded-pill border border-border bg-muted px-xs py-[1px] text-xs text-foreground transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                         key={alt}
-                                        onChange={() => applyReformulation(alt)}
-                                        onKeyDown={(
-                                            event: React.KeyboardEvent<HTMLSpanElement>
-                                        ) => {
+                                        onClick={() => applyReformulation(alt)}
+                                        onKeyDown={(event) => {
                                             if (
                                                 event.key === "Enter" ||
                                                 event.key === " "
@@ -655,55 +633,74 @@ const AiSearchInput: React.FC<Props> = (props) => {
                                                 applyReformulation(alt);
                                             }
                                         }}
-                                        role="button"
                                         tabIndex={0}
+                                        type="button"
                                     >
                                         {alt}
-                                    </ReformulationTag>
+                                    </button>
                                 ))}
-                            </Space>
-                        ) : null
-                    }
-                    onClose={() => setNoMatchHint(null)}
-                    showIcon
-                    style={{
-                        marginTop: themeSpace.sm,
-                        maxWidth: "40rem"
-                    }}
-                    title={noMatchHint}
-                    type="info"
-                />
-            ) : null}
-            {errorView ? (
-                <Alert
-                    action={
-                        errorView.retryable ? (
+                            </div>
+                        ) : null}
+                        <div className="mt-xs flex items-center gap-xs">
                             <Button
+                                className="h-auto p-0"
                                 onClick={() => void performSearch(draft)}
-                                size="small"
-                                type="link"
+                                size="sm"
+                                variant="link"
                             >
                                 {microcopy.ai.retryLabel}
                             </Button>
-                        ) : null
-                    }
-                    closable
-                    onClose={() => {
-                        if (isRemote) {
-                            remoteAgent.abort();
-                            remoteAgent.clearSuggestion();
-                        } else {
-                            searchAi.reset();
-                        }
-                    }}
-                    style={{
-                        marginTop: themeSpace.sm,
-                        maxWidth: "40rem"
-                    }}
-                    title={errorView.heading}
-                    description={errorView.body || undefined}
-                    type={errorView.severity}
-                />
+                        </div>
+                    </AlertDescription>
+                    <button
+                        aria-label={microcopy.actions.close}
+                        className="absolute right-md top-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={() => setNoMatchHint(null)}
+                        type="button"
+                    >
+                        <X aria-hidden className="size-4" />
+                    </button>
+                </Alert>
+            ) : null}
+            {errorView ? (
+                <Alert
+                    className="relative mt-sm max-w-[40rem]"
+                    variant={severityVariant(errorView.severity)}
+                >
+                    <Info aria-hidden />
+                    <AlertTitle>{errorView.heading}</AlertTitle>
+                    {errorView.body ? (
+                        <AlertDescription>{errorView.body}</AlertDescription>
+                    ) : null}
+                    {errorView.retryable ? (
+                        <AlertDescription>
+                            <Button
+                                className="h-auto p-0"
+                                onClick={() => void performSearch(draft)}
+                                size="sm"
+                                variant="link"
+                            >
+                                {microcopy.ai.retryLabel}
+                            </Button>
+                        </AlertDescription>
+                    ) : null}
+                    <button
+                        aria-label={microcopy.actions.close}
+                        className="absolute right-md top-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={() => {
+                            setDismissedError(activeErrorKey);
+                            if (isRemote) {
+                                remoteAgent.abort();
+                                remoteAgent.clearSuggestion();
+                            } else {
+                                searchAi.reset();
+                            }
+                        }}
+                        type="button"
+                    >
+                        <X aria-hidden className="size-4" />
+                    </button>
+                </Alert>
             ) : null}
         </div>
     );

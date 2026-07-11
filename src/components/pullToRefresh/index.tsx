@@ -1,23 +1,10 @@
-import {
-    ArrowDownOutlined,
-    LoadingOutlined,
-    ReloadOutlined
-} from "@ant-design/icons";
-import styled from "@emotion/styled";
-import { Button } from "antd";
+import { ArrowDown, Loader2, RefreshCw } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
 import { microcopy } from "../../constants/microcopy";
-import {
-    easing,
-    fontSize,
-    fontWeight,
-    motion,
-    radius,
-    shadow,
-    space,
-    touchTargetCoarse
-} from "../../theme/tokens";
 import useHaptic from "../../utils/hooks/useHaptic";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useReducedMotion from "../../utils/hooks/useReducedMotion";
@@ -48,16 +35,15 @@ import useReducedMotion from "../../utils/hooks/useReducedMotion";
  *      is `false` in jsdom by default, so the primitive is a transparent
  *      wrapper unless a test explicitly opts into the coarse branch.
  *
- * DESIGN CHOICE — raw touch events over framer-motion. A vertical pull
- * must `preventDefault()` the `touchmove` to stop the document scrolling
+ * DESIGN CHOICE — raw touch events over a drag/gesture library. A vertical
+ * pull must `preventDefault()` the `touchmove` to stop the document scrolling
  * while the finger drags (rubber-banding the page would fight the
  * indicator). React's synthetic `onTouchMove` is bound passively and
  * CANNOT call `preventDefault`, so the listeners are attached manually
- * via a ref + `addEventListener(..., { passive: false })`. Framer's
- * `drag` is built for element drag inside a constraint box, not a
+ * via a ref + `addEventListener(..., { passive: false })`. A generic
+ * element-drag helper is built for dragging inside a constraint box, not a
  * conditional document-top gesture that yields to native scroll the
- * instant the finger moves up or the page isn't scrolled to the top —
- * wiring that through Framer would mean fighting its gesture recognizer.
+ * instant the finger moves up or the page isn't scrolled to the top.
  * The raw-pointer swipe in `taskDetailPanel` is the in-repo template.
  * All the pull math lives in the pure, exported `resolvePull` helper so
  * it is unit-testable without a real touch-physics harness (jsdom can't
@@ -153,29 +139,7 @@ export const resolvePull = ({
     return { offset, willRefresh: offset >= threshold };
 };
 
-/* -- Styled surfaces --------------------------------------------------- */
-
-interface ViewportProps {
-    $reducedMotion: boolean;
-}
-
-/**
- * Gesture-mode clip box. `overflow: hidden` keeps the indicator tucked
- * above the content (translated up by its own height) from spilling into
- * the page, and `touch-action: pan-y` lets the browser keep vertical
- * scroll everywhere except while we actively `preventDefault` a pull.
- */
-const Viewport = styled.div<ViewportProps>`
-    overflow: hidden;
-    position: relative;
-    touch-action: pan-y;
-`;
-
-interface IndicatorProps {
-    $offset: number;
-    $reducedMotion: boolean;
-    $settling: boolean;
-}
+/* -- Surface class recipes --------------------------------------------- */
 
 /**
  * The pull indicator. Solid `--ant-color-bg-container` token background
@@ -183,89 +147,39 @@ interface IndicatorProps {
  * content reads as muddy, and glass would need the reduced-transparency
  * / forced-colors gating dance for no benefit here. It is parked just
  * above the content (translated up by its own resting height) and rides
- * down with the pull offset.
+ * down with the pull offset (an inline `translateY`).
  */
-const Indicator = styled.div<IndicatorProps>`
-    align-items: center;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-    display: flex;
-    gap: ${space.xs}px;
-    height: ${touchTargetCoarse}px;
-    justify-content: center;
-    left: 0;
-    position: absolute;
-    right: 0;
-    /* Park the indicator one row above the content, then ride the pull
-     * offset down into view. */
-    top: -${touchTargetCoarse}px;
-    transform: translateY(${(p) => p.$offset}px);
-    transition: ${(p) =>
-        p.$reducedMotion || !p.$settling
-            ? "none"
-            : `transform ${motion.medium}ms ${easing.standard}`};
-    z-index: 1;
-`;
+const INDICATOR_CLASS = cn(
+    "absolute left-0 right-0 top-[-44px] z-[1] flex h-[44px] items-center justify-center gap-xs",
+    "[color:var(--ant-color-text-secondary,rgba(15,23,42,0.65))]"
+);
 
-const IndicatorPill = styled.span`
-    align-items: center;
-    background: var(--ant-color-bg-container, #ffffff);
-    border-radius: ${radius.pill}px;
-    box-shadow: ${shadow.sm};
-    color: var(--ant-color-primary, #ea580c);
-    display: inline-flex;
-    gap: ${space.xxs}px;
-    height: ${space.xl}px;
-    padding-inline: ${space.sm}px;
+/**
+ * The pill. Solid container-token background so it reads crisply over the
+ * scrolling content. Forced-colors mode strips box-shadow, so the pill
+ * would lose its edge against the content; restore one with a
+ * system-color border.
+ */
+const INDICATOR_PILL_CLASS = cn(
+    "inline-flex h-xl items-center gap-xxs rounded-pill px-sm",
+    "[background:var(--ant-color-bg-container,#ffffff)]",
+    "[color:var(--ant-color-primary,#ea580c)]",
+    "shadow-[0_1px_2px_rgba(15,23,42,0.05),0_1px_3px_rgba(15,23,42,0.06)]",
+    "forced-colors:border forced-colors:border-[CanvasText] forced-colors:shadow-none"
+);
 
-    /* Forced-colors mode strips box-shadow, so the pill would lose its
-     * edge against the content; restore one with a system-color border. */
-    @media (forced-colors: active) {
-        border: 1px solid CanvasText;
-        box-shadow: none;
-    }
-`;
+const INDICATOR_LABEL_CLASS =
+    "text-sm font-medium [color:var(--ant-color-text-secondary,rgba(15,23,42,0.65))]";
 
-const IndicatorLabel = styled.span`
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-    font-size: ${fontSize.sm}px;
-    font-weight: ${fontWeight.medium};
-`;
-
-interface ArrowProps {
-    $flipped: boolean;
-    $reducedMotion: boolean;
-}
-
-/** The pull arrow rotates 180deg once the pull crosses the threshold. */
-const Arrow = styled(ArrowDownOutlined)<ArrowProps>`
-    transform: rotate(${(p) => (p.$flipped ? 180 : 0)}deg);
-    transition: ${(p) =>
-        p.$reducedMotion
-            ? "none"
-            : `transform ${motion.short}ms ${easing.standard}`};
-`;
-
-interface ContentProps {
-    $offset: number;
-    $reducedMotion: boolean;
-    $settling: boolean;
-}
-
-/** Content wrapper — translated down by the live pull offset. */
-const Content = styled.div<ContentProps>`
-    transform: translateY(${(p) => p.$offset}px);
-    transition: ${(p) =>
-        p.$reducedMotion || !p.$settling
-            ? "none"
-            : `transform ${motion.medium}ms ${easing.standard}`};
-    will-change: transform;
-`;
-
-const ButtonRow = styled.div`
-    display: flex;
-    justify-content: center;
-    margin-bottom: ${space.sm}px;
-`;
+/**
+ * Snap-back transition applied to both the indicator and the content
+ * wrapper. Only animate the post-release settle — never the live
+ * finger-tracking — so it is gated on `settling`.
+ */
+const settleTransition = (settling: boolean): string =>
+    settling
+        ? "transition-transform duration-medium ease-standard motion-reduce:[transition:none]"
+        : "[transition:none]";
 
 /* -- Component --------------------------------------------------------- */
 
@@ -448,43 +362,53 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({
         // that armed state behind a premature spinner.
         const showSpinner = busy;
         return (
-            <Viewport
-                $reducedMotion={reducedMotion}
-                className={className}
+            <div
+                className={cn(
+                    "relative overflow-hidden touch-pan-y",
+                    className
+                )}
                 data-testid={dataTestid}
                 ref={viewportRef}
             >
-                <Indicator
-                    $offset={offset}
-                    $reducedMotion={reducedMotion}
-                    $settling={settling}
+                <div
                     aria-live="polite"
+                    className={cn(INDICATOR_CLASS, settleTransition(settling))}
                     data-testid={
                         dataTestid ? `${dataTestid}-indicator` : undefined
                     }
                     role="status"
+                    style={{ transform: `translateY(${offset}px)` }}
                 >
-                    <IndicatorPill>
+                    <span className={INDICATOR_PILL_CLASS}>
                         {showSpinner ? (
-                            <LoadingOutlined aria-hidden spin />
-                        ) : (
-                            <Arrow
-                                $flipped={willRefresh}
-                                $reducedMotion={reducedMotion}
+                            <Loader2
                                 aria-hidden
+                                className="size-4 animate-spin"
+                            />
+                        ) : (
+                            <ArrowDown
+                                aria-hidden
+                                className={cn(
+                                    "size-4 transition-transform duration-short ease-standard motion-reduce:[transition:none]",
+                                    willRefresh ? "rotate-180" : "rotate-0"
+                                )}
                             />
                         )}
-                        <IndicatorLabel>{statusText}</IndicatorLabel>
-                    </IndicatorPill>
-                </Indicator>
-                <Content
-                    $offset={offset}
-                    $reducedMotion={reducedMotion}
-                    $settling={settling}
+                        <span className={INDICATOR_LABEL_CLASS}>
+                            {statusText}
+                        </span>
+                    </span>
+                </div>
+                <div
+                    className={cn(
+                        "will-change-transform",
+                        settleTransition(settling)
+                    )}
+                    style={{ transform: `translateY(${offset}px)` }}
                 >
                     {children}
-                </Content>
-            </Viewport>
+                </div>
+            </div>
         );
     }
 
@@ -493,21 +417,21 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({
     if (buttonMode) {
         return (
             <div className={className} data-testid={dataTestid}>
-                <ButtonRow>
+                <div className="mb-sm flex justify-center">
                     <Button
                         aria-label={label}
                         data-testid={
                             dataTestid ? `${dataTestid}-button` : undefined
                         }
-                        icon={<ReloadOutlined aria-hidden />}
                         loading={busy}
                         onClick={() => {
                             void runRefresh();
                         }}
                     >
+                        {!busy && <RefreshCw aria-hidden />}
                         {label}
                     </Button>
-                </ButtonRow>
+                </div>
                 {children}
             </div>
         );

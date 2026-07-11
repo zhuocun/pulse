@@ -1,9 +1,9 @@
-import { keyframes } from "@emotion/react";
-import styled from "@emotion/styled";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-import { easing, motion, radius, space, zIndex } from "../../theme/tokens";
+import { cn } from "@/lib/utils";
+
+import { motion } from "../../theme/tokens";
 import GlassPanel from "../glassPanel";
 
 /**
@@ -184,33 +184,6 @@ const TabBarAccessory: React.FC<TabBarAccessoryProps> = ({ children }) => {
 const SLOT_DOM_ID = "pulse-tab-accessory-slot";
 
 /*
- * Position above the tab bar. The exact offset is a starting estimate —
- * Worker C will refine in their MainLayout body-padding work. The width
- * mirrors the floating tab-bar capsule's own clamp so the slot lines up
- * visually above it. The slot uses `pointer-events: auto` on its
- * children but no background until content arrives, so an empty mount
- * leaves the area transparent and click-through.
- */
-const Slot = styled.div`
-    bottom: calc(64px + env(safe-area-inset-bottom) + ${space.xs}px);
-    display: flex;
-    justify-content: center;
-    left: 50%;
-    pointer-events: none;
-    position: fixed;
-    transform: translateX(-50%);
-    width: min(100% - ${space.lg * 2}px, 480px);
-    /*
-     * Sit at the same z tier as the tab bar's navBar layer (above
-     * page content, below AntD overlays). The accessory is logically
-     * part of the bottom-chrome stack; if a Drawer/Modal opens, both
-     * the bar and accessory should disappear behind the dimmer.
-     */
-    z-index: ${zIndex.navBar};
-    view-transition-name: pulse-tab-accessory;
-`;
-
-/*
  * CSS animations (not transitions) so the materialize fade-in runs on
  * the chrome's FIRST paint. A transition needs a prior state to
  * interpolate from — the chrome is unmounted before content arrives,
@@ -219,30 +192,15 @@ const Slot = styled.div`
  * on mount and a real dematerialize on the exit pass (driven by the
  * deferred-unmount window in <TabBarAccessoryMount />).
  */
-const materializeKeyframes = keyframes`
-    from { opacity: 0; transform: translateY(${space.sm}px); }
+const ACCESSORY_KEYFRAMES = `
+@keyframes pulse-tba-materialize {
+    from { opacity: 0; transform: translateY(var(--pulse-space-sm)); }
     to   { opacity: 1; transform: translateY(0); }
-`;
-
-const dematerializeKeyframes = keyframes`
+}
+@keyframes pulse-tba-dematerialize {
     from { opacity: 1; transform: translateY(0); }
-    to   { opacity: 0; transform: translateY(${space.sm}px); }
-`;
-
-const GlassChrome = styled(GlassPanel)<{ $exiting: boolean }>`
-    animation: ${(p) =>
-            p.$exiting ? dematerializeKeyframes : materializeKeyframes}
-        ${motion.morph}ms ${easing.springSoft} forwards;
-    border-radius: ${radius.lg}px;
-    padding: ${space.sm}px ${space.md}px;
-    pointer-events: ${(p) => (p.$exiting ? "none" : "auto")};
-    width: 100%;
-
-    @media (prefers-reduced-motion: reduce) {
-        animation: none;
-        opacity: ${(p) => (p.$exiting ? 0 : 1)};
-    }
-`;
+    to   { opacity: 0; transform: translateY(var(--pulse-space-sm)); }
+}`;
 
 /*
  * Idempotent portal-host installer. Lives outside the component so
@@ -340,18 +298,33 @@ export const TabBarAccessoryMount: React.FC = () => {
     if (containerHost === null) return null;
 
     return createPortal(
-        <Slot data-testid="tab-bar-accessory-slot">
+        <div
+            className={cn(
+                "pointer-events-none fixed left-1/2 flex -translate-x-1/2 justify-center",
+                "bottom-[calc(64px+env(safe-area-inset-bottom)+8px)]",
+                "z-[15] w-[min(100%-48px,480px)]",
+                "[view-transition-name:pulse-tab-accessory]"
+            )}
+            data-testid="tab-bar-accessory-slot"
+        >
+            <style>{ACCESSORY_KEYFRAMES}</style>
             {renderedNode !== null ? (
-                <GlassChrome
-                    $exiting={exiting}
+                <GlassPanel
+                    aria-label="Tab bar accessory"
+                    className={cn(
+                        "w-full rounded-lg px-md py-sm",
+                        "motion-reduce:[animation:none]",
+                        exiting
+                            ? "pointer-events-none [animation:pulse-tba-dematerialize_450ms_var(--pulse-ease-springSoft)_forwards] motion-reduce:opacity-0"
+                            : "pointer-events-auto [animation:pulse-tba-materialize_450ms_var(--pulse-ease-springSoft)_forwards] motion-reduce:opacity-100"
+                    )}
                     intensity="regular"
                     role="region"
-                    aria-label="Tab bar accessory"
                 >
                     {renderedNode}
-                </GlassChrome>
+                </GlassPanel>
             ) : null}
-        </Slot>,
+        </div>,
         containerHost
     );
 };

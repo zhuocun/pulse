@@ -5,6 +5,7 @@ import {
     waitFor,
     within
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { axe, toHaveNoViolations } from "jest-axe";
 
 import { microcopy } from "../../constants/microcopy";
@@ -40,20 +41,13 @@ const mockedUseReactQuery = useReactQuery as jest.MockedFunction<
     typeof useReactQuery
 >;
 
-const installAntdBrowserMocks = () => {
-    Object.defineProperty(window, "matchMedia", {
-        writable: true,
-        value: (query: string) => ({
-            addEventListener: jest.fn(),
-            addListener: jest.fn(),
-            dispatchEvent: jest.fn(),
-            matches: false,
-            media: query,
-            onchange: null,
-            removeEventListener: jest.fn(),
-            removeListener: jest.fn()
-        })
-    });
+const installBrowserMocks = () => {
+    // Radix Select/Popover/Tooltip drive their surfaces with pointer-capture
+    // and scroll APIs jsdom doesn't ship; polyfill them so the role picker,
+    // remove-confirm popover, and add-member selects can open.
+    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+    Element.prototype.releasePointerCapture = jest.fn();
 };
 
 const addMember = jest.fn();
@@ -132,7 +126,7 @@ const rowFor = (memberId: string): HTMLElement => {
 };
 
 describe("ProjectMembersManager", () => {
-    beforeAll(installAntdBrowserMocks);
+    beforeAll(installBrowserMocks);
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -197,62 +191,16 @@ describe("ProjectMembersManager", () => {
         expect(within(managerRow).getByTestId("member-remove")).toBeDisabled();
     });
 
-    it("darkens the gold manager badge ink to an AA-safe gold-9 in light mode", () => {
+    it("styles the manager badge with a solid, always-AA warning token", () => {
         renderManager();
         const badge = within(rowFor(MANAGER_ID)).getByTestId(
             "member-manager-badge"
         );
-        // styled-components hashes the rule into a class like `css-mcde2a`
-        // (skipping AntD's `css-var-root` / `css-dev-only-...` markers).
-        const styledCls = badge.className
-            .split(/\s+/)
-            .find(
-                (tok) =>
-                    /^css-[a-z0-9]{4,}$/i.test(tok) &&
-                    !tok.startsWith("css-var-") &&
-                    !tok.startsWith("css-dev-only-")
-            );
-        expect(styledCls).toBeTruthy();
-
-        // The AA ink must be declared inside a light-mode-scoped rule
-        // (`html:not([data-color-scheme="dark"]) …`) so the dark
-        // algorithm's gold pairing stays untouched.
-        const lightModeRules: string[] = [];
-        const visit = (rule: CSSRule) => {
-            if (rule instanceof CSSStyleRule) {
-                if (!styledCls || !rule.selectorText.includes(styledCls))
-                    return;
-                if (
-                    rule.selectorText.includes(
-                        'html:not([data-color-scheme="dark"])'
-                    )
-                ) {
-                    lightModeRules.push(rule.cssText);
-                }
-                return;
-            }
-            const grouping = rule as CSSGroupingRule;
-            if (grouping.cssRules) {
-                Array.from(grouping.cssRules).forEach(visit);
-            }
-        };
-        Array.from(document.styleSheets).forEach((sheet) => {
-            Array.from(sheet.cssRules).forEach(visit);
-        });
-
-        const aaInkRule = lightModeRules.find((cssText) =>
-            /color:\s*(?:#874d00|rgb\(135,\s*77,\s*0\))/i.test(cssText)
-        );
-        expect(aaInkRule).toBeTruthy();
-
-        // Specificity guard: AntD's gold-filled ink rule computes (0,4,0)
-        // (`.ant-tag.ant-tag-gold:not(.ant-tag-disabled).ant-tag-filled`),
-        // so the override must repeat the styled class three times to
-        // reach (0,4,1) — a double `&` loses the cascade and the badge
-        // silently stays at the 2.8:1 stock ink.
-        const classRepeats =
-            aaInkRule!.split("{")[0].split(`.${styledCls}`).length - 1;
-        expect(classRepeats).toBeGreaterThanOrEqual(3);
+        // The migrated badge drops AntD's gold Tag (whose #d48806-on-#fffbe6
+        // ink failed WCAG AA at 12px) for a solid `warning`-token fill with
+        // white ink — an always-AA pairing that needs no per-mode override.
+        expect(badge).toHaveClass("bg-warning");
+        expect(badge).toHaveClass("text-white");
     });
 
     it("renders the roster read-only for a non-owner", () => {
@@ -305,15 +253,15 @@ describe("ProjectMembersManager", () => {
 
     it("changes a member's role through the Select", async () => {
         updateMemberRole.mockResolvedValue("Member updated");
+        const menuUser = userEvent.setup();
         renderManager();
 
-        const select = within(rowFor("user-bob")).getByTestId(
-            "member-role-select"
+        await menuUser.click(
+            within(rowFor("user-bob")).getByTestId("member-role-select")
         );
-        fireEvent.mouseDown(within(select).getByRole("combobox"));
-        fireEvent.click(
-            await screen.findByText(microcopy.members.roles.owner, {
-                selector: ".ant-select-item-option-content"
+        await menuUser.click(
+            await screen.findByRole("option", {
+                name: microcopy.members.roles.owner
             })
         );
 
@@ -365,20 +313,20 @@ describe("ProjectMembersManager", () => {
     });
 
     it("offers guest among the add-member role options", async () => {
+        const menuUser = userEvent.setup();
         renderManager();
-        const roleSelect = screen.getByTestId("member-add-role");
-        fireEvent.mouseDown(within(roleSelect).getByRole("combobox"));
+        await menuUser.click(screen.getByTestId("member-add-role"));
         expect(
-            await screen.findByText(microcopy.members.roles.guest, {
-                selector: ".ant-select-item-option-content"
+            await screen.findByRole("option", {
+                name: microcopy.members.roles.guest
             })
         ).toBeInTheDocument();
     });
 
     it("only offers directory users who aren't already on the roster", async () => {
+        const menuUser = userEvent.setup();
         renderManager();
-        const userSelect = screen.getByTestId("member-add-user");
-        fireEvent.mouseDown(within(userSelect).getByRole("combobox"));
+        await menuUser.click(screen.getByTestId("member-add-user"));
 
         // Carol + Dave are addable; the existing members are filtered out.
         expect(
@@ -397,14 +345,12 @@ describe("ProjectMembersManager", () => {
 
     it("adds the selected user with the default viewer role and clears the picker", async () => {
         addMember.mockResolvedValue("Member added");
+        const menuUser = userEvent.setup();
         renderManager();
 
-        const userSelect = screen.getByTestId("member-add-user");
-        fireEvent.mouseDown(within(userSelect).getByRole("combobox"));
-        fireEvent.click(
-            await screen.findByText(/carol/, {
-                selector: ".ant-select-item-option-content"
-            })
+        await menuUser.click(screen.getByTestId("member-add-user"));
+        await menuUser.click(
+            await screen.findByRole("option", { name: /carol/ })
         );
 
         fireEvent.click(screen.getByTestId("member-add-submit"));

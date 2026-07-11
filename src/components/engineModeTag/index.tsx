@@ -1,5 +1,11 @@
-import { Tooltip } from "antd";
 import React from "react";
+
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger
+} from "@/components/ui/tooltip";
 
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
@@ -29,11 +35,19 @@ const EngineModeTag: React.FC = () => {
         ? microcopy.ai.engineCapabilityLocal
         : microcopy.ai.engineCapabilityRemote;
     return (
-        <Tooltip title={tooltip}>
-            <CopilotChip tone={isLocal ? "default" : "purple"} variant="engine">
-                {label}
-            </CopilotChip>
-        </Tooltip>
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <CopilotChip
+                        tone={isLocal ? "default" : "purple"}
+                        variant="engine"
+                    >
+                        {label}
+                    </CopilotChip>
+                </TooltipTrigger>
+                <TooltipContent>{tooltip}</TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
     );
 };
 

@@ -1,7 +1,14 @@
-import { InfoCircleOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
-import { Button, Popover, Tag, Typography } from "antd";
+import { Info } from "lucide-react";
 import React from "react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger
+} from "@/components/ui/popover";
+import { Typography } from "@/components/ui/typography";
 
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
@@ -17,26 +24,14 @@ import useChatAgentMetadata from "../../utils/hooks/useChatAgentMetadata";
  * Triggered by a small info icon button that renders inline wherever it is
  * placed (e.g. inside the AI chat drawer header area).
  */
-const TriggerButton = styled(Button)`
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-    font-size: ${fontSize.xs}px;
-    font-weight: ${fontWeight.medium};
-
-    &:hover,
-    &:focus-visible {
-        color: var(--ant-color-text, rgba(15, 23, 42, 0.9));
-    }
-`;
-
-const List = styled.ul`
-    margin: ${space.xxs}px 0;
-    max-width: 22rem;
-    padding-inline-start: ${space.lg}px;
-`;
-
-const Section = styled.div`
-    margin-top: ${space.xs}px;
-`;
+const LIST_CLASS = "my-xxs max-w-[22rem] ps-lg list-disc";
+const SECTION_CLASS = "mt-xs";
+const SUBTITLE_STYLE: React.CSSProperties = {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+    marginBottom: space.xxs,
+    marginTop: 0
+};
 
 const SERVER_METADATA_EMPTY =
     "Server did not publish additional limit details.";
@@ -206,16 +201,11 @@ const CopilotAboutPopover: React.FC = () => {
                             >
                                 {microcopy.about.allowedAutonomyLabel}:
                             </Typography.Paragraph>
-                            <div
-                                style={{
-                                    display: "flex",
-                                    flexWrap: "wrap",
-                                    gap: 6,
-                                    marginBottom: space.xs
-                                }}
-                            >
+                            <div className="mb-xs flex flex-wrap gap-[6px]">
                                 {levels.map((level) => (
-                                    <Tag key={level}>{level}</Tag>
+                                    <Badge key={level} variant="secondary">
+                                        {level}
+                                    </Badge>
                                 ))}
                             </div>
                         </>
@@ -231,16 +221,11 @@ const CopilotAboutPopover: React.FC = () => {
                             >
                                 Tags:
                             </Typography.Paragraph>
-                            <div
-                                style={{
-                                    display: "flex",
-                                    flexWrap: "wrap",
-                                    gap: 6,
-                                    marginBottom: space.xs
-                                }}
-                            >
+                            <div className="mb-xs flex flex-wrap gap-[6px]">
                                 {normalizedTags.map((tag) => (
-                                    <Tag key={tag}>{tag}</Tag>
+                                    <Badge key={tag} variant="secondary">
+                                        {tag}
+                                    </Badge>
                                 ))}
                             </div>
                         </>
@@ -260,110 +245,85 @@ const CopilotAboutPopover: React.FC = () => {
             );
         })();
 
-    const content = (
-        <div style={{ maxWidth: "22rem" }}>
-            <Typography.Title level={5} style={{ marginTop: 0 }}>
-                {microcopy.about.title}
-            </Typography.Title>
-
-            <Section>
-                <Typography.Title
-                    level={5}
-                    style={{
-                        fontSize: fontSize.sm,
-                        fontWeight: fontWeight.semibold,
-                        marginBottom: space.xxs,
-                        marginTop: 0
-                    }}
-                >
-                    {microcopy.about.canHelpTitle}
-                </Typography.Title>
-                <List>
-                    {microcopy.about.canHelpItems.map((item) => (
-                        <li key={item}>{item}</li>
-                    ))}
-                </List>
-            </Section>
-
-            <Section>
-                <Typography.Title
-                    level={5}
-                    style={{
-                        fontSize: fontSize.sm,
-                        fontWeight: fontWeight.semibold,
-                        marginBottom: space.xxs,
-                        marginTop: 0
-                    }}
-                >
-                    {microcopy.about.limitationsTitle}
-                </Typography.Title>
-                <List>
-                    {microcopy.about.limitationsItems.map((item) => (
-                        <li key={item}>{item}</li>
-                    ))}
-                </List>
-            </Section>
-
-            {showServerLimits ? (
-                <Section>
-                    <Typography.Title
-                        level={5}
-                        style={{
-                            fontSize: fontSize.sm,
-                            fontWeight: fontWeight.semibold,
-                            marginBottom: space.xxs,
-                            marginTop: 0
-                        }}
-                    >
-                        {microcopy.about.serverLimitsTitle}
-                    </Typography.Title>
-                    {serverLimitsSection}
-                </Section>
-            ) : null}
-
-            <Typography.Paragraph
-                style={{
-                    alignItems: "center",
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 6,
-                    marginBottom: space.xs,
-                    marginTop: space.xs
-                }}
-                type="secondary"
-            >
-                <Tag
-                    color={isRemote ? "purple" : "default"}
-                    style={{ marginInlineEnd: 0 }}
-                >
-                    {isRemote
-                        ? microcopy.about.remoteModeTag
-                        : microcopy.about.localModeTag}
-                </Tag>
-                <span>{modelInfo}</span>
-            </Typography.Paragraph>
-
-            <Typography.Paragraph
-                style={{ marginBottom: 0, marginTop: 0 }}
-                type="secondary"
-            >
-                {knowledgeCutoffLine}
-            </Typography.Paragraph>
-        </div>
-    );
-
     return (
-        <Popover
-            content={content}
-            placement="topRight"
-            trigger={["click", "focus"]}
-        >
-            <TriggerButton
-                aria-label={microcopy.a11y.aboutBoardCopilot}
-                icon={<InfoCircleOutlined />}
-                size="small"
-                type="text"
-            />
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button
+                    aria-label={microcopy.a11y.aboutBoardCopilot}
+                    className="text-muted-foreground hover:text-foreground"
+                    size="icon"
+                    variant="ghost"
+                >
+                    <Info aria-hidden />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent
+                align="end"
+                aria-label={microcopy.about.title}
+                className="max-h-[70vh] w-[22rem] max-w-[calc(100vw-2rem)] overflow-y-auto"
+                side="top"
+            >
+                <Typography.Title level={5} style={{ marginTop: 0 }}>
+                    {microcopy.about.title}
+                </Typography.Title>
+
+                <div className={SECTION_CLASS}>
+                    <Typography.Title level={5} style={SUBTITLE_STYLE}>
+                        {microcopy.about.canHelpTitle}
+                    </Typography.Title>
+                    <ul className={LIST_CLASS}>
+                        {microcopy.about.canHelpItems.map((item) => (
+                            <li key={item}>{item}</li>
+                        ))}
+                    </ul>
+                </div>
+
+                <div className={SECTION_CLASS}>
+                    <Typography.Title level={5} style={SUBTITLE_STYLE}>
+                        {microcopy.about.limitationsTitle}
+                    </Typography.Title>
+                    <ul className={LIST_CLASS}>
+                        {microcopy.about.limitationsItems.map((item) => (
+                            <li key={item}>{item}</li>
+                        ))}
+                    </ul>
+                </div>
+
+                {showServerLimits ? (
+                    <div className={SECTION_CLASS}>
+                        <Typography.Title level={5} style={SUBTITLE_STYLE}>
+                            {microcopy.about.serverLimitsTitle}
+                        </Typography.Title>
+                        {serverLimitsSection}
+                    </div>
+                ) : null}
+
+                <Typography.Paragraph
+                    style={{
+                        alignItems: "center",
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 6,
+                        marginBottom: space.xs,
+                        marginTop: space.xs
+                    }}
+                    type="secondary"
+                >
+                    <Badge variant={isRemote ? "default" : "secondary"}>
+                        {isRemote
+                            ? microcopy.about.remoteModeTag
+                            : microcopy.about.localModeTag}
+                    </Badge>
+                    <span>{modelInfo}</span>
+                </Typography.Paragraph>
+
+                <Typography.Paragraph
+                    style={{ marginBottom: 0, marginTop: 0 }}
+                    type="secondary"
+                >
+                    {knowledgeCutoffLine}
+                </Typography.Paragraph>
+            </PopoverContent>
         </Popover>
     );
 };

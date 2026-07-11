@@ -1,9 +1,8 @@
-import styled from "@emotion/styled";
-import { Form } from "antd";
 import { useEffect, useRef } from "react";
 
+import { useFormInstance, useFormState } from "@/components/ui/form";
+
 import { microcopy } from "../../constants/microcopy";
-import { fontSize, fontWeight, space } from "../../theme/tokens";
 import { resolveAuthPageErrorMessage } from "../errorBox";
 
 export type AuthErrorFieldMeta = {
@@ -11,59 +10,6 @@ export type AuthErrorFieldMeta = {
     id: string;
     label: string;
 };
-
-const SummaryRoot = styled.div`
-    border: 1px solid var(--ant-color-error-border, #ffccc7);
-    border-radius: var(--ant-border-radius, 6px);
-    color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
-    margin-bottom: ${space.lg}px;
-    outline: none;
-    padding: ${space.md}px ${space.lg}px;
-`;
-
-const SummaryTitle = styled.h2`
-    color: var(--ant-color-error-text, #ff4d4f);
-    font-size: ${fontSize.md}px;
-    font-weight: ${fontWeight.semibold};
-    margin: 0 0 ${space.xs}px;
-`;
-
-const SummaryIntro = styled.p`
-    margin: 0 0 ${space.sm}px;
-`;
-
-const ErrorList = styled.ul`
-    margin: 0;
-    padding-inline-start: ${space.lg}px;
-`;
-
-const ListItem = styled.li`
-    margin: ${space.xxs}px 0;
-`;
-
-const FieldAnchor = styled.a`
-    color: var(--ant-color-link);
-`;
-
-const SrOnly = styled.span`
-    border: 0;
-    clip: rect(0, 0, 0, 0);
-    height: 1px;
-    margin: -1px;
-    overflow: hidden;
-    padding: 0;
-    /*
-     * The 1×1 clip keeps the box visually invisible, but the element
-     * still occupies a hit-test target above whatever it is positioned
-     * over. Drop pointer-events so the visible button beneath always
-     * receives the click — matches the SR-only pattern used in
-     * commandPalette and the board filter announcer.
-     */
-    pointer-events: none;
-    position: absolute;
-    white-space: nowrap;
-    width: 1px;
-`;
 
 type SummaryBodyProps = {
     apiMessage: string | null;
@@ -96,30 +42,47 @@ const AuthErrorSummaryBody = ({
     }
 
     return (
-        <SummaryRoot
+        <div
             ref={ref}
             aria-describedby="auth-error-summary-intro auth-error-summary-sr-only"
             aria-labelledby="auth-error-summary-title"
+            className="mb-lg rounded-md border border-destructive/50 px-lg py-md text-foreground outline-none"
             id="auth-error-summary"
             role="group"
             tabIndex={-1}
         >
-            <SummaryTitle id="auth-error-summary-title">
+            <h2
+                className="mb-xxs text-md font-semibold text-destructive"
+                id="auth-error-summary-title"
+            >
                 {microcopy.auth.errorSummaryTitle}
-            </SummaryTitle>
-            <SummaryIntro id="auth-error-summary-intro">
+            </h2>
+            <p className="mb-sm" id="auth-error-summary-intro">
                 {microcopy.auth.errorSummaryIntro}
-            </SummaryIntro>
-            <SrOnly id="auth-error-summary-sr-only">
+            </p>
+            {/*
+             * The 1×1 clipped announcer sits absolute over the visible
+             * submit button on auth pages. `pointer-events-none` keeps the
+             * invisible box from intercepting clicks meant for the button
+             * beneath it (mirrors the commandPalette / board announcer
+             * pattern).
+             */}
+            <span
+                className="sr-only pointer-events-none"
+                id="auth-error-summary-sr-only"
+            >
                 {microcopy.auth.errorSummaryRegionAriaLabel}
-            </SrOnly>
-            <ErrorList>
+            </span>
+            <ul className="m-0 ps-lg">
                 {apiMessage ? (
-                    <ListItem key="_api">{apiMessage}</ListItem>
+                    <li className="my-xxs" key="_api">
+                        {apiMessage}
+                    </li>
                 ) : null}
                 {fieldErrors.map(({ meta, message }) => (
-                    <ListItem key={meta.name}>
-                        <FieldAnchor
+                    <li className="my-xxs" key={meta.name}>
+                        <a
+                            className="text-primary underline-offset-4 hover:underline"
                             href={`#${meta.id}`}
                             onClick={(event) => {
                                 event.preventDefault();
@@ -129,11 +92,11 @@ const AuthErrorSummaryBody = ({
                             }}
                         >
                             {`${meta.label}: ${message}`}
-                        </FieldAnchor>
-                    </ListItem>
+                        </a>
+                    </li>
                 ))}
-            </ErrorList>
-        </SummaryRoot>
+            </ul>
+        </div>
     );
 };
 
@@ -146,36 +109,29 @@ const AuthErrorSummary = ({
     includeFieldErrors: boolean;
     serverError: Error | IError | null | undefined;
 }) => {
-    const form = Form.useFormInstance();
+    const form = useFormInstance();
+    const state = useFormState(form);
+    const apiMessage = resolveAuthPageErrorMessage(serverError);
+    const fieldErrors = includeFieldErrors
+        ? fields
+              .map((meta) => {
+                  const errs = state.errors[meta.name] ?? [];
+                  return errs.length ? { meta, message: errs[0] ?? "" } : null;
+              })
+              .filter(
+                  (
+                      x
+                  ): x is {
+                      meta: AuthErrorFieldMeta;
+                      message: string;
+                  } => x != null
+              )
+        : [];
     return (
-        <Form.Item shouldUpdate noStyle>
-            {() => {
-                const apiMessage = resolveAuthPageErrorMessage(serverError);
-                const fieldErrors = includeFieldErrors
-                    ? fields
-                          .map((meta) => {
-                              const errs = form.getFieldError(meta.name);
-                              return errs.length
-                                  ? { meta, message: errs[0] ?? "" }
-                                  : null;
-                          })
-                          .filter(
-                              (
-                                  x
-                              ): x is {
-                                  meta: AuthErrorFieldMeta;
-                                  message: string;
-                              } => x != null
-                          )
-                    : [];
-                return (
-                    <AuthErrorSummaryBody
-                        apiMessage={apiMessage}
-                        fieldErrors={fieldErrors}
-                    />
-                );
-            }}
-        </Form.Item>
+        <AuthErrorSummaryBody
+            apiMessage={apiMessage}
+            fieldErrors={fieldErrors}
+        />
     );
 };
 

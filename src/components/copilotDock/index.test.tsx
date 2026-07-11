@@ -1,5 +1,4 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { App as AntdApp } from "antd";
 import {
     act,
     fireEvent,
@@ -98,7 +97,7 @@ const baseAgent = (
  * we only assert dock-level behavior.
  */
 
-const installAntdBrowserMocks = (matchCoarse = false) => {
+const installBrowserMocks = (matchCoarse = false) => {
     Object.defineProperty(window, "matchMedia", {
         writable: true,
         value: (query: string) => ({
@@ -125,6 +124,11 @@ const installAntdBrowserMocks = (matchCoarse = false) => {
         writable: true,
         value: ResizeObserverMock
     });
+
+    // Radix's dialog/sheet/tabs lean on PointerEvent APIs jsdom doesn't ship.
+    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+    Element.prototype.releasePointerCapture = jest.fn();
 };
 
 const member = (overrides: Partial<IMember> = {}): IMember => ({
@@ -171,19 +175,17 @@ const renderDock = (options: RenderOptions = {}) => {
         <Provider store={store}>
             <QueryClientProvider client={queryClient}>
                 <MemoryRouter>
-                    <AntdApp>
-                        <CopilotDock
-                            activeTab={options.activeTab ?? "chat"}
-                            columns={[column()]}
-                            knownProjectIds={["project-1"]}
-                            members={[member()]}
-                            onClose={onClose}
-                            onTabChange={onTabChange}
-                            open={options.open ?? true}
-                            project={project()}
-                            tasks={[]}
-                        />
-                    </AntdApp>
+                    <CopilotDock
+                        activeTab={options.activeTab ?? "chat"}
+                        columns={[column()]}
+                        knownProjectIds={["project-1"]}
+                        members={[member()]}
+                        onClose={onClose}
+                        onTabChange={onTabChange}
+                        open={options.open ?? true}
+                        project={project()}
+                        tasks={[]}
+                    />
                 </MemoryRouter>
             </QueryClientProvider>
         </Provider>
@@ -268,9 +270,7 @@ const renderControlled = (
         <Provider store={store}>
             <QueryClientProvider client={queryClient}>
                 <MemoryRouter>
-                    <AntdApp>
-                        <ControlledDock {...props} />
-                    </AntdApp>
+                    <ControlledDock {...props} />
                 </MemoryRouter>
             </QueryClientProvider>
         </Provider>
@@ -280,7 +280,7 @@ const renderControlled = (
 describe("CopilotDock", () => {
     beforeEach(() => {
         resetBriefCacheForTests();
-        installAntdBrowserMocks(false);
+        installBrowserMocks(false);
         // Safe default mock returns so existing dock-level assertions
         // (which don't care about hook internals) keep passing. Tests
         // that DO drive hook behavior override these via mockReturnValue.
@@ -312,7 +312,8 @@ describe("CopilotDock", () => {
         const briefTab = screen.getByRole("tab", {
             name: microcopy.copilotDock.tabBrief as string
         });
-        fireEvent.click(briefTab);
+        // Radix Tabs selects on mousedown/focus, not a bare click.
+        fireEvent.mouseDown(briefTab);
 
         await waitFor(() => {
             expect(onTabChange).toHaveBeenCalledWith("brief");
@@ -333,19 +334,17 @@ describe("CopilotDock", () => {
     it("mounts as a right-placement drawer on desktop/tablet (default jsdom mocks)", () => {
         renderDock();
 
-        // Phase 6 Wave 3 — the dock now renders through the Sheet
-        // primitive. On non-coarse-pointer (desktop/tablet) Sheet falls
-        // back to an AntD `<Drawer placement={desktopPlacement}>`, which
-        // ships the `.ant-drawer-right` class. Assert via the class so
-        // the test stays decoupled from the Sheet's internal data-attr
-        // forwarding policy.
+        // On non-coarse-pointer (desktop/tablet) the Sheet renders the
+        // shadcn `<Sheet side="right">` surface — a `role="dialog"` node
+        // carrying the dock's `data-testid` and the right-edge slide-in
+        // classes. Assert the surface exists and sits on the right edge.
         const dock = document.querySelector("[data-testid='copilot-dock']");
         expect(dock).not.toBeNull();
-        expect(document.querySelector(".ant-drawer-right")).not.toBeNull();
+        expect(dock).toHaveClass("right-0");
     });
 
     it("mounts as a multi-detent Sheet on coarse-pointer phone viewports", async () => {
-        installAntdBrowserMocks(true);
+        installBrowserMocks(true);
         renderDock();
 
         // Phase 6 Wave 3 — phone branch now goes through the Sheet's
@@ -363,14 +362,16 @@ describe("CopilotDock", () => {
     it("renders a minimal dock header (sparkle + title, no AI badge tag)", () => {
         renderDock();
 
-        const header = document.querySelector(
-            "[data-testid='copilot-dock'] .ant-drawer-header"
-        );
-        expect(header).not.toBeNull();
-        const headerBadgeMatches = (header as HTMLElement).querySelectorAll(
-            ".ant-tag"
-        );
-        const headerAiBadges = Array.from(headerBadgeMatches).filter((node) =>
+        // The dock surface owns the title chrome (sparkle + heading). The
+        // heading carries `id="copilot-dock-title"`; there must be no AI
+        // badge chip in the header.
+        const dock = document.querySelector("[data-testid='copilot-dock']");
+        expect(dock).not.toBeNull();
+        const headerAiBadges = Array.from(
+            (dock as HTMLElement).querySelectorAll(
+                "[data-copilot-chip-variant]"
+            )
+        ).filter((node) =>
             (node.textContent ?? "").includes(microcopy.a11y.aiBadge as string)
         );
         expect(headerAiBadges).toHaveLength(0);
@@ -379,28 +380,35 @@ describe("CopilotDock", () => {
         );
     });
 
-    it("invokes onClose when the mask is clicked on desktop (dirty-state-safe close)", () => {
+    it("invokes onClose when the mask is clicked on desktop (dirty-state-safe close)", async () => {
         const onClose = jest.fn();
         renderDock({ onClose });
 
-        // Desktop branch uses the AntD Drawer fallback (the Sheet's
-        // non-animated path), so the dismiss surface is the AntD mask
-        // class — same selector as before the Sheet migration.
-        const mask = document.querySelector(".ant-drawer-mask");
-        expect(mask).not.toBeNull();
-        fireEvent.click(mask as Element);
-        expect(onClose).toHaveBeenCalled();
+        // Desktop branch renders the shadcn `<Sheet>` surface (Radix
+        // Dialog machinery). Its scrim is the overlay behind the panel;
+        // a pointer-down outside the content dismisses the dialog, which
+        // routes to the dock's `onClose`. Radix arms its outside-pointer
+        // listener on a `setTimeout(0)`, so let that microtask flush
+        // before dispatching.
+        const overlay = document.querySelector('[class*="bg-black/45"]');
+        expect(overlay).not.toBeNull();
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+        fireEvent.pointerDown(overlay as Element);
+        await waitFor(() => {
+            expect(onClose).toHaveBeenCalled();
+        });
     });
 
     it("invokes onClose when the scrim is clicked on phone chrome", async () => {
-        installAntdBrowserMocks(true);
+        installBrowserMocks(true);
         const onClose = jest.fn();
         renderDock({ onClose });
 
-        // Phase 6 Wave 3 — phone branch goes through the Sheet's
-        // animated surface, which emits a scrim with the suffixed
-        // `${data-testid}-scrim` id. Clicking it must invoke the same
-        // `onClose` callback the AntD mask click used to fire.
+        // Phone branch goes through the Sheet's animated surface, which
+        // emits a scrim with the suffixed `${data-testid}-scrim` id.
+        // Clicking it must invoke the dock's `onClose`.
         const scrim = await screen.findByTestId("copilot-dock-scrim");
         fireEvent.click(scrim);
         expect(onClose).toHaveBeenCalled();
@@ -410,10 +418,11 @@ describe("CopilotDock", () => {
         const onClose = jest.fn();
         renderDock({ onClose });
 
-        // AntD Drawer (desktop) listens for Esc on the dialog content;
-        // firing keyDown from the document level reliably triggers the
-        // close. The Sheet's animated branch also listens for Escape at
-        // the window level, so the same fireEvent works on phone too.
+        // The desktop Sheet (Radix Dialog) listens for Esc on the
+        // dialog content; firing keyDown from the document level
+        // reliably triggers the close. The Sheet's animated branch also
+        // listens for Escape at the window level, so the same fireEvent
+        // works on phone too.
         fireEvent.keyDown(document.body, {
             key: "Escape",
             code: "Escape"
@@ -430,16 +439,13 @@ describe("CopilotDock", () => {
         expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     });
 
-    it("forwards aria-labelledby to the AntD Drawer fallback on desktop", () => {
+    it("forwards aria-labelledby to the Sheet surface on desktop", () => {
         renderDock();
 
-        // Sheet's P1.1 fix forwards the consumer-supplied
-        // `aria-labelledby` to the underlying AntD Drawer fallback so
-        // the desktop dialog keeps its accessible name. The dock's only
-        // accessible-name carrier is the title element; the labelledby
-        // wiring is what surfaces it to AT. The rc-drawer panel renders
-        // a `role="dialog"` with the consumer's `aria-labelledby`
-        // picked off the props via `pickAttrs({ aria: true })`.
+        // The Sheet forwards the consumer-supplied `aria-labelledby` to
+        // the underlying desktop `role="dialog"` surface so it keeps its
+        // accessible name. The dock's only accessible-name carrier is the
+        // title element; the labelledby wiring is what surfaces it to AT.
         const dialog = document.querySelector("[role='dialog']");
         expect(dialog).not.toBeNull();
         expect(dialog?.getAttribute("aria-labelledby")).toBe(
@@ -454,7 +460,7 @@ describe("CopilotDock", () => {
     });
 
     it("forwards aria-labelledby to the animated surface on phone chrome", async () => {
-        installAntdBrowserMocks(true);
+        installBrowserMocks(true);
         renderDock();
 
         // Phase 6 Wave 3 — phone branch animated surface must carry the
@@ -477,7 +483,7 @@ describe("CopilotDock", () => {
      * MUST NOT fire on a child key change.
      */
     it("keeps the shell surface mounted when keyed children remount across projectId changes", async () => {
-        installAntdBrowserMocks(true);
+        installBrowserMocks(true);
         const onClose = jest.fn();
         const ShellHarness: React.FC<{ projectId: string }> = ({
             projectId
@@ -490,9 +496,7 @@ describe("CopilotDock", () => {
         );
         const { rerender } = render(
             <Provider store={store}>
-                <AntdApp>
-                    <ShellHarness projectId="p1" />
-                </AntdApp>
+                <ShellHarness projectId="p1" />
             </Provider>
         );
         const surfaceBefore = await screen.findByTestId("copilot-dock-surface");
@@ -500,9 +504,7 @@ describe("CopilotDock", () => {
 
         rerender(
             <Provider store={store}>
-                <AntdApp>
-                    <ShellHarness projectId="p2" />
-                </AntdApp>
+                <ShellHarness projectId="p2" />
             </Provider>
         );
         const surfaceAfter = await screen.findByTestId("copilot-dock-surface");
@@ -545,15 +547,15 @@ describe("CopilotDock", () => {
         // Sanity: abort hasn't fired during render / typing.
         expect(abort).not.toHaveBeenCalled();
 
-        fireEvent.click(
+        fireEvent.mouseDown(
             screen.getByRole("tab", {
                 name: microcopy.copilotDock.tabBrief as string
             })
         );
 
-        // After the switch, AntD keeps the Chat panel mounted (it just
-        // hides its visibility). The textarea node is still in the DOM
-        // and its value MUST be preserved.
+        // After the switch, Radix keeps the Chat panel mounted
+        // (`forceMount`, just hidden). The textarea node is still in the
+        // DOM and its value MUST be preserved.
         await waitFor(() => {
             expect(
                 screen.getByRole("tab", {
@@ -576,7 +578,7 @@ describe("CopilotDock", () => {
 
         // Switching back to Chat re-shows the same composer with the
         // text intact.
-        fireEvent.click(
+        fireEvent.mouseDown(
             screen.getByRole("tab", {
                 name: microcopy.copilotDock.tabChat as string
             })
@@ -627,7 +629,7 @@ describe("CopilotDock", () => {
             // Switch to Chat, then back to Brief. Same fingerprint, same
             // surface state — the event must NOT fire a second time just
             // because the user toggled tabs.
-            fireEvent.click(
+            fireEvent.mouseDown(
                 screen.getByRole("tab", {
                     name: microcopy.copilotDock.tabChat as string
                 })
@@ -641,7 +643,7 @@ describe("CopilotDock", () => {
                 ).toBeInTheDocument();
             });
 
-            fireEvent.click(
+            fireEvent.mouseDown(
                 screen.getByRole("tab", {
                     name: microcopy.copilotDock.tabBrief as string
                 })
@@ -704,7 +706,7 @@ describe("CopilotDock", () => {
 
             // Switch to Chat so `surfaceVisible` flips false on the brief
             // body — the user is no longer looking at the brief.
-            fireEvent.click(
+            fireEvent.mouseDown(
                 screen.getByRole("tab", {
                     name: microcopy.copilotDock.tabChat as string
                 })
@@ -739,7 +741,7 @@ describe("CopilotDock", () => {
 
             // Switch back to Brief — the body sees a new fingerprint and
             // must refetch under the distinct refresh event.
-            fireEvent.click(
+            fireEvent.mouseDown(
                 screen.getByRole("tab", {
                     name: microcopy.copilotDock.tabBrief as string
                 })
@@ -1330,7 +1332,7 @@ describe("CopilotDock", () => {
                 // the brief body, which must drop the trailing timer.
                 await advanceBy(5_000);
                 await act(async () => {
-                    fireEvent.click(
+                    fireEvent.mouseDown(
                         screen.getByRole("tab", {
                             name: microcopy.copilotDock.tabChat as string
                         })

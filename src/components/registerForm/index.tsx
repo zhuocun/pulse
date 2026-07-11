@@ -1,34 +1,64 @@
-import { EyeInvisibleOutlined, EyeOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
-import { Form, Input } from "antd";
-import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
+import { forwardRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
+
+import { Form } from "@/components/ui/form";
+import { Input, type InputProps } from "@/components/ui/input";
+import useAppMessage from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 
 import { microcopy } from "../../constants/microcopy";
 import { AuthButton } from "../../layouts/authLayout";
-import { lineHeight } from "../../theme/tokens";
-import useAppMessage from "../../utils/hooks/useAppMessage";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 
 import AuthErrorSummary from "../authErrorSummary";
 import { PasswordStrengthHint } from "./passwordStrengthHint";
 import { AuthTermsAgreement } from "./termsAgreement";
 
-const inputSize = "large" as const;
-
-const CapsLockSlot = styled.span`
-    display: inline-block;
-    line-height: ${lineHeight.snug};
-    min-height: ${lineHeight.snug}em;
-`;
+/**
+ * Password field with an eye/eye-off adornment — replaces antd's
+ * `Input.Password`. `Form.Item` clones this control and injects
+ * `value` / `onChange` / `onBlur` / `id` / `aria-*`, which spread onto the
+ * inner `<input>`; the toggle is a sibling button so the primitive stays a
+ * plain themed input.
+ */
+const PasswordInput = forwardRef<HTMLInputElement, InputProps>(
+    ({ className, ...props }, ref) => {
+        const [visible, setVisible] = useState(false);
+        return (
+            <div className="relative">
+                <Input
+                    ref={ref}
+                    className={cn("pr-11", className)}
+                    type={visible ? "text" : "password"}
+                    {...props}
+                />
+                <button
+                    aria-label={
+                        visible
+                            ? microcopy.actions.hidePassword
+                            : microcopy.actions.showPassword
+                    }
+                    className="absolute inset-y-0 right-0 flex items-center justify-center rounded-md px-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-[44px] coarse:min-w-[44px]"
+                    onClick={() => setVisible((prev) => !prev)}
+                    type="button"
+                >
+                    {visible ? (
+                        <Eye aria-hidden className="size-4" />
+                    ) : (
+                        <EyeOff aria-hidden className="size-4" />
+                    )}
+                </button>
+            </div>
+        );
+    }
+);
+PasswordInput.displayName = "PasswordInput";
 
 const RegisterForm: React.FC<{
     onError: React.Dispatch<React.SetStateAction<Error | null | IError>>;
     serverError?: Error | IError | null;
 }> = ({ onError, serverError = null }) => {
-    // AntD v6: static `message` import warns about dynamic theme;
-    // `useAppMessage()` returns a theme-aware instance (with a static
-    // fallback for tests that render without `<App>`).
     const message = useAppMessage();
     const navigate = useNavigate();
     const location = useLocation();
@@ -37,7 +67,7 @@ const RegisterForm: React.FC<{
         username: string;
         password: string;
     }>();
-    const passwordValue = Form.useWatch("password", form) ?? "";
+    const passwordValue = (Form.useWatch("password", form) as string) ?? "";
     const [capsLockOn, setCapsLockOn] = useState(false);
     const [submitAttempted, setSubmitAttempted] = useState(false);
     const { mutateAsync, isLoading } = useReactMutation(
@@ -120,11 +150,10 @@ const RegisterForm: React.FC<{
                 <Input
                     autoComplete="email"
                     enterKeyHint="next"
+                    id="email"
                     inputMode="email"
                     placeholder={microcopy.placeholders.emailExample}
-                    size={inputSize}
                     type="email"
-                    id="email"
                 />
             </Form.Item>
             <Form.Item
@@ -142,23 +171,23 @@ const RegisterForm: React.FC<{
                 <Input
                     autoComplete="username"
                     enterKeyHint="next"
-                    inputMode="text"
-                    size={inputSize}
-                    type="text"
                     id="username"
+                    inputMode="text"
+                    type="text"
                 />
             </Form.Item>
             <Form.Item
                 extra={
                     <>
                         <PasswordStrengthHint password={passwordValue} />
-                        <CapsLockSlot
+                        <span
                             aria-atomic="true"
                             aria-live="polite"
+                            className="inline-block min-h-[1.4em] leading-snug"
                             role="status"
                         >
                             {capsLockOn ? microcopy.a11y.capsLockOn : ""}
-                        </CapsLockSlot>
+                        </span>
                     </>
                 }
                 label={microcopy.fields.password}
@@ -175,36 +204,24 @@ const RegisterForm: React.FC<{
                 ]}
                 validateTrigger={["onBlur", "onSubmit"]}
             >
-                <Input.Password
+                <PasswordInput
                     autoComplete="new-password"
                     enterKeyHint="go"
+                    id="password"
                     inputMode="text"
-                    iconRender={(visible) =>
-                        visible ? (
-                            <EyeOutlined
-                                aria-label={microcopy.actions.hidePassword}
-                            />
-                        ) : (
-                            <EyeInvisibleOutlined
-                                aria-label={microcopy.actions.showPassword}
-                            />
-                        )
-                    }
                     onKeyUp={(event) =>
                         setCapsLockOn(
                             "getModifierState" in event &&
                                 event.getModifierState("CapsLock")
                         )
                     }
-                    size={inputSize}
-                    id="password"
                 />
             </Form.Item>
             <AuthTermsAgreement variant="register" />
             <Form.Item>
                 <AuthButton
-                    loading={isLoading}
                     htmlType="submit"
+                    loading={isLoading}
                     type="primary"
                 >
                     {isLoading

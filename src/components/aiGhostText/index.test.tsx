@@ -5,8 +5,9 @@ import {
     screen,
     waitFor
 } from "@testing-library/react";
-import { Input } from "antd";
 import { useState } from "react";
+
+import { Textarea } from "@/components/ui/textarea";
 
 import AiGhostText from ".";
 
@@ -43,7 +44,7 @@ const grantConsent = () => {
     window.localStorage.setItem(PRIVACY_KEY, "1");
 };
 
-const installAntdBrowserMocks = (matches = false) => {
+const installBrowserMocks = (matches = false) => {
     // setupTests.ts already wires matchMedia as `writable: true`. We
     // overwrite the value (rather than re-define the property) so the
     // descriptor's existing flags stick — `Object.defineProperty` would
@@ -89,7 +90,7 @@ const Host: React.FC<{
                 currentValue: value
             }}
         >
-            <Input.TextArea
+            <Textarea
                 aria-label="task-note"
                 rows={4}
                 onChange={(event) => {
@@ -104,7 +105,7 @@ const Host: React.FC<{
 
 beforeEach(() => {
     jest.useFakeTimers();
-    installAntdBrowserMocks(false);
+    installBrowserMocks(false);
     window.localStorage.clear();
     setFlag(false);
 });
@@ -311,7 +312,7 @@ describe("AiGhostText", () => {
     it("renders without a fade-in transition when prefers-reduced-motion is set", async () => {
         setFlag(true);
         grantConsent();
-        installAntdBrowserMocks(true);
+        installBrowserMocks(true);
         render(<Host taskName="Login redirect bug" />);
         const textarea = screen.getByLabelText(
             "task-note"

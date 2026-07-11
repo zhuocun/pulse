@@ -10,12 +10,12 @@ import TaskDetailPanel from ".";
 /*
  * W2-01 contract test — deep-link hydration guard. On the very first
  * render (before effects run) the panel must force Sheet's static
- * AntD Drawer fallback via `forceDrawerFallback`, so a deep-linked
- * mount never kicks off the framer-motion enter animation mid-
- * hydration. After mount, the animated branch takes over.
+ * shadcn `<Sheet>` fallback via `forceDrawerFallback`, so a deep-linked
+ * mount never kicks off the animated multi-detent enter transition
+ * mid-hydration. After mount, the animated branch takes over.
  *
  * The Sheet module is mocked to record the prop across renders; the
- * animated-vs-drawer branch selection itself is covered by
+ * animated-vs-fallback branch selection itself is covered by
  * `src/components/sheet/index.test.tsx`.
  */
 

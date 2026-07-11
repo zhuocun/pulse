@@ -19,7 +19,7 @@ const mockedUseNotifications = useNotifications as jest.MockedFunction<
     typeof useNotifications
 >;
 
-const installAntdBrowserMocks = () => {
+const installBrowserMocks = () => {
     Object.defineProperty(window, "matchMedia", {
         writable: true,
         value: (query: string) => ({
@@ -64,7 +64,7 @@ const setNotifications = (notifications: INotification[] | undefined) => {
 };
 
 describe("NotificationBell", () => {
-    beforeAll(installAntdBrowserMocks);
+    beforeAll(installBrowserMocks);
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -116,7 +116,7 @@ describe("NotificationBell", () => {
 });
 
 describe("NotificationDrawer", () => {
-    beforeAll(installAntdBrowserMocks);
+    beforeAll(installBrowserMocks);
 
     beforeEach(() => {
         jest.clearAllMocks();

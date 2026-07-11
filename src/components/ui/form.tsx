@@ -120,13 +120,24 @@ const runRules = (value: FieldValue, rules: Rule[]): string[] => {
     return errors;
 };
 
+/** antd-parity field descriptor for `setFields`. */
+export interface FieldData {
+    name: string;
+    value?: FieldValue;
+    errors?: string[];
+    touched?: boolean;
+}
+
 export interface FormInstance<Values extends FormValues = FormValues> {
     submit(): void;
     resetFields(names?: string[]): void;
     setFieldsValue(values: Partial<Values>): void;
     setFieldValue(name: keyof Values & string, value: FieldValue): void;
+    /** antd parity: imperatively set value/errors/touched on named fields. */
+    setFields(fields: FieldData[]): void;
     getFieldsValue(): Partial<Values>;
     getFieldValue(name: keyof Values & string): FieldValue;
+    getFieldError(name: string): string[];
     isFieldsTouched(): boolean;
     validateFields(): Promise<Values>;
     /** Internal wiring used by `<Form>` and `<Form.Item>`; not a public API. */
@@ -223,11 +234,30 @@ export const createForm = <
         setFieldValue(name, value) {
             setValues({ [name]: value } as Partial<Values>, true);
         },
+        setFields(fieldsToSet) {
+            const values = { ...state.values };
+            const errors = { ...state.errors };
+            const touched = { ...state.touched };
+            for (const field of fieldsToSet) {
+                if ("value" in field) {
+                    values[field.name as keyof Values] =
+                        field.value as Values[keyof Values];
+                }
+                if (field.errors) errors[field.name] = field.errors;
+                if (field.touched !== undefined) {
+                    touched[field.name] = field.touched;
+                }
+            }
+            setState({ values, errors, touched });
+        },
         getFieldsValue() {
             return state.values;
         },
         getFieldValue(name) {
             return state.values[name];
+        },
+        getFieldError(name) {
+            return state.errors[name] ?? [];
         },
         isFieldsTouched() {
             return Object.values(state.touched).some(Boolean);
@@ -315,7 +345,7 @@ export function useForm<Values extends FormValues = FormValues>(): [
     return [ref.current];
 }
 
-const useFormState = <Values extends FormValues>(
+export const useFormState = <Values extends FormValues>(
     form: FormInstance<Values>
 ): FormState<Values> =>
     React.useSyncExternalStore(
@@ -323,6 +353,21 @@ const useFormState = <Values extends FormValues>(
         form.internals.getState,
         form.internals.getState
     );
+
+/**
+ * antd parity: `Form.useFormInstance()` — read the ambient form instance
+ * from the nearest `<Form>` ancestor. Lets a descendant (e.g. an error
+ * summary) subscribe to field errors without prop-drilling the instance.
+ */
+export function useFormInstance<
+    Values extends FormValues = FormValues
+>(): FormInstance<Values> {
+    const ctx = React.useContext(FormContext);
+    if (!ctx) {
+        throw new Error("useFormInstance must be used inside a <Form>");
+    }
+    return ctx.form as FormInstance<Values>;
+}
 
 /** antd parity: `Form.useWatch(name, form)`. */
 export function useWatch<Values extends FormValues = FormValues>(
@@ -456,17 +501,30 @@ function FormItem({
     const hasError = errors.length > 0;
     const isRequired = required ?? rules.some((rule) => rule.required === true);
 
+    // Honor an explicit `id` the caller set on the control so the label,
+    // the control, and any external anchor (e.g. an error-summary link
+    // that focuses `#email`) all agree on one id.
+    const childId =
+        React.isValidElement(children) &&
+        typeof (children.props as InjectableProps).id === "string"
+            ? ((children.props as InjectableProps).id as string)
+            : undefined;
+    const controlId = childId ?? `${reactId}-control`;
+
     const labelNode = label ? (
         <Label
-            htmlFor={name ? `${reactId}-control` : undefined}
-            className={cn(hasError && "text-destructive")}
+            htmlFor={name || childId ? controlId : undefined}
+            className={cn(
+                hasError && "text-destructive",
+                // Render the required marker as a CSS pseudo-element so it
+                // stays out of the label's textContent — otherwise a
+                // baked-in "*" pollutes `getByLabelText`/accessible-name
+                // lookups and reads to screen readers.
+                isRequired &&
+                    "after:ml-xxs after:text-destructive after:content-['*']"
+            )}
         >
             {label}
-            {isRequired ? (
-                <span aria-hidden className="ml-xxs text-destructive">
-                    *
-                </span>
-            ) : null}
         </Label>
     ) : null;
 
@@ -488,7 +546,7 @@ function FormItem({
             | ((event: React.FocusEvent) => void)
             | undefined;
         const injected: InjectableProps = {
-            id: (childProps.id as string | undefined) ?? `${reactId}-control`,
+            id: controlId,
             [valuePropName]: state.values[name] ?? "",
             [trigger]: (...args: unknown[]) => {
                 const value = getValueFromEvent
@@ -551,11 +609,13 @@ type FormType = typeof FormComponent & {
     Item: typeof FormItem;
     useForm: typeof useForm;
     useWatch: typeof useWatch;
+    useFormInstance: typeof useFormInstance;
 };
 
 const Form = FormComponent as FormType;
 Form.Item = FormItem;
 Form.useForm = useForm;
 Form.useWatch = useWatch;
+Form.useFormInstance = useFormInstance;
 
 export { Form, FormItem };

@@ -4,9 +4,10 @@ import { PageError, PageSpin } from ".";
 
 describe("status components", () => {
     it("renders a full page spinner", () => {
-        const { container } = render(<PageSpin />);
+        render(<PageSpin />);
 
-        expect(container.querySelector(".ant-spin")).toBeInTheDocument();
+        expect(screen.getByText("Loading…")).toBeInTheDocument();
+        expect(screen.getByText("Loading page")).toBeInTheDocument();
     });
 
     it("renders a supplied page error message", () => {

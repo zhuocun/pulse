@@ -1,25 +1,33 @@
-import { DeleteOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
-import {
-    Alert,
-    Button,
-    Popconfirm,
-    Select,
-    Skeleton,
-    Tag,
-    Tooltip,
-    Typography
-} from "antd";
+import { AlertCircle, Trash2 } from "lucide-react";
 import React, { useCallback, useMemo, useState } from "react";
 
-import { microcopy, microcopyString } from "../../constants/microcopy";
+import { Alert, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-    fontSize,
-    fontWeight,
-    space,
-    touchTargetCoarse
-} from "../../theme/tokens";
-import useAppMessage from "../../utils/hooks/useAppMessage";
+    Popover,
+    PopoverContent,
+    PopoverTrigger
+} from "@/components/ui/popover";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger
+} from "@/components/ui/tooltip";
+import { Typography } from "@/components/ui/typography";
+
+import useAppMessage from "@/components/ui/toast";
+
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import useAuth from "../../utils/hooks/useAuth";
 import useMembersList from "../../utils/hooks/useMembersList";
 import useProjectMemberMutations from "../../utils/hooks/useProjectMemberMutations";
@@ -55,153 +63,65 @@ const ROLE_ORDER: readonly ProjectRole[] = [
 ];
 const DEFAULT_NEW_ROLE: ProjectRole = "viewer";
 
-const Wrapper = styled.section`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.md}px;
-`;
-
-const List = styled.ul`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xs}px;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-`;
-
-const Row = styled.li`
-    align-items: center;
-    border: 1px solid var(--ant-color-border-secondary, rgba(15, 23, 42, 0.08));
-    border-radius: ${space.xs}px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.sm}px;
-    margin: 0;
-    padding: ${space.sm}px;
-`;
-
-const Identity = styled.div`
-    align-items: center;
-    display: flex;
-    flex: 1 1 12rem;
-    gap: ${space.sm}px;
-    min-width: 0;
-`;
-
-const NameBlock = styled.div`
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-`;
-
-const MemberName = styled(Typography.Text)`
-    && {
-        font-size: ${fontSize.base}px;
-        font-weight: ${fontWeight.semibold};
-    }
-`;
-
-const MemberEmail = styled(Typography.Text)`
-    && {
-        color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45));
-        font-size: ${fontSize.xs}px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-`;
-
-const Controls = styled.div`
-    align-items: center;
-    display: flex;
-    gap: ${space.xs}px;
-    margin-inline-start: auto;
-`;
-
-const RoleSelect = styled(Select<ProjectRole>)`
-    min-width: 8rem;
-
-    @media (pointer: coarse) {
-        .ant-select-selector {
-            min-height: ${touchTargetCoarse}px;
-        }
-    }
-`;
-
-const RemoveButton = styled(Button)`
-    @media (pointer: coarse) {
-        min-height: ${touchTargetCoarse}px;
-        min-width: ${touchTargetCoarse}px;
-    }
-`;
+const isProjectRole = (role: string): role is ProjectRole =>
+    role === "owner" ||
+    role === "editor" ||
+    role === "viewer" ||
+    role === "guest";
 
 /*
- * AntD's light-mode gold Tag pairs #d48806 ink with the #fffbe6 fill —
- * 2.8:1, failing WCAG AA for the 12px badge label. Darken the ink to
- * gold-9 (#874d00, ~6.5:1 on the same fill) in light mode only; the
- * dark algorithm's gold pairing already clears AA.
- *
- * Triple `&` is load-bearing: AntD's own ink rule is
- * `:where(.css-x).ant-tag.ant-tag-gold:not(.ant-tag-disabled).ant-tag-filled`
- * — specificity (0,4,0) — so the override needs (0,4,1) to win the
- * cascade (a double `&` at (0,3,1) silently loses).
+ * The manager row gets a solid `warning`-token badge (white ink on the
+ * amber fill) so it reads as an always-AA highlight without re-deriving
+ * AntD's gold Tag ink, which failed WCAG AA at the 12px badge size.
  */
-const ManagerBadge = styled(Tag)`
-    html:not([data-color-scheme="dark"]) &&& {
-        color: #874d00;
-    }
-`;
+const MANAGER_BADGE_CLASS = "border-transparent bg-warning text-white";
 
-const AddSection = styled.div`
-    border-top: 1px solid
-        var(--ant-color-border-secondary, rgba(15, 23, 42, 0.08));
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xs}px;
-    padding-block-start: ${space.md}px;
-`;
+const ICON_BUTTON_CLASS = "coarse:min-w-[44px]";
 
-const AddHeading = styled(Typography.Text)`
-    && {
-        font-size: ${fontSize.sm}px;
-        font-weight: ${fontWeight.semibold};
-    }
-`;
+interface ConfirmPopoverProps {
+    trigger: React.ReactNode;
+    title: string;
+    okText: string;
+    cancelText: string;
+    onConfirm: () => void;
+}
 
-const AddRow = styled.div`
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xs}px;
-`;
-
-const AddUserSelect = styled(Select<string>)`
-    flex: 1 1 14rem;
-    min-width: 12rem;
-
-    @media (pointer: coarse) {
-        .ant-select-selector {
-            min-height: ${touchTargetCoarse}px;
-        }
-    }
-`;
-
-const AddRoleSelect = styled(Select<ProjectRole>)`
-    min-width: 8rem;
-
-    @media (pointer: coarse) {
-        .ant-select-selector {
-            min-height: ${touchTargetCoarse}px;
-        }
-    }
-`;
-
-const AddButton = styled(Button)`
-    @media (pointer: coarse) {
-        min-height: ${touchTargetCoarse}px;
-    }
-`;
+const ConfirmPopover: React.FC<ConfirmPopoverProps> = ({
+    trigger,
+    title,
+    okText,
+    cancelText,
+    onConfirm
+}) => {
+    const [open, setOpen] = useState(false);
+    return (
+        <Popover onOpenChange={setOpen} open={open}>
+            <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+            <PopoverContent aria-label={title} className="w-64" role="dialog">
+                <p className="text-sm font-medium text-foreground">{title}</p>
+                <div className="mt-sm flex justify-end gap-xs">
+                    <Button
+                        onClick={() => setOpen(false)}
+                        size="sm"
+                        variant="default"
+                    >
+                        {cancelText}
+                    </Button>
+                    <Button
+                        onClick={() => {
+                            setOpen(false);
+                            onConfirm();
+                        }}
+                        size="sm"
+                        variant="destructive"
+                    >
+                        {okText}
+                    </Button>
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+};
 
 interface ProjectMembersManagerProps {
     projectId: string;
@@ -273,12 +193,7 @@ const ProjectMembersManager: React.FC<ProjectMembersManagerProps> = ({
     );
 
     const roleLabel = useCallback((role: string): string => {
-        if (
-            role === "owner" ||
-            role === "editor" ||
-            role === "viewer" ||
-            role === "guest"
-        ) {
+        if (isProjectRole(role)) {
             return microcopyString(microcopy.members.roles[role]);
         }
         return role;
@@ -337,242 +252,327 @@ const ProjectMembersManager: React.FC<ProjectMembersManagerProps> = ({
 
     if (rosterError) {
         return (
-            <Alert
-                data-testid="members-load-error"
-                message={microcopyString(microcopy.members.loadError)}
-                showIcon
-                type="error"
-            />
+            <Alert data-testid="members-load-error" variant="destructive">
+                <AlertCircle aria-hidden />
+                <AlertTitle>
+                    {microcopyString(microcopy.members.loadError)}
+                </AlertTitle>
+            </Alert>
         );
     }
 
     if (rosterLoading && members.length === 0) {
         return (
-            <div data-testid="members-loading">
-                <Skeleton active paragraph={{ rows: 3 }} />
+            <div className="flex flex-col gap-xs" data-testid="members-loading">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
             </div>
         );
     }
 
     return (
-        <Wrapper>
-            {!canManage ? (
-                <Typography.Text
-                    data-testid="members-read-only-hint"
-                    type="secondary"
-                    style={{ fontSize: fontSize.sm }}
-                >
-                    {microcopyString(microcopy.members.readOnlyHint)}
-                </Typography.Text>
-            ) : null}
+        <TooltipProvider>
+            <section className="flex flex-col gap-md">
+                {!canManage ? (
+                    <Typography.Text
+                        data-testid="members-read-only-hint"
+                        type="secondary"
+                    >
+                        {microcopyString(microcopy.members.readOnlyHint)}
+                    </Typography.Text>
+                ) : null}
 
-            {members.length === 0 ? (
-                <Typography.Text
-                    data-testid="members-empty"
-                    type="secondary"
-                    style={{ fontSize: fontSize.sm }}
-                >
-                    {microcopyString(microcopy.members.empty)}
-                </Typography.Text>
-            ) : (
-                <List
-                    aria-label={microcopyString(
-                        microcopy.members.listAriaLabel
-                    )}
-                >
-                    {members.map((member) => {
-                        const isManager = member._id === managerId;
-                        const memberName =
-                            member.username || member.email || member._id;
-                        return (
-                            <Row
-                                key={member._id}
-                                data-testid="member-row"
-                                data-member-id={member._id}
-                            >
-                                <Identity>
-                                    <UserAvatar
-                                        id={member._id}
-                                        name={memberName}
-                                    />
-                                    <NameBlock>
-                                        <MemberName>{memberName}</MemberName>
-                                        {member.email ? (
-                                            <MemberEmail>
-                                                {member.email}
-                                            </MemberEmail>
-                                        ) : null}
-                                    </NameBlock>
-                                </Identity>
-                                <Controls>
-                                    {isManager ? (
-                                        <ManagerBadge
-                                            color="gold"
-                                            data-testid="member-manager-badge"
-                                        >
-                                            {microcopyString(
-                                                microcopy.members.managerBadge
-                                            )}
-                                        </ManagerBadge>
-                                    ) : null}
-                                    {canManage && !isManager ? (
-                                        <RoleSelect
-                                            aria-label={microcopyString(
-                                                microcopy.members
-                                                    .changeRoleAriaLabel
-                                            ).replace("{name}", memberName)}
-                                            data-testid="member-role-select"
-                                            onChange={(role) =>
-                                                handleRoleChange(
-                                                    member._id,
-                                                    role
-                                                )
-                                            }
-                                            options={roleOptions}
-                                            value={
-                                                ROLE_ORDER.includes(
-                                                    member.role as ProjectRole
-                                                )
-                                                    ? (member.role as ProjectRole)
-                                                    : undefined
-                                            }
+                {members.length === 0 ? (
+                    <Typography.Text
+                        data-testid="members-empty"
+                        type="secondary"
+                    >
+                        {microcopyString(microcopy.members.empty)}
+                    </Typography.Text>
+                ) : (
+                    <ul
+                        aria-label={microcopyString(
+                            microcopy.members.listAriaLabel
+                        )}
+                        className="m-0 flex list-none flex-col gap-xs p-0"
+                    >
+                        {members.map((member) => {
+                            const isManager = member._id === managerId;
+                            const memberName =
+                                member.username || member.email || member._id;
+                            const roleValue = isProjectRole(member.role)
+                                ? member.role
+                                : undefined;
+                            return (
+                                <li
+                                    className="m-0 flex flex-wrap items-center gap-sm rounded-md border border-border p-sm"
+                                    data-member-id={member._id}
+                                    data-testid="member-row"
+                                    key={member._id}
+                                >
+                                    <div className="flex min-w-0 flex-[1_1_12rem] items-center gap-sm">
+                                        <UserAvatar
+                                            id={member._id}
+                                            name={memberName}
                                         />
-                                    ) : (
-                                        <Tag data-testid="member-role-tag">
-                                            {roleLabel(member.role)}
-                                        </Tag>
-                                    )}
-                                    {canManage ? (
-                                        isManager ? (
-                                            <Tooltip
-                                                title={microcopyString(
+                                        <div className="flex min-w-0 flex-col">
+                                            <Typography.Text strong>
+                                                {memberName}
+                                            </Typography.Text>
+                                            {member.email ? (
+                                                <span className="overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground">
+                                                    {member.email}
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                    <div className="ms-auto flex items-center gap-xs">
+                                        {isManager ? (
+                                            <Badge
+                                                className={MANAGER_BADGE_CLASS}
+                                                data-testid="member-manager-badge"
+                                            >
+                                                {microcopyString(
                                                     microcopy.members
-                                                        .managerImmutableHint
+                                                        .managerBadge
                                                 )}
+                                            </Badge>
+                                        ) : null}
+                                        {canManage && !isManager ? (
+                                            <Select
+                                                onValueChange={(role) =>
+                                                    handleRoleChange(
+                                                        member._id,
+                                                        role as ProjectRole
+                                                    )
+                                                }
+                                                value={roleValue}
                                             >
-                                                <RemoveButton
+                                                <SelectTrigger
                                                     aria-label={microcopyString(
                                                         microcopy.members
-                                                            .removeAriaLabel
+                                                            .changeRoleAriaLabel
                                                     ).replace(
                                                         "{name}",
                                                         memberName
                                                     )}
-                                                    danger
-                                                    data-testid="member-remove"
-                                                    disabled
-                                                    icon={
-                                                        <DeleteOutlined
-                                                            aria-hidden
-                                                        />
-                                                    }
-                                                    size="small"
-                                                    type="text"
-                                                />
-                                            </Tooltip>
+                                                    className="w-32"
+                                                    data-testid="member-role-select"
+                                                >
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {roleOptions.map(
+                                                        (option) => (
+                                                            <SelectItem
+                                                                key={
+                                                                    option.value
+                                                                }
+                                                                value={
+                                                                    option.value
+                                                                }
+                                                            >
+                                                                {option.label}
+                                                            </SelectItem>
+                                                        )
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
                                         ) : (
-                                            <Popconfirm
-                                                cancelText={
-                                                    microcopy.actions.cancel
-                                                }
-                                                okText={
-                                                    microcopy.members.remove
-                                                }
-                                                onConfirm={() =>
-                                                    handleRemove(member._id)
-                                                }
-                                                title={microcopyString(
-                                                    microcopy.members
-                                                        .removeConfirmTitle
-                                                ).replace("{name}", memberName)}
+                                            <Badge
+                                                data-testid="member-role-tag"
+                                                variant="outline"
                                             >
-                                                <RemoveButton
-                                                    aria-label={microcopyString(
+                                                {roleLabel(member.role)}
+                                            </Badge>
+                                        )}
+                                        {canManage ? (
+                                            isManager ? (
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <span>
+                                                            <Button
+                                                                aria-label={microcopyString(
+                                                                    microcopy
+                                                                        .members
+                                                                        .removeAriaLabel
+                                                                ).replace(
+                                                                    "{name}",
+                                                                    memberName
+                                                                )}
+                                                                className={
+                                                                    ICON_BUTTON_CLASS
+                                                                }
+                                                                data-testid="member-remove"
+                                                                disabled
+                                                                size="sm"
+                                                                variant="ghost"
+                                                            >
+                                                                <Trash2
+                                                                    aria-hidden
+                                                                    className="text-destructive"
+                                                                />
+                                                            </Button>
+                                                        </span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        {microcopyString(
+                                                            microcopy.members
+                                                                .managerImmutableHint
+                                                        )}
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            ) : (
+                                                <ConfirmPopover
+                                                    cancelText={
+                                                        microcopy.actions.cancel
+                                                    }
+                                                    okText={
+                                                        microcopy.members.remove
+                                                    }
+                                                    onConfirm={() =>
+                                                        handleRemove(member._id)
+                                                    }
+                                                    title={microcopyString(
                                                         microcopy.members
-                                                            .removeAriaLabel
+                                                            .removeConfirmTitle
                                                     ).replace(
                                                         "{name}",
                                                         memberName
                                                     )}
-                                                    danger
-                                                    data-testid="member-remove"
-                                                    icon={
-                                                        <DeleteOutlined
-                                                            aria-hidden
-                                                        />
+                                                    trigger={
+                                                        <Button
+                                                            aria-label={microcopyString(
+                                                                microcopy
+                                                                    .members
+                                                                    .removeAriaLabel
+                                                            ).replace(
+                                                                "{name}",
+                                                                memberName
+                                                            )}
+                                                            className={
+                                                                ICON_BUTTON_CLASS
+                                                            }
+                                                            data-testid="member-remove"
+                                                            size="sm"
+                                                            variant="ghost"
+                                                        >
+                                                            <Trash2
+                                                                aria-hidden
+                                                                className="text-destructive"
+                                                            />
+                                                        </Button>
                                                     }
-                                                    size="small"
-                                                    type="text"
                                                 />
-                                            </Popconfirm>
-                                        )
-                                    ) : null}
-                                </Controls>
-                            </Row>
-                        );
-                    })}
-                </List>
-            )}
+                                            )
+                                        ) : null}
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
 
-            {canManage ? (
-                <AddSection>
-                    <AddHeading>
-                        {microcopyString(microcopy.members.addHeading)}
-                    </AddHeading>
-                    {addableOptions.length === 0 ? (
-                        <Typography.Text
-                            data-testid="members-no-addable"
-                            type="secondary"
-                            style={{ fontSize: fontSize.sm }}
-                        >
-                            {microcopyString(microcopy.members.noAddableUsers)}
+                {canManage ? (
+                    <div className="flex flex-col gap-xs border-t border-border pt-md">
+                        <Typography.Text strong>
+                            {microcopyString(microcopy.members.addHeading)}
                         </Typography.Text>
-                    ) : (
-                        <AddRow>
-                            <AddUserSelect
-                                aria-label={microcopyString(
-                                    microcopy.members.addUserPlaceholder
-                                )}
-                                data-testid="member-add-user"
-                                onChange={(value) => setNewUserId(value)}
-                                optionFilterProp="label"
-                                options={addableOptions}
-                                placeholder={microcopyString(
-                                    microcopy.members.addUserPlaceholder
-                                )}
-                                showSearch
-                                value={newUserId}
-                            />
-                            <AddRoleSelect
-                                aria-label={microcopyString(
-                                    microcopy.members.addRolePlaceholder
-                                )}
-                                data-testid="member-add-role"
-                                onChange={(value) => setNewRole(value)}
-                                options={roleOptions}
-                                placeholder={microcopyString(
-                                    microcopy.members.addRolePlaceholder
-                                )}
-                                value={newRole}
-                            />
-                            <AddButton
-                                data-testid="member-add-submit"
-                                disabled={!newUserId || isAdding}
-                                loading={isAdding}
-                                onClick={handleAdd}
-                                type="primary"
+                        {addableOptions.length === 0 ? (
+                            <Typography.Text
+                                data-testid="members-no-addable"
+                                type="secondary"
                             >
-                                {isAdding
-                                    ? microcopyString(microcopy.members.adding)
-                                    : microcopyString(
-                                          microcopy.members.addButton
-                                      )}
-                            </AddButton>
-                        </AddRow>
-                    )}
-                </AddSection>
-            ) : null}
-        </Wrapper>
+                                {microcopyString(
+                                    microcopy.members.noAddableUsers
+                                )}
+                            </Typography.Text>
+                        ) : (
+                            <div className="flex flex-wrap items-center gap-xs">
+                                <Select
+                                    onValueChange={(value) =>
+                                        setNewUserId(value)
+                                    }
+                                    value={newUserId}
+                                >
+                                    <SelectTrigger
+                                        aria-label={microcopyString(
+                                            microcopy.members.addUserPlaceholder
+                                        )}
+                                        className="min-w-[12rem] flex-[1_1_14rem]"
+                                        data-testid="member-add-user"
+                                    >
+                                        <SelectValue
+                                            placeholder={microcopyString(
+                                                microcopy.members
+                                                    .addUserPlaceholder
+                                            )}
+                                        />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {addableOptions.map((option) => (
+                                            <SelectItem
+                                                key={option.value}
+                                                value={option.value}
+                                            >
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Select
+                                    onValueChange={(value) =>
+                                        setNewRole(value as ProjectRole)
+                                    }
+                                    value={newRole}
+                                >
+                                    <SelectTrigger
+                                        aria-label={microcopyString(
+                                            microcopy.members.addRolePlaceholder
+                                        )}
+                                        className="w-32"
+                                        data-testid="member-add-role"
+                                    >
+                                        <SelectValue
+                                            placeholder={microcopyString(
+                                                microcopy.members
+                                                    .addRolePlaceholder
+                                            )}
+                                        />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {roleOptions.map((option) => (
+                                            <SelectItem
+                                                key={option.value}
+                                                value={option.value}
+                                            >
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button
+                                    data-testid="member-add-submit"
+                                    disabled={!newUserId || isAdding}
+                                    loading={isAdding}
+                                    onClick={handleAdd}
+                                    variant="primary"
+                                >
+                                    {isAdding
+                                        ? microcopyString(
+                                              microcopy.members.adding
+                                          )
+                                        : microcopyString(
+                                              microcopy.members.addButton
+                                          )}
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                ) : null}
+            </section>
+        </TooltipProvider>
     );
 };
 

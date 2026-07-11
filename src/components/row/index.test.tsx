@@ -11,12 +11,9 @@ describe("Row", () => {
             </Row>
         );
 
-        expect(screen.getByTestId("row")).toHaveStyle({
-            alignItems: "center",
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: "3rem"
-        });
+        const row = screen.getByTestId("row");
+        expect(row).toHaveClass("flex", "items-center", "justify-between");
+        expect(row).toHaveStyle({ marginBottom: "3rem" });
     });
 
     it("uses a numeric gap between child elements", () => {

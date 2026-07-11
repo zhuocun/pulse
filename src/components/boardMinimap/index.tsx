@@ -39,7 +39,6 @@
  * scrollLeft.
  */
 
-import styled from "@emotion/styled";
 import React, {
     useCallback,
     useEffect,
@@ -48,15 +47,10 @@ import React, {
     useState
 } from "react";
 
+import { cn } from "@/lib/utils";
+
 import { microcopy, microcopyString } from "../../constants/microcopy";
-import {
-    accent,
-    breakpoints,
-    fontSize,
-    fontWeight,
-    radius,
-    space
-} from "../../theme/tokens";
+import { accent } from "../../theme/tokens";
 import useReducedMotion from "../../utils/hooks/useReducedMotion";
 
 /**
@@ -104,137 +98,35 @@ const DEFAULT_MIN_COLUMNS = 5;
  * lift below extends each segment to 44 px without enlarging the
  * visual strip.
  */
-const MinimapNav = styled.nav`
-    align-items: stretch;
-    background: var(--ant-color-fill-quaternary, rgba(15, 23, 42, 0.04));
-    border: 1px solid var(--ant-color-border-secondary, rgba(15, 23, 42, 0.06));
-    border-radius: ${radius.pill}px;
-    display: flex;
-    gap: 2px;
-    height: 32px;
-    margin-bottom: ${space.xs}px;
-    overflow: hidden;
-    padding: 2px;
-    width: 100%;
-
-    /* Hidden on the smallest viewports where one column fills the
-     * screen — the SwipeHint surface already covers the
-     * "more columns this way" affordance on phones, and the minimap
-     * would be the dominant element on a 320 px display. */
-    @media (max-width: ${breakpoints.sm - 1}px) {
-        display: none;
-    }
-
-    /* Coarse-pointer escape hatch (PR #309 follow-up): each segment
-     * carries a 44 px floor so dense boards (8+ columns) overflow the
-     * strip width. Replace the desktop overflow: hidden with
-     * horizontal scrolling so the user can pan to reach off-strip
-     * segments rather than losing them entirely. We mask the
-     * scrollbar (no visible thumb) because the minimap is decorative
-     * chrome — a visible scrollbar inside a 32 px band would itself
-     * eat the touch target. */
-    @media (pointer: coarse) {
-        overflow-x: auto;
-        overflow-y: hidden;
-        scrollbar-width: none;
-
-        &::-webkit-scrollbar {
-            display: none;
-        }
-    }
-`;
+/**
+ * Sticky overview strip. Hidden on the smallest viewports where one column
+ * fills the screen (the SwipeHint surface covers the "more columns" hint on
+ * phones). On coarse pointers the strip becomes horizontally scrollable
+ * (with a masked scrollbar) so the per-segment 44px floor doesn't clip
+ * off-strip segments on dense boards.
+ */
+const MINIMAP_NAV_CLASS = cn(
+    "flex h-8 w-full items-stretch gap-[2px] mb-xs overflow-hidden rounded-full border border-border bg-muted p-[2px]",
+    "max-[479px]:hidden",
+    "coarse:overflow-x-auto coarse:overflow-y-hidden coarse:[scrollbar-width:none] coarse:[&::-webkit-scrollbar]:hidden"
+);
 
 /**
- * Individual column segment. `flex-grow` is set per-segment via the
- * inline `style` so each column claims a proportional share of the
- * minimap width that matches its actual width on the board (column
- * widths are uniform today, but we compute from the live width so a
- * future variable-width column doesn't ship a misaligned minimap).
+ * Individual column segment. `flex-grow` is set per-segment via the inline
+ * `style` so each column claims a proportional share of the minimap width
+ * that matches its actual width on the board. The in-view accent fill /
+ * border colours ride as inline styles because they resolve from the
+ * `--pulse-accent-*` token vars. On coarse pointers each segment carries a
+ * 44px min-width plus an `::after` hit-area extender (WCAG 2.5.5).
  */
-const MinimapSegment = styled.button<{ $inView: boolean }>`
-    align-items: stretch;
-    background: ${(p) =>
-        p.$inView
-            ? accent.bgStrong
-            : "var(--ant-color-fill-secondary, rgba(15, 23, 42, 0.06))"};
-    border: 1px solid ${(p) => (p.$inView ? accent.border : "transparent")};
-    border-radius: ${radius.sm}px;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.55));
-    cursor: pointer;
-    display: flex;
-    flex: 0 0 auto;
-    font-size: ${fontSize.xs}px;
-    font-weight: ${fontWeight.medium};
-    height: 100%;
-    justify-content: center;
-    min-width: 0;
-    overflow: hidden;
-    padding: 0 ${space.xs}px;
-    position: relative;
-    text-align: center;
-    transition:
-        background-color 120ms ease-out,
-        border-color 120ms ease-out;
-    white-space: nowrap;
+const MINIMAP_SEGMENT_CLASS = cn(
+    "relative flex h-full min-w-0 flex-[0_0_auto] cursor-pointer items-stretch justify-center overflow-hidden whitespace-nowrap rounded-sm border border-transparent bg-muted-foreground/[0.08] px-xs text-center text-xs font-medium text-muted-foreground transition-colors",
+    "hover:bg-muted-foreground/[0.14]",
+    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary",
+    "coarse:min-w-[44px] coarse:after:absolute coarse:after:inset-x-0 coarse:after:-inset-y-[8px] coarse:after:min-h-[44px] coarse:after:content-['']"
+);
 
-    &:hover {
-        background: ${(p) =>
-            p.$inView
-                ? accent.bgStrong
-                : "var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.10))"};
-    }
-
-    &:focus-visible {
-        outline: 2px solid var(--ant-color-primary, #ea580c);
-        outline-offset: 1px;
-    }
-
-    /* Coarse-pointer touch lift (WCAG 2.5.5). The visual segment stays
-     * 28 px tall (the strip 32 px minus 2x2 px inner padding); the
-     * 44 px touch target is achieved with absolute-positioned
-     * extension above and below the visual strip.
-     *
-     * Reviewer follow-up (PR #309): the ::after extender only lifted
-     * the vertical hit area. On dense boards (8+ columns x narrow
-     * viewport) each proportional segment can fall well below the WCAG
-     * 44 px horizontal minimum — a 320 px strip / 8 columns = 40 px per
-     * segment before gaps, and a 12-column board collapses to ~27 px
-     * each. Add min-width: 44px so every segment hits the WCAG
-     * floor regardless of column count. The visual trade-off is real:
-     * once 8 x 44 = 352 px exceeds the available width, the
-     * proportional flex strip overflows and the strip becomes
-     * horizontally scrollable mini-segments. We accept that trade —
-     * mis-tapped segments would scroll the user to the wrong column,
-     * which is a far worse outcome than a scrollable minimap on dense
-     * boards. The fine-pointer path is unaffected (no min-width on
-     * desktop), so the visual rhythm stays intact for mouse users. */
-    @media (pointer: coarse) {
-        min-width: 44px;
-
-        &::after {
-            content: "";
-            position: absolute;
-            inset: -8px 0;
-            min-height: 44px;
-        }
-    }
-
-    /* Forced-colors / Windows high-contrast: drop the brand fill so
-     * the segment paints in system colours. The currentColor border
-     * + Highlight background on the in-view variant keeps the
-     * affordance legible without authoring custom palette overrides. */
-    @media (forced-colors: active) {
-        background: ${(p) => (p.$inView ? "Highlight" : "Canvas")};
-        border-color: CanvasText;
-        color: ${(p) => (p.$inView ? "HighlightText" : "CanvasText")};
-    }
-`;
-
-const SegmentLabel = styled.span`
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-`;
+const SEGMENT_LABEL_CLASS = "overflow-hidden text-ellipsis whitespace-nowrap";
 
 const formatTemplate = (
     template: string,
@@ -508,8 +400,9 @@ const BoardMinimap: React.FC<BoardMinimapProps> = ({
     );
 
     return (
-        <MinimapNav
+        <nav
             aria-label={microcopyString(microcopy.board.minimap.aria)}
+            className={MINIMAP_NAV_CLASS}
             data-testid="board-minimap"
         >
             {columns.map((column) => {
@@ -532,24 +425,34 @@ const BoardMinimap: React.FC<BoardMinimapProps> = ({
                     status: inView ? inViewLabel : offScreenLabel
                 });
                 return (
-                    <MinimapSegment
-                        $inView={inView}
+                    <button
                         aria-current={inView ? "true" : undefined}
                         aria-label={ariaLabel}
+                        className={MINIMAP_SEGMENT_CLASS}
                         data-column-id={column.id}
                         data-in-view={inView ? "true" : "false"}
                         data-testid={`board-minimap-segment-${column.id}`}
                         key={column.id}
                         onClick={() => handleSegmentClick(column.id)}
-                        style={{ flexGrow }}
+                        style={{
+                            flexGrow,
+                            ...(inView
+                                ? {
+                                      background: accent.bgStrong,
+                                      borderColor: accent.border
+                                  }
+                                : {})
+                        }}
                         title={column.name}
                         type="button"
                     >
-                        <SegmentLabel aria-hidden>{column.name}</SegmentLabel>
-                    </MinimapSegment>
+                        <span aria-hidden className={SEGMENT_LABEL_CLASS}>
+                            {column.name}
+                        </span>
+                    </button>
                 );
             })}
-        </MinimapNav>
+        </nav>
     );
 };
 

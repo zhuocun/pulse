@@ -1,6 +1,13 @@
-import styled from "@emotion/styled";
-import { Modal, Typography } from "antd";
-import { useCallback, useId, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 import { microcopy } from "../../constants/microcopy";
 import {
@@ -13,72 +20,25 @@ import {
     type ShortcutEntry,
     type ShortcutScope
 } from "../../constants/shortcuts";
-import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
-import useReducedMotion from "../../utils/hooks/useReducedMotion";
 import useShortcut from "../../utils/hooks/useShortcut";
 
-const Section = styled.section`
-    & + & {
-        margin-top: ${space.lg}px;
-    }
-`;
+const SCOPE_HEADING_CLASS = cn(
+    "m-0 mb-xs text-xs font-semibold uppercase tracking-[0.04em]",
+    "[color:var(--ant-color-text-secondary,rgba(15,23,42,0.65))]"
+);
 
-const ScopeHeading = styled.h3`
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-    font-size: ${fontSize.xs}px;
-    font-weight: ${fontWeight.semibold};
-    letter-spacing: 0.04em;
-    margin: 0 0 ${space.xs}px;
-    text-transform: uppercase;
-`;
+const ROW_CLASS = cn(
+    "flex items-center justify-between gap-md py-xs",
+    "[&+&]:border-t [&+&]:border-[color:var(--ant-color-border-secondary,rgba(15,23,42,0.06))]"
+);
 
-const Row = styled.div`
-    align-items: center;
-    display: flex;
-    gap: ${space.md}px;
-    justify-content: space-between;
-    padding: ${space.xs}px 0;
-
-    & + & {
-        border-top: 1px solid
-            var(--ant-color-border-secondary, rgba(15, 23, 42, 0.06));
-    }
-`;
-
-const Description = styled.span`
-    color: var(--ant-color-text, inherit);
-    min-width: 0;
-    overflow-wrap: anywhere;
-`;
-
-const ComboWrap = styled.span`
-    display: inline-flex;
-    flex: 0 0 auto;
-    flex-wrap: wrap;
-    gap: ${space.xxs}px;
-    justify-content: flex-end;
-`;
-
-const Key = styled.kbd`
-    background: var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.06));
-    border: 1px solid var(--ant-color-border, rgba(15, 23, 42, 0.12));
-    border-radius: ${radius.sm}px;
-    box-shadow: 0 1px 0 var(--ant-color-border, rgba(15, 23, 42, 0.12));
-    color: var(--ant-color-text, inherit);
-    font-family: inherit;
-    font-size: ${fontSize.xs}px;
-    font-weight: ${fontWeight.medium};
-    line-height: 1.4;
-    min-width: 1.5em;
-    padding: 2px ${space.xs}px;
-    text-align: center;
-`;
-
-const SequenceSep = styled.span`
-    color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45));
-    font-size: ${fontSize.xs}px;
-    align-self: center;
-`;
+const KEY_CLASS = cn(
+    "min-w-[1.5em] rounded-sm border px-xs py-[2px] text-center font-[inherit] text-xs font-medium leading-[1.4]",
+    "[background:var(--ant-color-fill-tertiary,rgba(15,23,42,0.06))]",
+    "border-[color:var(--ant-color-border,rgba(15,23,42,0.12))]",
+    "shadow-[0_1px_0_var(--ant-color-border,rgba(15,23,42,0.12))]",
+    "[color:var(--ant-color-text,inherit)]"
+);
 
 /**
  * Render an entry's structured combo as `<kbd>` tokens. Multiple segments
@@ -89,23 +49,28 @@ const SequenceSep = styled.span`
 const ComboKeys: React.FC<{ entry: ShortcutEntry }> = ({ entry }) => {
     const then = microcopy.shortcuts.sequenceThen;
     return (
-        <ComboWrap>
+        <span className="inline-flex flex-[0_0_auto] flex-wrap justify-end gap-xxs">
             {entry.combo.map((segment, segmentIndex) => (
                 <span
                     key={`${entry.id}-seg-${segmentIndex}`}
-                    style={{ display: "inline-flex", gap: 2 }}
+                    className="inline-flex gap-[2px]"
                 >
                     {segmentIndex > 0 ? (
-                        <SequenceSep>{then}</SequenceSep>
+                        <span className="self-center text-xs [color:var(--ant-color-text-tertiary,rgba(15,23,42,0.45))]">
+                            {then}
+                        </span>
                     ) : null}
                     {segment.map((token) => (
-                        <Key key={`${token.key}-${token.label ?? ""}`}>
+                        <kbd
+                            key={`${token.key}-${token.label ?? ""}`}
+                            className={KEY_CLASS}
+                        >
                             {renderToken(token)}
-                        </Key>
+                        </kbd>
                     ))}
                 </span>
             ))}
-        </ComboWrap>
+        </span>
     );
 };
 
@@ -134,8 +99,9 @@ export interface ShortcutHelpProps {
  *
  * Lists the `SHORTCUTS` catalog grouped by scope, rendering each combo as
  * `<kbd>`. Opens on `?` (global, suppressed while typing in a field) and is
- * dismissible via Esc / close (AntD Modal handles focus-trapping + Esc). The
- * dialog's accessible name comes from `microcopy.shortcuts.dialogTitle`.
+ * dismissible via Esc / close (the Dialog primitive handles focus-trapping +
+ * Esc). The dialog's accessible name comes from
+ * `microcopy.shortcuts.dialogTitle`.
  */
 const ShortcutHelp: React.FC<ShortcutHelpProps> = ({
     open: controlledOpen,
@@ -144,9 +110,6 @@ const ShortcutHelp: React.FC<ShortcutHelpProps> = ({
     const [internalOpen, setInternalOpen] = useState(false);
     const isControlled = controlledOpen !== undefined;
     const open = isControlled ? controlledOpen : internalOpen;
-    const reducedMotion = useReducedMotion();
-    const titleId = useId();
-    const descId = useId();
 
     const groups = useMemo(groupByScope, []);
 
@@ -164,33 +127,41 @@ const ShortcutHelp: React.FC<ShortcutHelpProps> = ({
     }, [isControlled, onClose]);
 
     return (
-        <Modal
-            aria-describedby={descId}
-            aria-labelledby={titleId}
-            destroyOnHidden
-            footer={null}
-            onCancel={handleClose}
+        <Dialog
             open={open}
-            title={<span id={titleId}>{microcopy.shortcuts.dialogTitle}</span>}
-            transitionName={reducedMotion ? "" : undefined}
-            maskTransitionName={reducedMotion ? "" : undefined}
-            width={520}
+            onOpenChange={(next) => {
+                if (!next) handleClose();
+            }}
         >
-            <Typography.Paragraph id={descId} type="secondary">
-                {microcopy.shortcuts.dialogDescription}
-            </Typography.Paragraph>
-            {groups.map((group) => (
-                <Section aria-label={scopeLabel(group.scope)} key={group.scope}>
-                    <ScopeHeading>{scopeLabel(group.scope)}</ScopeHeading>
-                    {group.entries.map((entry) => (
-                        <Row key={entry.id}>
-                            <Description>{describeShortcut(entry)}</Description>
-                            <ComboKeys entry={entry} />
-                        </Row>
+            <DialogContent className="max-w-[520px]">
+                <DialogHeader>
+                    <DialogTitle>{microcopy.shortcuts.dialogTitle}</DialogTitle>
+                    <DialogDescription>
+                        {microcopy.shortcuts.dialogDescription}
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-lg">
+                    {groups.map((group) => (
+                        <section
+                            aria-label={scopeLabel(group.scope)}
+                            key={group.scope}
+                        >
+                            <h3 className={SCOPE_HEADING_CLASS}>
+                                {scopeLabel(group.scope)}
+                            </h3>
+                            {group.entries.map((entry) => (
+                                <div className={ROW_CLASS} key={entry.id}>
+                                    <span className="min-w-0 [color:var(--ant-color-text,inherit)] [overflow-wrap:anywhere]">
+                                        {describeShortcut(entry)}
+                                    </span>
+                                    <ComboKeys entry={entry} />
+                                </div>
+                            ))}
+                        </section>
                     ))}
-                </Section>
-            ))}
-        </Modal>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 };
 

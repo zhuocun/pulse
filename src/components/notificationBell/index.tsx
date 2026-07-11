@@ -1,10 +1,12 @@
-import { BellOutlined, CheckOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
-import { Badge, Button, Empty, Typography } from "antd";
+import { Bell, Check } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
+import { Button } from "@/components/ui/button";
+import { Empty } from "@/components/ui/empty";
+import { Typography } from "@/components/ui/typography";
+
 import { microcopy, microcopyString } from "../../constants/microcopy";
-import { fontSize, radius, space, touchTargetCoarse } from "../../theme/tokens";
+import { fontSize } from "../../theme/tokens";
 import { formatRelativeTime } from "../../utils/formatRelativeTime";
 import useNotifications from "../../utils/hooks/useNotifications";
 import Sheet from "../sheet";
@@ -15,117 +17,16 @@ import Sheet from "../sheet";
  * Header companion to the activity-feed bell, but backed by the server's
  * persisted notifications (`useNotifications`) rather than the session-only
  * `useActivityFeed`. The exported `<NotificationBell>` is the bell trigger
- * (an accessible button with an unread-count `<Badge>`); the default export
+ * (an accessible button with an unread-count badge); the default export
  * `<NotificationDrawer>` is the list surface (mounted once at the header
  * level, exactly like `ActivityFeedDrawer`), rendering each notification's
  * summary + relative time, clickable to mark read, with a "Mark all as read"
  * action.
  *
  * Mirrors `ActivityFeedDrawer`'s chrome split via the shared `<Sheet>`
- * primitive — on phone a multi-detent bottom sheet, on desktop the AntD
- * right-shelf `<Drawer>`.
+ * primitive — on phone a multi-detent bottom sheet, on desktop a
+ * right-shelf drawer.
  */
-
-const DrawerHeader = styled.div`
-    align-items: center;
-    display: flex;
-    gap: ${space.xs}px;
-    justify-content: space-between;
-    padding-bottom: ${space.xs}px;
-`;
-
-const List = styled.ul`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xxs}px;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-`;
-
-/*
- * A notification row is itself the mark-read affordance — a full-width
- * borderless button so the whole row is one accessible target (the
- * jsx-a11y gate wants a real <button>, not a click handler on a <div>).
- * Unread rows carry the same faint brand-tinted background the activity
- * drawer uses so the two surfaces read consistently.
- */
-const Row = styled.li`
-    margin: 0;
-    padding: 0;
-`;
-
-const RowButton = styled.button<{ $unread: boolean }>`
-    align-items: flex-start;
-    background: ${({ $unread }) =>
-        $unread
-            ? "var(--ant-color-primary-bg, rgba(234, 88, 12, 0.06))"
-            : "transparent"};
-    border: none;
-    border-radius: ${radius.md}px;
-    cursor: pointer;
-    display: flex;
-    font: inherit;
-    gap: ${space.xs}px;
-    padding: ${space.xs}px ${space.sm}px;
-    text-align: start;
-    width: 100%;
-
-    &:hover,
-    &:focus-visible {
-        background: var(--ant-color-bg-text-hover, rgba(15, 23, 42, 0.05));
-    }
-
-    &:disabled {
-        cursor: default;
-    }
-
-    @media (pointer: coarse) {
-        min-height: ${touchTargetCoarse}px;
-    }
-`;
-
-const RowBody = styled.span`
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-`;
-
-const RowSummary = styled(Typography.Text)`
-    && {
-        font-size: ${fontSize.sm}px;
-        word-break: break-word;
-    }
-`;
-
-const RowMeta = styled(Typography.Text)`
-    && {
-        color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45));
-        font-size: ${fontSize.xs}px;
-    }
-`;
-
-/*
- * Unread dot — a small leading marker so unread rows are distinguishable
- * without relying on background colour alone (forced-colors / colour-blind
- * users). `aria-hidden` because the row's accessible name already carries
- * the "Mark as read" intent, which only renders while unread.
- */
-const UnreadDot = styled.span`
-    background: var(--ant-color-primary, #ea580c);
-    border-radius: 50%;
-    flex: 0 0 auto;
-    height: 8px;
-    margin-top: 6px;
-    width: 8px;
-`;
-
-const ReadSpacer = styled.span`
-    flex: 0 0 auto;
-    width: 8px;
-`;
 
 /**
  * Localized relative-time formatter. Delegates to the shared
@@ -198,7 +99,7 @@ const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
 
     const body = (
         <div data-testid="notification-drawer-body">
-            <DrawerHeader>
+            <div className="flex items-center justify-between gap-xs pb-xs">
                 <Typography.Text strong style={{ fontSize: fontSize.sm }}>
                     {drawerTitle}
                 </Typography.Text>
@@ -208,28 +109,26 @@ const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                     )}
                     data-testid="notification-mark-all-read"
                     disabled={allRead}
-                    icon={<CheckOutlined aria-hidden />}
                     onClick={markAllRead}
-                    size="small"
-                    type="text"
+                    size="sm"
+                    variant="ghost"
                 >
+                    <Check aria-hidden />
                     {microcopyString(microcopy.notifications.markAllRead)}
                 </Button>
-            </DrawerHeader>
+            </div>
             {list.length === 0 ? (
                 <Empty
                     data-testid="notification-empty"
                     description={microcopyString(microcopy.notifications.empty)}
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
                 />
             ) : (
-                <List>
+                <ul className="m-0 flex list-none flex-col gap-xxs p-0">
                     {list.map((notification) => {
                         const ms = toEpochMs(notification.createdAt);
                         return (
-                            <Row key={notification._id}>
-                                <RowButton
-                                    $unread={!notification.isRead}
+                            <li className="m-0 p-0" key={notification._id}>
+                                <button
                                     aria-label={
                                         notification.isRead
                                             ? undefined
@@ -240,6 +139,14 @@ const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                                                   "{summary}",
                                                   notification.summary
                                               )
+                                    }
+                                    className={
+                                        "flex w-full items-start gap-xs rounded-md px-sm py-xs text-start transition-colors " +
+                                        "hover:bg-muted focus-visible:bg-muted focus-visible:outline-none " +
+                                        "disabled:cursor-default coarse:min-h-[44px] " +
+                                        (notification.isRead
+                                            ? "bg-transparent"
+                                            : "bg-primary/10")
                                     }
                                     data-testid="notification-row"
                                     data-kind={notification.kind}
@@ -252,25 +159,34 @@ const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                                     type="button"
                                 >
                                     {notification.isRead ? (
-                                        <ReadSpacer aria-hidden />
+                                        <span
+                                            aria-hidden
+                                            className="w-2 flex-none"
+                                        />
                                     ) : (
-                                        <UnreadDot aria-hidden />
+                                        <span
+                                            aria-hidden
+                                            className="mt-[6px] h-2 w-2 flex-none rounded-full bg-primary"
+                                        />
                                     )}
-                                    <RowBody>
-                                        <RowSummary>
+                                    <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
+                                        <Typography.Text className="break-words">
                                             {notification.summary}
-                                        </RowSummary>
+                                        </Typography.Text>
                                         {ms !== null && (
-                                            <RowMeta>
+                                            <Typography.Text
+                                                className="text-xs"
+                                                type="secondary"
+                                            >
                                                 {formatRelative(ms, now)}
-                                            </RowMeta>
+                                            </Typography.Text>
                                         )}
-                                    </RowBody>
-                                </RowButton>
-                            </Row>
+                                    </span>
+                                </button>
+                            </li>
                         );
                     })}
-                </List>
+                </ul>
             )}
         </div>
     );
@@ -289,8 +205,8 @@ const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
             onClose={onClose}
             open={open}
             title={
-                <span>
-                    <BellOutlined aria-hidden style={{ marginInlineEnd: 8 }} />
+                <span className="inline-flex items-center gap-xs">
+                    <Bell aria-hidden className="size-4" />
                     {drawerTitle}
                 </span>
             }
@@ -309,31 +225,6 @@ interface NotificationBellProps {
     unreadCount: number;
     onClick: () => void;
 }
-
-const BellButton = styled.button`
-    align-items: center;
-    background: transparent;
-    border: none;
-    border-radius: ${radius.md}px;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-    cursor: pointer;
-    display: inline-flex;
-    height: 36px;
-    justify-content: center;
-    padding: 0;
-    width: 36px;
-
-    &:hover,
-    &:focus-visible {
-        background: var(--ant-color-bg-text-hover, rgba(15, 23, 42, 0.05));
-        color: var(--ant-color-text, rgba(15, 23, 42, 0.9));
-    }
-
-    @media (pointer: coarse) {
-        height: ${touchTargetCoarse}px;
-        width: ${touchTargetCoarse}px;
-    }
-`;
 
 /**
  * Bell-icon button used by the header. The accessible name follows the same
@@ -355,21 +246,28 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                       : microcopy.notifications.bellAriaLabelOther
               ).replace("{count}", String(unreadCount));
     return (
-        <BellButton
+        <button
             aria-label={ariaLabel}
+            className="inline-flex size-9 items-center justify-center rounded-md bg-transparent text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:outline-none coarse:size-[44px]"
             data-testid="notification-bell"
             onClick={onClick}
             type="button"
         >
-            <Badge
-                count={unreadCount}
+            <span
+                className="relative inline-flex"
                 data-testid="notification-bell-badge"
-                offset={[-2, 2]}
-                size="small"
             >
-                <BellOutlined aria-hidden style={{ fontSize: fontSize.md }} />
-            </Badge>
-        </BellButton>
+                <Bell aria-hidden className="size-4" />
+                {unreadCount > 0 ? (
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute -right-[6px] -top-[6px] inline-flex min-w-4 items-center justify-center rounded-pill bg-destructive px-[4px] text-[10px] font-semibold leading-4 text-destructive-foreground"
+                    >
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                ) : null}
+            </span>
+        </button>
     );
 };
 

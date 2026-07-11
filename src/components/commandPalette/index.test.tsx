@@ -9,7 +9,6 @@ import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { store } from "../../store";
 import { overlaysActions } from "../../store/reducers/overlaysSlice";
-import { ruleTextsFor, styledClassFor } from "../../testUtils/styleRules";
 
 import CommandPalette from ".";
 
@@ -148,15 +147,10 @@ describe("CommandPalette", () => {
         const label = (await screen.findAllByText("Roadmap"))[0];
         const sublabel = screen.getAllByText("Acme")[0];
 
-        const labelRuleText = ruleTextsFor(styledClassFor(label) ?? "").join(
-            "\n"
-        );
-        const sublabelRuleText = ruleTextsFor(
-            styledClassFor(sublabel) ?? ""
-        ).join("\n");
-
-        expect(labelRuleText).toContain("overflow-wrap: anywhere");
-        expect(sublabelRuleText).toContain("overflow-wrap: anywhere");
+        // Tailwind arbitrary utility applies `overflow-wrap: anywhere` so
+        // long labels/sublabels wrap instead of stretching the row.
+        expect(label.className).toContain("[overflow-wrap:anywhere]");
+        expect(sublabel.className).toContain("[overflow-wrap:anywhere]");
     });
 
     it("uses the full nav placeholder on desktop", async () => {

@@ -1,7 +1,6 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { message, Modal } from "antd";
 import type { ReactNode } from "react";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -9,14 +8,66 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { userPreferencesSlice } from "../../store/reducers/userPreferencesSlice";
-import { mediaRuleTextsFor, styledClassFor } from "../../testUtils/styleRules";
 import { BulkSelectionProvider } from "../../utils/hooks/useBulkSelection";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
 import { TaskSearchParam } from "../taskSearchPanel";
+import { declaresTouchTarget } from "../ui/testHelpers";
 
 import Column from ".";
+
+/*
+ * The transient Undo toast (empty-column delete + column edit) routes
+ * through the out-of-Batch-B, AntD-backed `useUndoToast` / `useAppMessage`
+ * hooks. Mock them so this suite stays free of AntD's global message
+ * container while still asserting the column raises the toast with the
+ * right copy and that the undo closures replay the inverse POST / PUT.
+ */
+interface UndoOptions {
+    description: string;
+    undo: () => void | Promise<void>;
+    analyticsTag?: string;
+    dismissOnUnmount?: boolean;
+}
+let mockLastUndoOptions: UndoOptions | null = null;
+const mockShowUndoToast = jest.fn((options: UndoOptions) => {
+    mockLastUndoOptions = options;
+    return { dismiss: jest.fn() };
+});
+const mockMessageError = jest.fn();
+jest.mock("../../utils/hooks/useUndoToast", () => ({
+    __esModule: true,
+    default: () => ({ show: mockShowUndoToast })
+}));
+jest.mock("../../utils/hooks/useAppMessage", () => ({
+    __esModule: true,
+    default: () => ({
+        error: mockMessageError,
+        success: jest.fn(),
+        info: jest.fn(),
+        warning: jest.fn(),
+        loading: jest.fn(),
+        open: jest.fn(),
+        destroy: jest.fn()
+    })
+}));
+
+/*
+ * Radix `DropdownMenu` (the column more-actions menu) and `Select` (the
+ * edit modal's category picker) drive their surfaces with pointer-capture
+ * and `scrollIntoView`, neither of which jsdom implements.
+ */
+Element.prototype.scrollIntoView = jest.fn();
+if (!Element.prototype.hasPointerCapture) {
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+}
+if (!Element.prototype.setPointerCapture) {
+    Element.prototype.setPointerCapture = jest.fn();
+}
+if (!Element.prototype.releasePointerCapture) {
+    Element.prototype.releasePointerCapture = jest.fn();
+}
 
 jest.mock("../../utils/hooks/useReactMutation");
 jest.mock("../../utils/hooks/useTaskModal");
@@ -42,18 +93,6 @@ type TaskCreatorMockProps = {
     columnId?: string;
     disabled?: boolean;
     boardAiOn?: boolean;
-};
-
-type DropdownMenuItem = {
-    key?: string | number;
-    label?: ReactNode;
-};
-
-type DropdownMockProps = {
-    children: ReactNode;
-    menu?: {
-        items?: DropdownMenuItem[];
-    };
 };
 
 jest.mock("../dragAndDrop", () => {
@@ -109,32 +148,6 @@ jest.mock("../taskCreator", () => ({
         />
     )
 }));
-
-jest.mock("antd", () => {
-    const actual = jest.requireActual("antd");
-    const React = jest.requireActual("react");
-
-    return {
-        ...actual,
-        Dropdown: ({ children, menu }: DropdownMockProps) =>
-            React.createElement(
-                "div",
-                null,
-                children,
-                React.createElement(
-                    "div",
-                    { "data-testid": "dropdown-menu" },
-                    menu?.items?.map((item) =>
-                        React.createElement(
-                            "div",
-                            { key: item.key },
-                            item.label
-                        )
-                    )
-                )
-            )
-    };
-});
 
 const mockedUseReactMutation = useReactMutation as jest.Mock;
 const mockedUseTaskModal = useTaskModal as jest.Mock;
@@ -310,20 +323,25 @@ const renderColumn = ({
     );
 };
 
+/**
+ * Open the column's more-actions overflow menu. The Edit / Delete
+ * affordances live inside a Radix `DropdownMenu` that only mounts its
+ * items once the trigger is activated, so every test that reaches for a
+ * menuitem opens the menu through this helper first.
+ */
+const openColumnMenu = async (columnName = "Todo") => {
+    const trigger = screen.getByRole("button", {
+        name: new RegExp(`^more actions for column ${columnName}$`, "i")
+    });
+    await userEvent.setup().click(trigger);
+};
+
 describe("Column", () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockLastUndoOptions = null;
         mockedEnvironment.taskPanelRouted = false;
         mockedEnvironment.aiColumnReadinessEnabled = false;
-    });
-
-    afterEach(() => {
-        // The Undo toast lives in a global AntD message container that
-        // outlives unmount (10 s window); tear it down so a leaked "Undo"
-        // button never bleeds into a sibling test's queries.
-        act(() => {
-            message.destroy();
-        });
     });
 
     it("advertises the keyboard-drag hint on a card while reordering is allowed", () => {
@@ -482,15 +500,17 @@ describe("Column", () => {
         );
         expect(optimisticShells).toHaveLength(1);
 
-        const cls = styledClassFor(optimisticShells[0]);
-        expect(cls).toBeTruthy();
-        // The reveal is guarded so reduced-motion users get an instant
-        // insert: the animation only lives inside the no-preference block.
-        const revealRules = mediaRuleTextsFor(cls ?? "", "no-preference");
-        const insertRule = revealRules.find((text) =>
-            text.includes('[data-optimistic="true"]')
+        // The reveal is a Tailwind `animate-in` slide-and-fade guarded by
+        // the `motion-safe:` variant (`@media (prefers-reduced-motion:
+        // no-preference)`), so reduced-motion users get an instant insert.
+        // Tailwind's compiled stylesheet isn't loaded in jsdom, so assert
+        // the utilities are threaded onto the placeholder shell rather than
+        // reading a computed animation.
+        const cls = optimisticShells[0]?.className ?? "";
+        expect(cls).toContain("motion-safe:data-[optimistic=true]:animate-in");
+        expect(cls).toContain(
+            "motion-safe:data-[optimistic=true]:slide-in-from-top-2"
         );
-        expect(insertRule).toContain("animation");
     });
 
     it("starts editing non-mock tasks but ignores mock tasks", () => {
@@ -562,38 +582,44 @@ describe("Column", () => {
 
     it("deletes an empty column immediately (no confirm) and surfaces an Undo toast", async () => {
         // §2.A.4 — an EMPTY column delete is reversible (nothing cascades),
-        // so it skips Modal.confirm and goes straight to an optimistic
+        // so it skips the confirm dialog and goes straight to an optimistic
         // delete + Undo toast.
-        const confirmSpy = jest.spyOn(Modal, "confirm");
         renderColumn({ tasks: [] });
 
-        fireEvent.click(
-            screen.getByRole("button", { name: /^delete column todo$/i })
+        await openColumnMenu();
+        await userEvent.setup().click(
+            await screen.findByRole("menuitem", {
+                name: /^delete column todo$/i
+            })
         );
 
-        expect(confirmSpy).not.toHaveBeenCalled();
+        // No confirm dialog appears for an empty column.
+        expect(
+            screen.queryByText(microcopy.confirm.deleteColumn.title)
+        ).not.toBeInTheDocument();
         expect(removeColumn).toHaveBeenCalledWith({ columnId: "column-1" });
 
-        // The toast announces the delete and offers a real, focusable
-        // Undo button.
-        expect(await screen.findByText("Column deleted")).toBeInTheDocument();
-        expect(
-            screen.getByRole("button", { name: "Undo" })
-        ).toBeInTheDocument();
-
-        confirmSpy.mockRestore();
+        // The Undo toast is raised with the delete copy and a real inverse
+        // closure (the toast surface itself is mocked out).
+        expect(mockShowUndoToast).toHaveBeenCalledTimes(1);
+        expect(mockLastUndoOptions?.description).toBe(
+            microcopy.feedback.columnDeleted
+        );
+        expect(typeof mockLastUndoOptions?.undo).toBe("function");
     });
 
     it("re-creates the empty column via the POST mutation when Undo is clicked", async () => {
         renderColumn({ tasks: [] });
 
-        fireEvent.click(
-            screen.getByRole("button", { name: /^delete column todo$/i })
+        await openColumnMenu();
+        await userEvent.setup().click(
+            await screen.findByRole("menuitem", {
+                name: /^delete column todo$/i
+            })
         );
 
-        const undoButton = await screen.findByRole("button", { name: "Undo" });
         await act(async () => {
-            fireEvent.click(undoButton);
+            await mockLastUndoOptions?.undo();
         });
 
         // Undo replays the inverse mutation with the captured snapshot.
@@ -605,41 +631,46 @@ describe("Column", () => {
     it("confirms before deleting a non-empty column and offers no Undo (cascade has no inverse)", async () => {
         // A column that still holds tasks cascades server-side
         // (board_service deletes every task with the columnId) and the
-        // re-create POST can't restore them — so §2.A.4 keeps it on
-        // Modal.confirm rather than promising an Undo we can't honor.
-        const confirmSpy = jest
-            .spyOn(Modal, "confirm")
-            .mockImplementation((config) => {
-                (config as { onOk?: () => void }).onOk?.();
-                return {} as ReturnType<typeof Modal.confirm>;
-            });
+        // re-create POST can't restore them — so §2.A.4 keeps it on a
+        // confirm dialog rather than promising an Undo we can't honor.
         renderColumn(); // default render seeds column-1 with tasks
 
-        fireEvent.click(
-            screen.getByRole("button", { name: /^delete column todo$/i })
+        await openColumnMenu();
+        await userEvent.setup().click(
+            await screen.findByRole("menuitem", {
+                name: /^delete column todo$/i
+            })
         );
 
-        expect(confirmSpy).toHaveBeenCalledTimes(1);
-        // Confirming still deletes the column…
-        expect(removeColumn).toHaveBeenCalledWith({ columnId: "column-1" });
-        // …but the reversible-delete affordances are absent.
-        expect(screen.queryByText("Column deleted")).not.toBeInTheDocument();
+        // The confirm dialog gates the destructive delete.
         expect(
-            screen.queryByRole("button", { name: "Undo" })
-        ).not.toBeInTheDocument();
+            await screen.findByText(microcopy.confirm.deleteColumn.title)
+        ).toBeInTheDocument();
+        expect(removeColumn).not.toHaveBeenCalled();
 
-        confirmSpy.mockRestore();
+        // Confirming still deletes the column…
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: microcopy.confirm.deleteColumn.confirmLabel
+            })
+        );
+        expect(removeColumn).toHaveBeenCalledWith({ columnId: "column-1" });
+        // …but the reversible-delete Undo toast is never raised.
+        expect(mockShowUndoToast).not.toHaveBeenCalled();
     });
 
     it("leaves the empty-column delete in place when the Undo toast is never clicked", async () => {
         renderColumn({ tasks: [] });
 
-        fireEvent.click(
-            screen.getByRole("button", { name: /^delete column todo$/i })
+        await openColumnMenu();
+        await userEvent.setup().click(
+            await screen.findByRole("menuitem", {
+                name: /^delete column todo$/i
+            })
         );
 
-        await screen.findByText("Column deleted");
-        // No Undo click — the optimistic delete stands and the inverse
+        expect(mockShowUndoToast).toHaveBeenCalledTimes(1);
+        // No Undo invocation — the optimistic delete stands and the inverse
         // mutation is never fired.
         expect(removeColumn).toHaveBeenCalledTimes(1);
         expect(recreateColumn).not.toHaveBeenCalled();
@@ -777,8 +808,11 @@ describe("Column", () => {
     it("edits a column's name and WIP limit through the edit modal (PUT /boards)", async () => {
         renderColumn({ boardColumn: column({ wipLimit: 0 }) });
 
-        fireEvent.click(
-            screen.getByRole("button", { name: /^edit column todo$/i })
+        await openColumnMenu();
+        await userEvent.setup().click(
+            await screen.findByRole("menuitem", {
+                name: /^edit column todo$/i
+            })
         );
 
         // The modal seeds from the column; rename it and set a positive cap.
@@ -787,7 +821,9 @@ describe("Column", () => {
         const wipInput = screen.getByRole("spinbutton", { name: "WIP limit" });
         fireEvent.change(wipInput, { target: { value: "4" } });
 
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        fireEvent.click(
+            screen.getByRole("button", { name: microcopy.actions.save })
+        );
 
         expect(editColumn).toHaveBeenCalledWith({
             _id: "column-1",
@@ -803,19 +839,26 @@ describe("Column", () => {
         // settings back.
         renderColumn({ boardColumn: column({ wipLimit: 0 }) });
 
-        fireEvent.click(
-            screen.getByRole("button", { name: /^edit column todo$/i })
+        await openColumnMenu();
+        await userEvent.setup().click(
+            await screen.findByRole("menuitem", {
+                name: /^edit column todo$/i
+            })
         );
         const nameInput = await screen.findByLabelText("New column name");
         fireEvent.change(nameInput, { target: { value: "Doing" } });
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        fireEvent.click(
+            screen.getByRole("button", { name: microcopy.actions.save })
+        );
 
-        expect(
-            await screen.findByText(microcopy.feedback.columnUpdated)
-        ).toBeInTheDocument();
-        const undoButton = await screen.findByRole("button", { name: "Undo" });
+        // The Undo toast is raised with the edit copy and a real inverse
+        // closure (the toast surface itself is mocked out).
+        expect(mockShowUndoToast).toHaveBeenCalledTimes(1);
+        expect(mockLastUndoOptions?.description).toBe(
+            microcopy.feedback.columnUpdated
+        );
         await act(async () => {
-            fireEvent.click(undoButton);
+            await mockLastUndoOptions?.undo();
         });
 
         // Undo replays the inverse PUT with the column's pre-edit settings.
@@ -827,14 +870,17 @@ describe("Column", () => {
         });
     });
 
-    it("disables the edit affordance for an optimistic mock column", () => {
+    it("disables the edit affordance for an optimistic mock column", async () => {
         renderColumn({
             boardColumn: column({ _id: "mock", columnName: "Mock" })
         });
 
+        await openColumnMenu("Mock");
         expect(
-            screen.getByRole("button", { name: /^edit column mock$/i })
-        ).toBeDisabled();
+            await screen.findByRole("menuitem", {
+                name: /^edit column mock$/i
+            })
+        ).toHaveAttribute("aria-disabled", "true");
     });
 
     /*
@@ -876,84 +922,40 @@ describe("Column", () => {
 
     // WCAG 2.5.8 (Target Size, Minimum). The bulk-select checkbox glyph is
     // only ~22 x 24 px on its own — below the 44 x 44 AAA target. The
-    // `SelectionCheckboxSlot` overlay lifts to `min-height`/`min-width: 44px`
-    // under `@media (pointer: coarse)` and stretches the AntD checkbox label
-    // to fill it, so the tap region matches the visible slot. Walk the
-    // rendered stylesheet (same approach as `projectCard.test.tsx`) and
-    // assert the 44 px declaration is still emitted — a refactor that drops
-    // it below 44 must fail CI.
+    // selection slot overlay lifts to `min-h-[44px]`/`min-w-[44px]` under
+    // `@media (pointer: coarse)` and stretches the checkbox to fill it, so
+    // the tap region matches the visible slot. Tailwind's compiled
+    // stylesheet isn't loaded in jsdom, so assert the canonical
+    // `coarse:min-h-[44px]` utility is threaded onto the slot (same pattern
+    // as the `ui/*` primitives) — a refactor that drops it must fail CI.
     it("declares a touch-target height of at least 44 px on the select slot (WCAG 2.5.8)", () => {
         renderColumn({ selection: true });
 
-        // Anchor on the checkbox, then walk up to the nearest element that
-        // carries a bare `css-xxx` emotion class (the styled slot),
-        // skipping AntD's `css-var-*` / `css-dev-only-*` markers.
         const checkbox = screen.getByRole("checkbox", {
             name: "Select task Build task"
         });
-        const isEmotionToken = (tok: string) =>
-            /^css-[a-z0-9]{4,}$/i.test(tok) &&
-            !tok.startsWith("css-var-") &&
-            !tok.startsWith("css-dev-only-");
-        let node: HTMLElement | null = checkbox as HTMLElement;
-        let styledCls: string | undefined;
-        while (node) {
-            styledCls = node.className
-                ?.toString()
-                .split(/\s+/)
-                .find(isEmotionToken);
-            if (styledCls) break;
-            node = node.parentElement;
-        }
-        expect(styledCls).toBeTruthy();
-
-        const heights: number[] = [];
-        const visit = (rule: CSSRule) => {
-            if (rule instanceof CSSStyleRule) {
-                if (!styledCls || !rule.selectorText.includes(styledCls))
-                    return;
-                const re = /(?:^|[\s;{])(?:min-)?height:\s*(\d+(?:\.\d+)?)px/gi;
-                let m: RegExpExecArray | null = re.exec(rule.cssText);
-                while (m !== null) {
-                    heights.push(parseFloat(m[1] ?? "0"));
-                    m = re.exec(rule.cssText);
-                }
-            } else if ("cssRules" in rule) {
-                for (const child of Array.from(
-                    (rule as CSSGroupingRule).cssRules
-                )) {
-                    visit(child);
-                }
-            }
-        };
-        Array.from(document.styleSheets).forEach((sheet) => {
-            let rules: CSSRuleList;
-            try {
-                rules = sheet.cssRules;
-            } catch {
-                return;
-            }
-            for (const rule of Array.from(rules)) visit(rule);
-        });
-
-        expect(heights).toContain(44);
+        const slot = checkbox.closest("[data-select-slot]");
+        expect(slot).not.toBeNull();
+        expect(declaresTouchTarget(slot as Element)).toBe(true);
+        expect((slot as Element).className).toContain("coarse:min-w-[44px]");
     });
 
-    it("disables delete for the optimistic mock column", () => {
+    it("disables delete for the optimistic mock column", async () => {
         renderColumn({
             boardColumn: column({ _id: "mock", columnName: "Mock" })
         });
 
-        const deleteButton = screen.getByRole("button", {
+        await openColumnMenu("Mock");
+        const deleteItem = await screen.findByRole("menuitem", {
             name: /^delete column mock$/i
         });
-        expect(deleteButton).toBeDisabled();
-        fireEvent.click(deleteButton);
+        expect(deleteItem).toHaveAttribute("aria-disabled", "true");
+        await userEvent.setup().click(deleteItem);
 
         // The placeholder column has no server id yet, so the delete (and
         // therefore the Undo toast) never fires.
         expect(removeColumn).not.toHaveBeenCalled();
-        expect(screen.queryByText("Column deleted")).not.toBeInTheDocument();
+        expect(mockShowUndoToast).not.toHaveBeenCalled();
     });
 
     it("does NOT render the readiness pill when the env flag is off (default)", () => {
@@ -1076,20 +1078,13 @@ describe("Column", () => {
      *     second one would double-feather the boundary.
      */
     describe("Liquid Glass chrome recipe (Wave 2 T3)", () => {
-        const sheetText = () =>
-            Array.from(document.styleSheets)
-                .map((sheet) => {
-                    let rules: CSSRuleList;
-                    try {
-                        rules = sheet.cssRules;
-                    } catch {
-                        return "";
-                    }
-                    return Array.from(rules)
-                        .map((rule) => rule.cssText)
-                        .join("\n");
-                })
-                .join("\n");
+        // Tailwind's compiled stylesheet isn't loaded in jsdom, so the
+        // specular-rim recipe is verified by the utilities threaded onto
+        // the ColumnHeader root rather than by walking `document.styleSheets`.
+        const headerClass = () => {
+            renderColumn();
+            return screen.getByTestId("column-header").className;
+        };
 
         it('marks the ColumnHeader root with data-glass-context="true"', () => {
             renderColumn();
@@ -1098,31 +1093,27 @@ describe("Column", () => {
         });
 
         it("emits a ::before specular-rim layer with --glass-specular-top", () => {
-            renderColumn();
-            const css = sheetText();
-            expect(css).toMatch(
-                /::before[^}]*background:\s*var\(--glass-specular-top\)/
+            expect(headerClass()).toContain(
+                "before:[background:var(--glass-specular-top)]"
             );
         });
 
         it("emits a ::after companion shadow layer with --glass-specular-bottom", () => {
-            renderColumn();
-            const css = sheetText();
-            expect(css).toMatch(
-                /::after[^}]*background:\s*var\(--glass-specular-bottom\)/
+            expect(headerClass()).toContain(
+                "after:[background:var(--glass-specular-bottom)]"
             );
         });
 
         it("respects prefers-reduced-transparency by dropping the rim backgrounds", () => {
-            renderColumn();
-            const css = sheetText();
-            expect(css).toMatch(/prefers-reduced-transparency[^}]*reduce/);
+            expect(headerClass()).toContain(
+                "[@media(prefers-reduced-transparency:reduce)]:before:[background:none]"
+            );
         });
 
         it("respects forced-colors mode (Windows high-contrast) by dropping the rim layers", () => {
-            renderColumn();
-            const css = sheetText();
-            expect(css).toMatch(/forced-colors[^}]*active/);
+            expect(headerClass()).toContain(
+                "forced-colors:before:[background:none]"
+            );
         });
     });
 
@@ -1326,30 +1317,14 @@ describe("Column", () => {
             const title = screen.getAllByTestId("task-card-title")[0];
             await rtlUser.dblClick(title);
             const input = await screen.findByTestId("task-card-title-input");
-            // The styled CardTitle scopes `.ant-input { font-size: var(...) }`
-            // to keep the rename affordance in lockstep with the title's
-            // compact font size. A failing assertion here flags that the
-            // override CSS rule was dropped or its selector drifted.
-            const ancestor = input
-                .closest('[data-testid="task-card-title-input"]')
-                ?.closest("div");
-            expect(ancestor?.parentElement).not.toBeNull();
-            // The rule lives on a styled-component class that wraps the
-            // editing CardTitle; assert by querying for the descendant
-            // selector pattern via the stylesheet rule presence.
-            const styleSheets = Array.from(document.styleSheets);
-            const hasDensityInputRule = styleSheets.some((sheet) => {
-                try {
-                    return Array.from(sheet.cssRules ?? []).some(
-                        (rule) =>
-                            rule.cssText.includes("--density-card-title-fs") &&
-                            rule.cssText.includes(".ant-input")
-                    );
-                } catch {
-                    return false;
-                }
-            });
-            expect(hasDensityInputRule).toBe(true);
+            // The rename Input threads the same `--density-card-title-fs`
+            // custom property that drives the card title, so it tracks the
+            // compact font size in lockstep. Tailwind's stylesheet isn't
+            // loaded in jsdom, so assert the arbitrary font-size utility is
+            // present on the Input rather than reading a computed size.
+            expect(input.className).toContain(
+                "[font-size:var(--density-card-title-fs,14px)]"
+            );
         });
     });
 

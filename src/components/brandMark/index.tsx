@@ -1,16 +1,8 @@
-import styled from "@emotion/styled";
 import React from "react";
 
-import {
-    accent,
-    brand,
-    fontSize,
-    fontWeight,
-    letterSpacing,
-    radius,
-    shadow,
-    space
-} from "../../theme/tokens";
+import { cn } from "@/lib/utils";
+
+import { accent, brand } from "../../theme/tokens";
 
 /**
  * Sanitize a React `useId()` value so it is safe to embed in an SVG
@@ -34,46 +26,15 @@ interface BrandMarkProps {
 const dimensions: Record<
     NonNullable<BrandMarkProps["size"]>,
     {
-        glyph: number;
+        glyphClass: string;
         innerSvg: number;
-        wordFontPx: number;
+        wordClass: string;
     }
 > = {
-    sm: { glyph: 28, innerSvg: 16, wordFontPx: fontSize.base },
-    md: { glyph: 36, innerSvg: 20, wordFontPx: fontSize.md },
-    lg: { glyph: 44, innerSvg: 24, wordFontPx: fontSize.lg }
+    sm: { glyphClass: "size-7", innerSvg: 16, wordClass: "text-base" },
+    md: { glyphClass: "size-9", innerSvg: 20, wordClass: "text-md" },
+    lg: { glyphClass: "size-11", innerSvg: 24, wordClass: "text-lg" }
 };
-
-const Wrap = styled.span<{ wordFontPx: number }>`
-    align-items: center;
-    color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
-    display: inline-flex;
-    gap: ${space.sm}px;
-    font-size: ${(p) => p.wordFontPx}px;
-    font-weight: ${fontWeight.semibold};
-    letter-spacing: ${letterSpacing.tight};
-    line-height: 1;
-`;
-
-const Glyph = styled.span<{ glyphPx: number }>`
-    align-items: center;
-    /* Inverted glyph: a clean white surface with the brand-orange pulse
-     * inside, instead of the previous orange-filled tile. The 1 px hairline
-     * border keeps the rounded square readable when it sits on top of the
-     * page's warm-cream background or any light surface. */
-    background: var(--ant-color-bg-elevated, #ffffff);
-    border: 1px solid var(--ant-color-border-secondary, rgba(15, 23, 42, 0.08));
-    border-radius: ${radius.md}px;
-    box-shadow:
-        ${shadow.xs},
-        inset 0 1px 0 rgba(255, 255, 255, 0.6);
-    color: ${brand.primary};
-    display: inline-flex;
-    flex: 0 0 auto;
-    height: ${(p) => p.glyphPx}px;
-    justify-content: center;
-    width: ${(p) => p.glyphPx}px;
-`;
 
 /**
  * Single-source-of-truth brand mark. Replaces the duplicated brand glyph
@@ -88,14 +49,28 @@ const BrandMark: React.FC<BrandMarkProps> = ({
     className,
     style
 }) => {
-    const { glyph, innerSvg, wordFontPx } = dimensions[size];
+    const { glyphClass, innerSvg, wordClass } = dimensions[size];
     /* Each glyph instance owns its own gradient id so multiple BrandMarks
      * on the same page (e.g. header + auth screen during a transition)
      * don't collide on `url(#…)` references. */
     const gradientId = `brand-pulse-${sanitizeId(React.useId())}`;
     return (
-        <Wrap className={className} style={style} wordFontPx={wordFontPx}>
-            <Glyph aria-hidden glyphPx={glyph}>
+        <span
+            className={cn(
+                "inline-flex items-center gap-sm font-semibold leading-none tracking-[-0.02em] text-foreground",
+                wordClass,
+                className
+            )}
+            style={style}
+        >
+            <span
+                aria-hidden
+                className={cn(
+                    "inline-flex shrink-0 items-center justify-center rounded-md border border-border bg-card text-brand",
+                    "shadow-[0_1px_2px_rgba(15,23,42,0.05),inset_0_1px_0_rgba(255,255,255,0.6)]",
+                    glyphClass
+                )}
+            >
                 <svg
                     focusable="false"
                     height={innerSvg}
@@ -122,9 +97,9 @@ const BrandMark: React.FC<BrandMarkProps> = ({
                         strokeWidth="2.6"
                     />
                 </svg>
-            </Glyph>
+            </span>
             {glyphOnly ? null : <span>{label}</span>}
-        </Wrap>
+        </span>
     );
 };
 

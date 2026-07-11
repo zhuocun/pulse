@@ -1,47 +1,14 @@
-import styled from "@emotion/styled";
-
 import {
     PasswordStrengthLevel,
     assessPasswordStrength,
     passwordStrengthMeterValue
 } from "../../constants/passwordStrength";
 import { microcopy } from "../../constants/microcopy";
-import { bodyCopyCoarseFontCss } from "../../theme/tokens";
+import { cn } from "@/lib/utils";
 
-const StrengthBlock = styled.div`
-    margin-bottom: 4px;
-`;
+type FilledLevel = Exclude<PasswordStrengthLevel, "empty">;
 
-const BarTrack = styled.div`
-    block-size: 6px;
-    border-radius: 3px;
-    background: var(--ant-color-fill-secondary, rgba(15, 23, 42, 0.08));
-    overflow: hidden;
-    inline-size: 100%;
-`;
-
-const BarFill = styled.div<{ $color: string; $value: number }>`
-    block-size: 100%;
-    border-radius: inherit;
-    background: ${(p) => p.$color};
-    inline-size: ${(p) => (p.$value / 4) * 100}%;
-
-    @media (prefers-reduced-motion: no-preference) {
-        transition:
-            inline-size 160ms ease-out,
-            background-color 160ms ease-out;
-    }
-`;
-
-const StrengthText = styled.span`
-    display: block;
-    margin-top: 6px;
-    color: var(--ant-color-text-secondary);
-    ${bodyCopyCoarseFontCss}
-    line-height: 1.4;
-`;
-
-const strengthCaption = (level: Exclude<PasswordStrengthLevel, "empty">) => {
+const strengthCaption = (level: FilledLevel) => {
     switch (level) {
         case "tooShort":
             return microcopy.auth.passwordStrength.tooShort;
@@ -51,25 +18,40 @@ const strengthCaption = (level: Exclude<PasswordStrengthLevel, "empty">) => {
             return microcopy.auth.passwordStrength.fair;
         case "strong":
             return microcopy.auth.passwordStrength.strong;
-        default:
-            return "";
+        default: {
+            const exhaustive: never = level;
+            return exhaustive;
+        }
     }
 };
 
-const strengthColor = (
-    level: Exclude<PasswordStrengthLevel, "empty">
-): string => {
+const strengthColorClass = (level: FilledLevel): string => {
     switch (level) {
         case "tooShort":
-            return "var(--ant-color-error, #ff4d4f)";
+            return "bg-destructive";
         case "weak":
-            return "var(--ant-color-warning, #faad14)";
+            return "bg-warning";
         case "fair":
-            return "var(--ant-color-info, #1677ff)";
+            return "bg-info";
         case "strong":
-            return "var(--ant-color-success, #52c41a)";
+            return "bg-success";
+        default: {
+            const exhaustive: never = level;
+            return exhaustive;
+        }
+    }
+};
+
+const meterWidthClass = (value: number): string => {
+    switch (value) {
+        case 1:
+            return "w-1/4";
+        case 2:
+            return "w-2/4";
+        case 3:
+            return "w-3/4";
         default:
-            return "var(--ant-color-primary, #1677ff)";
+            return "w-full";
     }
 };
 
@@ -85,18 +67,28 @@ export const PasswordStrengthHint = ({ password }: { password: string }) => {
     const fullLabel = `${microcopy.auth.passwordStrength.meterAriaLabel}: ${caption}`;
 
     return (
-        <StrengthBlock>
-            <BarTrack aria-hidden>
-                <BarFill $color={strengthColor(level)} $value={value} />
-            </BarTrack>
-            <StrengthText
+        <div className="mb-xxs">
+            <div
+                aria-hidden
+                className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+            >
+                <div
+                    className={cn(
+                        "h-full rounded-[inherit] transition-[width,background-color] duration-medium ease-out motion-reduce:transition-none",
+                        strengthColorClass(level),
+                        meterWidthClass(value)
+                    )}
+                />
+            </div>
+            <span
                 aria-atomic="true"
                 aria-label={fullLabel}
                 aria-live="polite"
+                className="mt-1.5 block text-sm leading-snug text-muted-foreground coarse:text-base"
                 role="status"
             >
                 {caption}
-            </StrengthText>
-        </StrengthBlock>
+            </span>
+        </div>
     );
 };
