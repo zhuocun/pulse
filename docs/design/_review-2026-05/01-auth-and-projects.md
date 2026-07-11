@@ -1,5 +1,7 @@
 # 01 — Auth + Projects review
 
+> **Point-in-time snapshot (2026-05).** This is a frozen per-surface source report behind [`ui-ux-comprehensive-review-2026-05.md`](../ui-ux-comprehensive-review-2026-05.md); component names and `file:line` references are correct as of the 2026-05 audit and are preserved as history, not a live task list. For current status see [`../../todo/ui-todo.md`](../../todo/ui-todo.md).
+
 ## TL;DR
 
 - **The auth surfaces are technically careful but conceptually 2018.** `inputMode`/`enterKeyHint`/`autoComplete`/caps-lock/strength-meter are all in place, but the actual flow is still "email + 8-char password + Forgot/Register switch + canned hero copy" — no passkey, no magic-link, no social SSO, no progressive disclosure. The hero rail is brand-correct on tablet+, but on mobile the form is dropped onto an `AntD Card` with `padding: 48px` and no on-page brand chrome other than a 36 px wordmark, which makes the most important screen in the app feel like a CMS login.

@@ -1,5 +1,7 @@
 # 06 — Visual / Playwright screenshot audit
 
+> **Point-in-time snapshot (2026-05).** This is a frozen per-surface source report behind [`ui-ux-comprehensive-review-2026-05.md`](../ui-ux-comprehensive-review-2026-05.md); component names and `file:line` references are correct as of the 2026-05 audit and are preserved as history, not a live task list. For current status see [`../../todo/ui-todo.md`](../../todo/ui-todo.md).
+
 ## TL;DR
 
 The look is calm, premium, and brand-consistent across light/dark and every viewport — the orange-on-warm-white palette, the rounded card system, and the Inter typography all land. There is one foundational rendering bug that affects every viewport (the page scroller is `body`, not `html`, so `window.scrollY` is permanently `0`); one mobile-blocking layout problem (the projects list and the AI chat drawer leak large empty regions because they don't fill the now-detached body scroller); a copy/state bug in the project modal that says **"Edit project"** when the user clicked **"Create project"**; and a cluster of mobile-only polish issues (truncated stat labels, wrapping drawer titles, sparse mobile chat). The board is in great shape on every viewport; the auth pages look excellent in both themes. Total cost-to-fix on the top issues looks small.

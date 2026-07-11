@@ -1,5 +1,7 @@
 # 03 — Modals + forms review
 
+> **Point-in-time snapshot (2026-05).** This is a frozen per-surface source report behind [`ui-ux-comprehensive-review-2026-05.md`](../ui-ux-comprehensive-review-2026-05.md); component names and `file:line` references are correct as of the 2026-05 audit and are preserved as history, not a live task list. For current status see [`../../todo/ui-todo.md`](../../todo/ui-todo.md).
+
 ## TL;DR
 
 The modal/form surfaces are technically solid: `inputMode`/`enterKeyHint`/`autoComplete` are consistent, iOS auto-zoom is correctly prevented by the `pointer: coarse` 16 px rule, popovers cap height in `dvh`, and `Modal.confirm` correctly replaces `window.confirm`. But the surfaces are bottlenecked by **one structural choice**: every detail/edit view is a centered AntD `Modal`, even on phones, even when the task it edits has 6 fields and a 600-LOC composition. Mobile UX, save-discard semantics, history/back-button handling, and "draft a task fast" all suffer for it.
