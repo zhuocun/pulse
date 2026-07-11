@@ -8,6 +8,18 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
 /*
+ * Tailwind layers. Added ALONGSIDE — not replacing — the Ant Design–era
+ * rules below during the antd↔Tailwind migration. Preflight is disabled
+ * in `tailwind.config.ts`, so `@tailwind base` ships no element reset that
+ * could clobber AntD; only the component + utility layers carry weight
+ * today. The layers sit above the static rules so an explicit App.css
+ * declaration still wins a specificity tie during coexistence.
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
  * Page-level theme tokens (`--pulse-*`, `--color-copilot-*`, `--glass-*`,
  * `--aurora-*`) are NOT defined here. They are injected synchronously
  * from `src/theme/palettes/` in `index.tsx` via `paletteToCss(palette)`,

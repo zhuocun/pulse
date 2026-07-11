@@ -7,6 +7,7 @@ import { setAnalyticsSink } from "./constants/analytics";
 import environment from "./constants/env";
 import reportWebVitals from "./reportWebVitals";
 import { palette, paletteToCss } from "./theme/palettes";
+import { tokenVarsCss } from "./theme/tailwindBridge";
 import AppProviders from "./utils/appProviders";
 import {
     devMemorySink,
@@ -33,6 +34,18 @@ const themeStyle = document.createElement("style");
 themeStyle.id = "pulse-theme-vars";
 themeStyle.textContent = paletteToCss(palette);
 document.head.appendChild(themeStyle);
+
+/*
+ * Design-token CSS vars (`--pulse-space-*`, `--pulse-radius-*`,
+ * `--pulse-font-*`, `--pulse-duration-*`, …) derived from `theme/tokens.ts`
+ * and consumed by the Tailwind theme. Static — no runtime switching — so
+ * seeded once here alongside the palette vars, before React's first render,
+ * so Tailwind utilities resolve to the token value from frame 1.
+ */
+const tokenStyle = document.createElement("style");
+tokenStyle.id = "pulse-token-vars";
+tokenStyle.textContent = tokenVarsCss;
+document.head.appendChild(tokenStyle);
 
 /*
  * Observability bootstrap — register production sinks when the env vars are

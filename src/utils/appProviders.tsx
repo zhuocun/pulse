@@ -2,6 +2,7 @@ import { App as AntdApp, ConfigProvider } from "antd";
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { Provider } from "react-redux";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "sonner";
 
 import { LanguageProvider, useLocale } from "../i18n";
 import { store } from "../store";
@@ -115,6 +116,13 @@ const ThemedShell = ({ children }: { children: ReactNode }) => {
             >
                 {children}
             </AntdApp>
+            {/*
+             * sonner toast seam for the Tailwind + shadcn/ui surface. Mounted
+             * alongside — not replacing — AntD's message/notification during
+             * the migration; `theme={scheme}` keeps it in sync with the
+             * app-wide light/dark flip driven by `useColorScheme`.
+             */}
+            <Toaster theme={scheme} />
         </ConfigProvider>
     );
 };

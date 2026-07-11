@@ -1,3 +1,5 @@
+import { fileURLToPath, URL } from "node:url";
+
 import react from "@vitejs/plugin-react";
 import { visualizer } from "rollup-plugin-visualizer";
 import { defineConfig, loadEnv } from "vite";
@@ -52,6 +54,11 @@ export default defineConfig(({ mode }) => {
     const errorReportEndpoint = env.VITE_ERROR_REPORT_ENDPOINT ?? "";
 
     return {
+        resolve: {
+            alias: {
+                "@": fileURLToPath(new URL("./src", import.meta.url))
+            }
+        },
         build: {
             chunkSizeWarningLimit: 1000,
             rolldownOptions: {
