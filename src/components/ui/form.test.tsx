@@ -118,4 +118,43 @@ describe("Form", () => {
         const { container } = render(<Harness />);
         expect(await axe(container)).toHaveNoViolations();
     });
+
+    it("describes the control by only the error when help and error coexist", () => {
+        const HelpHarness = () => {
+            const [form] = Form.useForm<Values>();
+            return (
+                <Form form={form}>
+                    <Form.Item
+                        name="email"
+                        label="Email"
+                        help="We never share your email."
+                        rules={[
+                            { required: true, message: "Email is required" }
+                        ]}
+                    >
+                        <Input />
+                    </Form.Item>
+                    <button type="submit">Save</button>
+                </Form>
+            );
+        };
+        const { container } = render(<HelpHarness />);
+        submitForm(container);
+
+        const control = screen.getByRole("textbox", { name: "Email" });
+        const describedBy = control.getAttribute("aria-describedby") ?? "";
+        const ids = describedBy.split(" ").filter(Boolean);
+        // Exactly one describing id, the error — the help id is dropped so
+        // aria-describedby never dangles at a non-rendered node.
+        expect(ids).toHaveLength(1);
+        expect(ids[0]).toMatch(/-error$/);
+        // The help text is not rendered while the error is showing.
+        expect(
+            screen.queryByText("We never share your email.")
+        ).not.toBeInTheDocument();
+        // And the error id resolves to the alert.
+        expect(document.getElementById(ids[0])).toHaveTextContent(
+            "Email is required"
+        );
+    });
 });

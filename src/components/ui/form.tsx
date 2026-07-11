@@ -530,7 +530,7 @@ function FormItem({
 
     const describedByIds = [
         hasError ? `${reactId}-error` : null,
-        extra || help ? `${reactId}-extra` : null
+        (extra || help) && !hasError ? `${reactId}-extra` : null
     ]
         .filter(Boolean)
         .join(" ");
