@@ -84,9 +84,22 @@ the whole backlog without folder-hopping.
 - [`operations/agent-stream-resume.md`](operations/agent-stream-resume.md)
   — support/operator runbook for agent SSE resume, idempotency, and
   retries (`thread_id` vs `Idempotency-Key`, `409` / `422` triage).
+- [`operations/pgvector-task-embeddings.sql`](operations/pgvector-task-embeddings.sql)
+  — pgvector extension + `task_embeddings` table DDL for
+  `AGENT_VECTOR_SEARCH_ENABLED`; includes the embeddings-provider
+  enablement order and resumable backfill-script steps.
+- [`operations/agent-memory.sql`](operations/agent-memory.sql) —
+  `agent_memory` table DDL backing `PostgresMemoryStore`, the durable
+  Board Copilot memory store (upsert-on-remember, project/user scope).
+- [`operations/agent-budget-counter.sql`](operations/agent-budget-counter.sql)
+  — `agent_budget_counter` table DDL backing `PostgresBudgetBackend`,
+  the multi-worker-safe per-(project, month) token budget counter.
 
 ## Design
 
+- [`design-tokens.md`](design-tokens.md) — contributor reference for the
+  design system (space, radius, palette, typography, motion, z-index
+  scales); implementation source of truth is `src/theme/tokens.ts`.
 - [`design/ai-ux-best-practices.md`](design/ai-ux-best-practices.md)
   — research reference (Google PAIR, Microsoft HAX, NN/g, NIST AI
   RMF, etc.).
@@ -108,5 +121,27 @@ the whole backlog without folder-hopping.
   default; AntD `Modal` is reserved for ephemeral yes/no/cancel prompts.
 - [`design/ui-ux-comprehensive-review-2026-05.md`](design/ui-ux-comprehensive-review-2026-05.md)
   — consolidated 2026-05 UI/UX audit (124 findings across six surface
-  reports, 30 screenshots); the per-surface source reports live under
-  [`design/_review-2026-05/`](design/_review-2026-05/).
+  reports, 30 screenshots). The per-surface source reports under
+  [`design/_review-2026-05/`](design/_review-2026-05/) are frozen
+  point-in-time snapshots:
+  - [`_review-2026-05/01-auth-and-projects.md`](design/_review-2026-05/01-auth-and-projects.md)
+    — auth surfaces + projects list.
+  - [`_review-2026-05/02-board-and-project-detail.md`](design/_review-2026-05/02-board-and-project-detail.md)
+    — board, column/card, and project-detail shell.
+  - [`_review-2026-05/03-modals-and-forms.md`](design/_review-2026-05/03-modals-and-forms.md)
+    — modals + forms surfaces.
+  - [`_review-2026-05/04-ai-copilot.md`](design/_review-2026-05/04-ai-copilot.md)
+    — AI / Copilot surfaces (chat drawer, brief, task assist, drafts).
+  - [`_review-2026-05/05-pwa-mobile-a11y-designsystem.md`](design/_review-2026-05/05-pwa-mobile-a11y-designsystem.md)
+    — cross-cutting PWA, mobile shell, a11y, and design-system audit.
+  - [`_review-2026-05/06-screenshot-audit.md`](design/_review-2026-05/06-screenshot-audit.md)
+    — visual / Playwright screenshot audit (30 shots under
+    `_review-2026-05/screenshots/`).
+  - [`_review-2026-05/_capture/capture.mjs`](design/_review-2026-05/_capture/capture.mjs)
+    — Playwright capture script that regenerated the audit screenshots.
+
+## Related (outside `docs/`)
+
+- [`backend/app/eval/README.md`](../backend/app/eval/README.md) —
+  Board Copilot eval harness: LLM-as-judge outcome scoring layered on
+  top of the backend structure tests (`python -m app.eval`).
