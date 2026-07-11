@@ -40,6 +40,50 @@ const config: Config = {
     theme: {
         extend: {
             colors: {
+                /*
+                 * shadcn/ui semantic surface tokens. Stored as HSL channel
+                 * triples in `--ui-*` vars (see the `@layer base` block in
+                 * `App.css`) with a light/dark pair so Tailwind's
+                 * `<alpha-value>` opacity modifiers (`bg-primary/90`,
+                 * `bg-muted/50`) resolve and dark mode flips via the
+                 * `[data-color-scheme="dark"]` selector. Namespaced `--ui-`
+                 * so they never collide with the `--pulse-*` / `--ant-*`
+                 * runtime palette vars the AntD surface still reads.
+                 */
+                background: "hsl(var(--ui-background) / <alpha-value>)",
+                foreground: "hsl(var(--ui-foreground) / <alpha-value>)",
+                card: {
+                    DEFAULT: "hsl(var(--ui-card) / <alpha-value>)",
+                    foreground: "hsl(var(--ui-card-foreground) / <alpha-value>)"
+                },
+                popover: {
+                    DEFAULT: "hsl(var(--ui-popover) / <alpha-value>)",
+                    foreground:
+                        "hsl(var(--ui-popover-foreground) / <alpha-value>)"
+                },
+                primary: {
+                    DEFAULT: "hsl(var(--ui-primary) / <alpha-value>)",
+                    foreground:
+                        "hsl(var(--ui-primary-foreground) / <alpha-value>)"
+                },
+                secondary: {
+                    DEFAULT: "hsl(var(--ui-secondary) / <alpha-value>)",
+                    foreground:
+                        "hsl(var(--ui-secondary-foreground) / <alpha-value>)"
+                },
+                muted: {
+                    DEFAULT: "hsl(var(--ui-muted) / <alpha-value>)",
+                    foreground:
+                        "hsl(var(--ui-muted-foreground) / <alpha-value>)"
+                },
+                destructive: {
+                    DEFAULT: "hsl(var(--ui-destructive) / <alpha-value>)",
+                    foreground:
+                        "hsl(var(--ui-destructive-foreground) / <alpha-value>)"
+                },
+                border: "hsl(var(--ui-border) / <alpha-value>)",
+                input: "hsl(var(--ui-input) / <alpha-value>)",
+                ring: "hsl(var(--ui-ring) / <alpha-value>)",
                 brand: {
                     DEFAULT: brand.primary,
                     hover: brand.primaryHover,

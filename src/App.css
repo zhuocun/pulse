@@ -20,6 +20,66 @@
 @tailwind utilities;
 
 /*
+ * shadcn/ui semantic token layer. The `ui/*` primitives read these through
+ * the Tailwind color utilities wired in `tailwind.config.ts` (bg-primary,
+ * text-muted-foreground, border-border, …). Values are HSL channel triples
+ * so Tailwind can inject `<alpha-value>` for opacity modifiers.
+ *
+ * A light/dark pair keeps the primitives dark-mode-correct on the same
+ * `html[data-color-scheme="dark"]` switch the rest of the app flips on.
+ * They live in the `--ui-*` namespace — independent of the `--ant-color-*`
+ * vars — so the primitives keep working once AntD is removed.
+ *
+ * Preflight is OFF during coexistence, so the primitives always pair a
+ * `border` width utility with an explicit border-color utility
+ * (`border-input` / `border-border`); this base block also sets a default
+ * border color on the primitives' own scope so any bare `border` inside a
+ * `ui/*` subtree still reads the theme instead of `currentColor`.
+ */
+@layer base {
+    :root,
+    html[data-color-scheme="light"] {
+        --ui-background: 33 80% 98%;
+        --ui-foreground: 222 47% 11%;
+        --ui-card: 0 0% 100%;
+        --ui-card-foreground: 222 47% 11%;
+        --ui-popover: 0 0% 100%;
+        --ui-popover-foreground: 222 47% 11%;
+        --ui-primary: 21 90% 48%;
+        --ui-primary-foreground: 0 0% 100%;
+        --ui-secondary: 210 40% 96%;
+        --ui-secondary-foreground: 222 47% 11%;
+        --ui-muted: 210 40% 96%;
+        --ui-muted-foreground: 215 16% 40%;
+        --ui-destructive: 0 84% 60%;
+        --ui-destructive-foreground: 0 0% 100%;
+        --ui-border: 214 32% 91%;
+        --ui-input: 214 32% 88%;
+        --ui-ring: 21 90% 48%;
+    }
+
+    html[data-color-scheme="dark"] {
+        --ui-background: 19 45% 7%;
+        --ui-foreground: 210 20% 90%;
+        --ui-card: 20 28% 10%;
+        --ui-card-foreground: 210 20% 90%;
+        --ui-popover: 20 28% 10%;
+        --ui-popover-foreground: 210 20% 90%;
+        --ui-primary: 21 90% 48%;
+        --ui-primary-foreground: 0 0% 100%;
+        --ui-secondary: 20 16% 18%;
+        --ui-secondary-foreground: 210 20% 90%;
+        --ui-muted: 20 16% 18%;
+        --ui-muted-foreground: 210 14% 65%;
+        --ui-destructive: 0 72% 51%;
+        --ui-destructive-foreground: 0 0% 100%;
+        --ui-border: 20 14% 22%;
+        --ui-input: 20 14% 22%;
+        --ui-ring: 21 90% 55%;
+    }
+}
+
+/*
  * Page-level theme tokens (`--pulse-*`, `--color-copilot-*`, `--glass-*`,
  * `--aurora-*`) are NOT defined here. They are injected synchronously
  * from `src/theme/palettes/` in `index.tsx` via `paletteToCss(palette)`,

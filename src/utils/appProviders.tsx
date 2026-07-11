@@ -2,7 +2,8 @@ import { App as AntdApp, ConfigProvider } from "antd";
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { Provider } from "react-redux";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "sonner";
+
+import { Toaster } from "@/components/ui/toast";
 
 import { LanguageProvider, useLocale } from "../i18n";
 import { store } from "../store";
