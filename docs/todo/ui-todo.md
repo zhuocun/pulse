@@ -130,10 +130,10 @@ Every recommendation in this plan is anchored to one or more of these external r
     - ~~`useReactQuery<IMember[]>("users/members")` is called from at least four components (`board.tsx`, `project.tsx`, `taskModal`, `memberPopover`); ensure it is a single shared key and cached, and stop refetching on popover open.~~ **[Complete: all four surfaces now consume `useMembersList()`, which centralizes the key (`["users/members"]`) and applies a shared `staleTime` cache window.]**
 
 20a. **Autonomy metadata / settings follow-through.**
-    `AiChatDrawer` now exposes a visible autonomy selector for `suggest` / `plan`, with `auto` present but disabled until preapproved tools ship. Remaining UX work is to move the control into the broader Board Copilot settings surface from the v3 PRD, self-gate options from backend `AgentMetadata.allowed_autonomy` once v3 policy exists, and explain per-project defaults instead of relying only on chat-drawer `localStorage` state. **§8 / §14 in [`release-todo.md`](release-todo.md) are closed UI-metadata rows** — this item is the **next UX** layer on top of those contracts.
+    The Copilot dock's chat tab (`copilotDock/ChatTabBody`) exposes a visible autonomy selector for `suggest` / `plan`, with `auto` present but disabled until preapproved tools ship. Remaining UX work is to move the control into the broader Board Copilot settings surface from the v3 PRD, self-gate options from backend `AgentMetadata.allowed_autonomy` once v3 policy exists, and explain per-project defaults instead of relying only on chat-tab `localStorage` state. **§8 / §14 in [`release-todo.md`](release-todo.md) are closed UI-metadata rows** — this item is the **next UX** layer on top of those contracts.
 
 20b. **Feedback parity outside chat.**
-    `AiFeedbackPopover` is wired into `AiChatDrawer` for assistant turns, so the old "no consumer" claim is stale. ~~Remaining work is parity on `AiTaskAssistPanel` suggestions and `BoardBriefDrawer` recommendations,~~ **[Complete: thumbs parity + `role="group"` names + analytics `surface: "task-assist"` / `"board-brief"` per `src/components/aiFeedbackPopover/copilotSurfaceFeedback.test.tsx`; jest-axe via `src/__tests__/aiAccessibility.strict.test.tsx`; i18n `microcopy.feedback.taskAssistTitle` / `boardBriefTitle` en+zh-CN.]** Remaining: product decision on whether feedback payload writes only analytics today or later feeds the agent memory namespaces from v3 PRD §11.
+    `AiFeedbackPopover` is wired into the Copilot dock's chat tab (`copilotDock/ChatTabBody`) for assistant turns, so the old "no consumer" claim is stale. ~~Remaining work is parity on `AiTaskAssistPanel` suggestions and `BoardBriefDrawer` recommendations,~~ **[Complete: thumbs parity + `role="group"` names + analytics `surface: "task-assist"` / `"board-brief"` per `src/components/aiFeedbackPopover/copilotSurfaceFeedback.test.tsx`; jest-axe via `src/__tests__/aiAccessibility.strict.test.tsx`; i18n `microcopy.feedback.taskAssistTitle` / `boardBriefTitle` en+zh-CN.]** Remaining: product decision on whether feedback payload writes only analytics today or later feeds the agent memory namespaces from v3 PRD §11.
 
 20c. ~~**`CopilotAboutPopover` two narrow gaps.**~~ **[Complete: mode tags read `microcopy.about.remoteModeTag` / `localModeTag`; knowledge cutoff uses `knowledgeCutoffTemplate` + `resolveAiKnowledgeCutoffForUi` (`REACT_APP_AI_KNOWLEDGE_CUTOFF` / optional `AgentMetadata.knowledge_cutoff`).]**
 
@@ -250,10 +250,10 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
    Touch points: `src/components/taskCreator/index.tsx:55–56`, `src/components/aiTaskAssistPanel/index.tsx:170–176`. Use AntD `Button type="link"` or `<button>` with proper styling.~~ **[Complete: `taskCreator` ships `CreateLink` as a real `<button>`, and every interactive control in `aiTaskAssistPanel` is now an AntD `<Button>`; no `<a onClick>` / `eslint-disable` survives in either file. Keep this rule on the contributor checklist (Section 2.C) so new components do not regress.]**
 
 3. **Audit color contrast.**
-   Replace ad-hoc `rgba(0,0,0,0.5)` muted text with `Typography.Text type="secondary"` (which respects the theme algorithm). Verify contrast at AA for: muted body text, the brand-tinted message bubbles in `aiChatDrawer`, the warning Alerts.
+   Replace ad-hoc `rgba(0,0,0,0.5)` muted text with `Typography.Text type="secondary"` (which respects the theme algorithm). Verify contrast at AA for: muted body text, the brand-tinted message bubbles in `copilotDock/ChatTabBody`, the warning Alerts.
 
 4. **Accessibility pass — WCAG 2.2 AA, line by line.**
-    - **2.4.3 Focus Order / 2.4.7 Focus Visible / 2.4.13 Focus Appearance.** Add a global focus ring using `:focus-visible` (2 px outline in `colorPrimary`, 2 px offset). Audit drawers and modals with `tab` / `shift+tab`; make sure focus is trapped while open and returned to the invoking control on close (today `TaskModal`, `BoardBriefDrawer`, `AiChatDrawer`, `ProjectModal` rely on AntD defaults — verify and add `triggerRef` patterns where AntD does not handle it).
+    - **2.4.3 Focus Order / 2.4.7 Focus Visible / 2.4.13 Focus Appearance.** Add a global focus ring using `:focus-visible` (2 px outline in `colorPrimary`, 2 px offset). Audit drawers and modals with `tab` / `shift+tab`; make sure focus is trapped while open and returned to the invoking control on close (today `TaskModal`, `CopilotDock` (Chat / Brief tabs), `ProjectModal` rely on AntD defaults — verify and add `triggerRef` patterns where AntD does not handle it).
     - **2.4.11 / 2.4.12 Focus Not Obscured.** Sticky elements (the new top-tier header and column headers from Phase 2.3) must not occlude focused controls; add `scroll-padding-top` on the page container equal to the header height.
     - **2.5.5 / 2.5.8 Target Size.** Every interactive element must be at least 24 × 24 CSS px (AA) and ideally 44 × 44 (AAA / mobile guidance). The "..." dropdown trigger in `projectList` and `column` is currently smaller than 24 px — fix when the icon swap happens in Phase 2.2.
     - ~~**2.5.7 Dragging Movements.** Drag-and-drop on the board must have a non-drag alternative. Wire `@hello-pangea/dnd`'s keyboard sensor (Space to lift, arrows to move, Space to drop, Esc to cancel) and surface those keystrokes in a tooltip on the card and in the help dialog from Phase 4.~~ **[Partially complete: keyboard drag discoverability now ships on task cards via localized hint copy + `aria-keyshortcuts` (`src/components/column/index.tsx`). Follow-up: include the same keystrokes in the global shortcut-help dialog from Phase 4.]**
@@ -271,16 +271,16 @@ The plan is split into four phases. Phases are ordered by dependency (Phase 1 un
     - **Tooling.** `jest-axe` and `eslint-plugin-jsx-a11y` are in place for the AI-heavy surfaces; ~~extend axe coverage to the remaining page/modal tests and tighten the current jsx-a11y warnings so ESLint fails under `--max-warnings 0`~~ **[Complete 2026-06-04: jsx-a11y is CI-blocking under `--max-warnings 0` (2026-06-03), and axe coverage now extends to the non-AI page/modal surfaces via `src/__tests__/pageAccessibility.strict.test.tsx` (ProjectList grid/empty/loading, MemberPopover, Column, ProjectModal — all zero-violation).]**
 
 5. **Loading states.**
-    - Replace bare `<Spin>` blocks with `<Skeleton.Input>` / `<Skeleton.Avatar>` / `<Skeleton.Paragraph>` matching the eventual layout for: project list rows, board columns, task cards, brief drawer sections, chat drawer initial load, AI assist panel.
+    - Replace bare `<Spin>` blocks with `<Skeleton.Input>` / `<Skeleton.Avatar>` / `<Skeleton.Paragraph>` matching the eventual layout for: project list rows, board columns, task cards, the `copilotDock/BriefTabBody` sections, the `copilotDock/ChatTabBody` initial load, AI assist panel.
     - ~~Add throttled spinners (only render after 250 ms) so fast local-engine responses do not flash a spinner at all.~~ **[Complete: `useDelayedFlag` now delays spinner rendering by 250 ms on the task-assist panel, chat drawer, and board brief drawer.]**
 
 6. **Empty states.**
    Build a reusable `<EmptyState illustration="…" title="…" description="…" cta={…} />` component and use it on:
     - Project list with no projects.
     - Board with no columns.
-    - Brief drawer when there are no unowned/unstarted tasks (replace the current `<p>` strings).
+    - Brief tab (`copilotDock/BriefTabBody`) when there are no unowned/unstarted tasks (replace the current `<p>` strings).
     - Members popover when the team is empty.
-    - Chat drawer initial state (replace the muted-text paragraph at `aiChatDrawer:134–139` with sample-prompt chips users can click).
+    - Chat tab initial state (`copilotDock/ChatTabBody`) — replace the muted-text placeholder with sample-prompt chips users can click.
 
 7. **Error states.**
     - Wrap the routed pages with an `<ErrorBoundary>` showing a friendly message + "Reload" button.
@@ -381,7 +381,7 @@ Form-level rules:
 - Honor `env(safe-area-inset-*)` on the header and fixed footer so the UI clears the iOS notch and gesture bar.
 - The board's horizontal scroll must work with touch swipe; do not intercept `touchstart` for drag-and-drop (`@hello-pangea/dnd` handles this — verify with a real device after Phase 2.3).
 - Long-press to enter drag mode on touch (this is `hello-pangea/dnd` default; document it).
-- Bottom-sheet variant of `AiChatDrawer` and `TaskModal` on `xs`/`sm` so the keyboard does not push the form off-screen.
+- Bottom-sheet variant of the Copilot dock chat tab (`copilotDock/ChatTabBody`) and `TaskModal` on `xs`/`sm` so the keyboard does not push the form off-screen.
 
 ### 2.A.3 Motion, color-scheme, and contrast preferences
 
@@ -410,7 +410,7 @@ Right now, the AI features mix all four. Adopt one rule per intent:
 | Quick lookup / picker, dismissed on outside click | **Popover**                                         | Members, Projects switcher, avatar menu      |
 | Suggestion or status that lives inside the form   | **Inline panel/Card**                               | AI assist on task modal                      |
 
-Apply: move `AiTaskDraftModal` to a drawer (it is augmentation, not blocking confirmation) **only if** breakdown selection still fits; otherwise document why it stays a modal. Keep `BoardBriefDrawer` and `AiChatDrawer` as drawers. Keep `TaskModal` and `ProjectModal` as modals.
+Apply: move `AiTaskDraftModal` to a drawer (it is augmentation, not blocking confirmation) **only if** breakdown selection still fits; otherwise document why it stays a modal. The board brief and chat surfaces now live as tabs inside the `CopilotDock` (a right-side drawer/sheet — `copilotDock/BriefTabBody` + `ChatTabBody`) rather than standalone drawers. Keep `TaskModal` and `ProjectModal` as modals.
 
 ### 2.A.6 Internationalization readiness
 
@@ -538,7 +538,7 @@ The order below batches changes that share files so we do not churn the same are
 
 - **AntD v6 token migration.** Removing the 62.5 % hack and inlining tokens will cause one round of pixel-level visual diffs. Tests that snapshot DOM are fine; tests that assert pixel sizes will need updating.
 - **Test coverage.** The repo carries a `react-test-development` skill aiming for 100 % coverage. Each phase needs to keep the existing tests green and add tests for the new affordances (e.g. keyboard handlers on the new task card, `<Avatar>` rendering in the project list).
-- **Board Copilot contract.** Phase 2.3's `Dropdown.Button` consolidation must not break the existing `aria-label` strings the AI tests rely on (`src/components/aiChatDrawer/index.tsx:96–106`, `src/components/aiTaskDraftModal/index.tsx:172–189`, `src/pages/board.tsx:111–151`). Keep the labels stable.
+- **Board Copilot contract.** Phase 2.3's `Dropdown.Button` consolidation must not break the existing `aria-label` strings the AI tests rely on (`src/components/copilotDock/ChatTabBody.tsx`, `src/components/aiTaskDraftModal/index.tsx:172–189`, `src/pages/board.tsx`). Keep the labels stable.
 - **Drag-and-drop keyboard support.** `@hello-pangea/dnd` already supports keyboard, but we have not wired any user-facing instructions; that is part of Phase 3.4 and should land alongside accessible task-card focus styles.
 - **Routing flash.** Phase 2.5 (project detail collapse) must preserve the existing `/projects/:projectId/board` URL — the navigation hook in `src/pages/projectDetail.tsx:45–49` redirects to `board`; the new tabbed shell needs to keep that redirect or the AI tests that mount the board route will fail.
 
