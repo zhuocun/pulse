@@ -1,13 +1,10 @@
-import {
-    BgColorsOutlined,
-    DragOutlined,
-    ThunderboltOutlined
-} from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Button, Card } from "antd";
-import { Suspense } from "react";
+import { Move, Palette, Zap } from "lucide-react";
+import { Suspense, forwardRef } from "react";
 import { Outlet } from "react-router";
 
+import { Button, type ButtonProps } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import BrandMark from "../components/brandMark";
 import { PageSpin } from "../components/status";
 import { microcopy } from "../constants/microcopy";
@@ -311,9 +308,10 @@ export const AuthSubtitle = styled.p`
 `;
 
 /**
- * AntD `Card` is retained as the form shell so the existing test contract
- * (`.ant-card` selector) keeps passing while we deliver a refined surface
- * treatment via the `box-shadow` / `border` / `border-radius` overrides.
+ * Form shell built on the `Card` primitive. The refined surface treatment
+ * (glass background, brand-tinted hairline, specular rims) rides on the
+ * styled overrides; the inner `FormCardBody` owns the padding the antd
+ * `.ant-card-body` used to supply.
  */
 const FormCard = styled(Card)`
     && {
@@ -381,17 +379,6 @@ const FormCard = styled(Card)`
         }
     }
 
-    /* Children (the AntD card body) sit above the rim pseudo-elements. */
-    && .ant-card-body {
-        padding: ${space.lg}px;
-        position: relative;
-        z-index: 1;
-
-        @media (min-width: ${breakpoints.sm}px) {
-            padding: ${space.xxl}px;
-        }
-    }
-
     /*
      * Honour the user's reduced-transparency preference and Windows
      * forced-colors mode: drop the rim layers so they don't paint
@@ -418,11 +405,62 @@ const FormCard = styled(Card)`
 `;
 
 /**
+ * Card body wrapper. Owns the padding the antd `.ant-card-body` supplied,
+ * and sits above the FormCard's specular-rim pseudo-elements via
+ * `position: relative; z-index: 1`.
+ */
+const FormCardBody = styled.div`
+    padding: ${space.lg}px;
+    position: relative;
+    z-index: 1;
+
+    @media (min-width: ${breakpoints.sm}px) {
+        padding: ${space.xxl}px;
+    }
+`;
+
+/**
+ * Antd-compatible `Button` adapter. The auth forms (`loginForm` /
+ * `registerForm`) still hand this the antd `type` / `htmlType` prop shape,
+ * so map those onto the primitive `Button`'s `variant` / native `type`
+ * before styling. Defaults to the primary variant — this is the dominant
+ * auth CTA.
+ */
+const ANTD_TYPE_TO_VARIANT: Record<
+    NonNullable<AuthButtonBaseProps["type"]>,
+    ButtonProps["variant"]
+> = {
+    primary: "primary",
+    default: "default",
+    link: "link",
+    text: "ghost",
+    dashed: "outline",
+    ghost: "outline"
+};
+
+interface AuthButtonBaseProps extends Omit<ButtonProps, "type"> {
+    type?: "primary" | "default" | "link" | "text" | "dashed" | "ghost";
+    htmlType?: "button" | "submit" | "reset";
+}
+
+const AuthButtonBase = forwardRef<HTMLButtonElement, AuthButtonBaseProps>(
+    ({ type = "primary", htmlType, variant, ...props }, ref) => (
+        <Button
+            ref={ref}
+            type={htmlType}
+            variant={variant ?? ANTD_TYPE_TO_VARIANT[type]}
+            {...props}
+        />
+    )
+);
+AuthButtonBase.displayName = "AuthButtonBase";
+
+/**
  * Auth submit button. Full width on mobile (single dominant CTA),
  * with the same minimum height for predictable alignment with the
  * rest of the form.
  */
-export const AuthButton = styled(Button)`
+export const AuthButton = styled(AuthButtonBase)`
     && {
         font-weight: 500;
         height: 44px;
@@ -477,19 +515,19 @@ const AuthLayout = () => {
                     <HeroFeatureList>
                         <HeroFeature>
                             <HeroFeatureIcon aria-hidden>
-                                <ThunderboltOutlined />
+                                <Zap />
                             </HeroFeatureIcon>
                             {microcopy.auth.heroFeatureDraft}
                         </HeroFeature>
                         <HeroFeature>
                             <HeroFeatureIcon aria-hidden>
-                                <DragOutlined />
+                                <Move />
                             </HeroFeatureIcon>
                             {microcopy.auth.heroFeatureDrag}
                         </HeroFeature>
                         <HeroFeature>
                             <HeroFeatureIcon aria-hidden>
-                                <BgColorsOutlined />
+                                <Palette />
                             </HeroFeatureIcon>
                             {microcopy.auth.heroFeatureColors}
                         </HeroFeature>
@@ -504,12 +542,14 @@ const AuthLayout = () => {
                     <BrandMark size="md" />
                 </BrandHeader>
                 <FormCard data-glass-context="true">
-                    {/* Suspense lives inside the layout so the brand
-                     * chrome stays mounted while a lazy page chunk
-                     * fetches. */}
-                    <Suspense fallback={<PageSpin />}>
-                        <Outlet />
-                    </Suspense>
+                    <FormCardBody>
+                        {/* Suspense lives inside the layout so the brand
+                         * chrome stays mounted while a lazy page chunk
+                         * fetches. */}
+                        <Suspense fallback={<PageSpin />}>
+                            <Outlet />
+                        </Suspense>
+                    </FormCardBody>
                 </FormCard>
             </Canvas>
         </Page>

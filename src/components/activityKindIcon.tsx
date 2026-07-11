@@ -1,9 +1,4 @@
-import {
-    FolderOpenOutlined,
-    ProjectOutlined,
-    RobotOutlined,
-    UnorderedListOutlined
-} from "@ant-design/icons";
+import { Bot, FolderKanban, FolderOpen, List } from "lucide-react";
 import React from "react";
 
 import type { ActivityEvent } from "../utils/hooks/useActivityFeed";
@@ -16,8 +11,8 @@ import type { ActivityEvent } from "../utils/hooks/useActivityFeed";
  * summary text carries the accessible description.
  */
 export const KIND_ICON: Record<ActivityEvent["kind"], React.ReactNode> = {
-    task: <UnorderedListOutlined aria-hidden />,
-    column: <FolderOpenOutlined aria-hidden />,
-    project: <ProjectOutlined aria-hidden />,
-    ai: <RobotOutlined aria-hidden />
+    task: <List aria-hidden />,
+    column: <FolderOpen aria-hidden />,
+    project: <FolderKanban aria-hidden />,
+    ai: <Bot aria-hidden />
 };

@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
-import { Alert, Breadcrumb, Button, Skeleton } from "antd";
-import { useEffect } from "react";
+import { CircleAlert } from "lucide-react";
+import { useEffect, type ReactNode } from "react";
 import {
     Link,
     NavLink,
@@ -10,6 +10,9 @@ import {
     useParams
 } from "react-router-dom";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import EmptyState from "../components/emptyState";
 import { microcopy } from "../constants/microcopy";
 import {
@@ -185,56 +188,70 @@ const TopBar = styled.div`
 `;
 
 /*
+ * Composed breadcrumb (replaces AntD `Breadcrumb`). A semantic
+ * `<nav><ol><li>` trail with a separator glyph between crumbs.
+ *
  * flex-basis: auto reads as the breadcrumb's max-content width, which for a
  * 200-char project name is wider than the row, pushing the Board tab onto
  * its own line below. Pin the basis to 0 so the wrapper starts empty and
  * grows into whatever space the tabs leave behind; the inner ellipsis takes
  * care of the visual truncation.
  *
- * AntD Breadcrumb's inner <ol> is a flex container with flex-wrap: wrap, so
- * once the wrapper stops growing past max-content the long item wraps onto
- * a second row instead of getting truncated. Force nowrap on the ol and
- * pin the last item with min-width: 0 + overflow: hidden so it can shrink
- * and ellipsize in place.
+ * The <ol> is a nowrap flex row so a long project name truncates in place
+ * instead of wrapping to a second line: the root crumb never shrinks, the
+ * middle (project-name link) ellipsizes on its inner span, and the current
+ * (last) crumb clips with an ellipsis.
  */
-const BreadcrumbWrapper = styled.div`
+const Breadcrumb = styled.nav`
     flex: 1 1 0;
     min-width: 0;
 
-    && .ant-breadcrumb {
-        font-size: ${fontSize.sm}px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    && .ant-breadcrumb ol {
+    & ol {
+        align-items: center;
+        display: flex;
         flex-wrap: nowrap;
+        font-size: ${fontSize.sm}px;
+        gap: ${space.xxs}px;
+        list-style: none;
+        margin: 0;
+        min-width: 0;
+        padding: 0;
+    }
+
+    & li {
+        align-items: center;
+        display: inline-flex;
         min-width: 0;
     }
-    && .ant-breadcrumb li,
-    && .ant-breadcrumb-link {
-        min-width: 0;
+
+    & a {
+        color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
+        text-decoration: none;
     }
-    && .ant-breadcrumb li:first-child,
-    && .ant-breadcrumb li:first-child .ant-breadcrumb-link,
-    && .ant-breadcrumb li:first-child a {
+    & a:hover,
+    & a:focus-visible {
+        color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
+        text-decoration: underline;
+    }
+
+    & [data-breadcrumb-separator] {
+        color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45));
+        flex: 0 0 auto;
+        margin-inline: ${space.xxs}px;
+    }
+
+    /* Root crumb ("Projects") never shrinks or ellipsizes. */
+    & li:first-of-type {
+        flex-shrink: 0;
+    }
+    & li:first-of-type a {
         flex-shrink: 0;
         max-width: none;
         overflow: visible;
         text-overflow: clip;
         white-space: nowrap;
     }
-    && .ant-breadcrumb li:not(:first-child):not(:last-child),
-    &&
-        .ant-breadcrumb
-        li:not(:first-child):not(:last-child)
-        .ant-breadcrumb-link {
-        max-width: 100%;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
+
     /*
      * The project-name anchor is inline-flex (it carries the 44 px
      * coarse-pointer touch target below), and text-overflow does not
@@ -243,7 +260,12 @@ const BreadcrumbWrapper = styled.div`
      * flex box and move the ellipsis onto the inner span, which as a
      * min-width: 0 flex item truncates correctly.
      */
-    && .ant-breadcrumb li:not(:first-child):not(:last-child) a {
+    & li[data-breadcrumb="middle"] {
+        max-width: 100%;
+        min-width: 0;
+        overflow: hidden;
+    }
+    & li[data-breadcrumb="middle"] a {
         align-items: center;
         display: inline-flex;
         max-width: 100%;
@@ -251,22 +273,24 @@ const BreadcrumbWrapper = styled.div`
         overflow: hidden;
         white-space: nowrap;
     }
-    && .ant-breadcrumb li:not(:first-child):not(:last-child) a > span {
+    & li[data-breadcrumb="middle"] a > span {
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
-    && .ant-breadcrumb li:last-child {
+
+    & li:last-of-type {
         color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
         font-weight: ${fontWeight.semibold};
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     @media (pointer: coarse) {
-        && .ant-breadcrumb a {
+        & a {
             align-items: center;
             display: inline-flex;
             min-height: 44px;
@@ -459,47 +483,33 @@ const ProjectDetailPage = () => {
         document.title = shellTitle;
     }, [shellOwnsTitle, shellTitle]);
 
-    const breadcrumbItems = [
-        {
-            title: (
-                <Link to="/projects" viewTransition>
-                    {microcopy.breadcrumb.projects}
-                </Link>
-            )
-        },
-        {
-            title:
-                pLoading && !project ? (
-                    <Skeleton.Input
-                        active
-                        size="small"
-                        style={{ width: 160 }}
-                    />
-                ) : childCrumbTitle ? (
-                    /*
-                     * When a child route is active, the project name
-                     * becomes a link back to the project root (which
-                     * declaratively redirects to /board) so the user
-                     * can navigate up from Reports back to the board
-                     * via the breadcrumb. The leaf crumb carries
-                     * `aria-current="page"`.
-                     */
-                    <Link to={`/projects/${projectId}`} viewTransition>
-                        <span>
-                            {project?.projectName ?? microcopy.labels.project}
-                        </span>
-                    </Link>
-                ) : (
-                    <span aria-current="page">
-                        {project?.projectName ?? microcopy.labels.project}
-                    </span>
-                )
-        },
+    const crumbs: ReactNode[] = [
+        <Link key="projects" to="/projects" viewTransition>
+            {microcopy.breadcrumb.projects}
+        </Link>,
+        pLoading && !project ? (
+            <Skeleton key="project" style={{ height: 16, width: 160 }} />
+        ) : childCrumbTitle ? (
+            /*
+             * When a child route is active, the project name becomes a
+             * link back to the project root (which declaratively
+             * redirects to /board) so the user can navigate up from
+             * Reports back to the board via the breadcrumb. The leaf
+             * crumb carries `aria-current="page"`.
+             */
+            <Link key="project" to={`/projects/${projectId}`} viewTransition>
+                <span>{project?.projectName ?? microcopy.labels.project}</span>
+            </Link>
+        ) : (
+            <span key="project" aria-current="page">
+                {project?.projectName ?? microcopy.labels.project}
+            </span>
+        ),
         ...(childCrumbTitle
             ? [
-                  {
-                      title: <span aria-current="page">{childCrumbTitle}</span>
-                  }
+                  <span key="child" aria-current="page">
+                      {childCrumbTitle}
+                  </span>
               ]
             : [])
     ];
@@ -511,9 +521,34 @@ const ProjectDetailPage = () => {
                     data-glass-context="true"
                     data-testid="project-detail-chrome"
                 >
-                    <BreadcrumbWrapper>
-                        <Breadcrumb items={breadcrumbItems} />
-                    </BreadcrumbWrapper>
+                    <Breadcrumb
+                        aria-label={microcopy.breadcrumb.ariaLabel}
+                        data-testid="project-breadcrumb"
+                    >
+                        <ol>
+                            {crumbs.map((crumb, index) => {
+                                const position =
+                                    index === 0
+                                        ? "root"
+                                        : index === crumbs.length - 1
+                                          ? "current"
+                                          : "middle";
+                                return (
+                                    <li key={index} data-breadcrumb={position}>
+                                        {index > 0 ? (
+                                            <span
+                                                aria-hidden
+                                                data-breadcrumb-separator
+                                            >
+                                                /
+                                            </span>
+                                        ) : null}
+                                        {crumb}
+                                    </li>
+                                );
+                            })}
+                        </ol>
+                    </Breadcrumb>
                     {/*
                      * In-project navigation (Phase 4.7). Hidden while the
                      * project query is in-flight to avoid a layout
@@ -571,22 +606,22 @@ const ProjectDetailPage = () => {
             ) : null}
             <Body>
                 {pError ? (
-                    <Alert
-                        action={
+                    <Alert variant="destructive" style={{ margin: space.md }}>
+                        <CircleAlert aria-hidden />
+                        <AlertTitle>{microcopy.feedback.loadFailed}</AlertTitle>
+                        <AlertDescription>
+                            {microcopy.feedback.retryHint}
+                        </AlertDescription>
+                        <div style={{ marginTop: space.sm }}>
                             <Button
                                 onClick={() => refetchProject()}
-                                size="small"
-                                type="primary"
+                                size="sm"
+                                variant="primary"
                             >
                                 {microcopy.actions.retry}
                             </Button>
-                        }
-                        description={microcopy.feedback.retryHint}
-                        message={microcopy.feedback.loadFailed}
-                        showIcon
-                        style={{ margin: space.md }}
-                        type="error"
-                    />
+                        </div>
+                    </Alert>
                 ) : isNotFound ? (
                     <EmptyState
                         title={microcopy.empty.notFound.title}
@@ -598,7 +633,7 @@ const ProjectDetailPage = () => {
                                         viewTransition: true
                                     })
                                 }
-                                type="primary"
+                                variant="primary"
                             >
                                 {microcopy.empty.notFound.cta}
                             </Button>

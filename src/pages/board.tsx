@@ -1,29 +1,36 @@
-import {
-    CloseOutlined,
-    DeleteOutlined,
-    FileTextOutlined,
-    InboxOutlined,
-    MessageOutlined,
-    MoreOutlined,
-    ReloadOutlined,
-    SettingOutlined,
-    UnorderedListOutlined
-} from "@ant-design/icons";
 import styled from "@emotion/styled";
-import {
-    Alert,
-    Button,
-    Dropdown,
-    Popover,
-    Skeleton,
-    Space,
-    Switch,
-    Typography
-} from "antd";
 import { DragDropContext } from "@hello-pangea/dnd";
+import {
+    CircleAlert,
+    FileText,
+    Inbox,
+    List,
+    MessageSquare,
+    MoreHorizontal,
+    RotateCw,
+    Settings,
+    Trash2,
+    X
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger
+} from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Typography } from "@/components/ui/typography";
 import AiSearchInput from "../components/aiSearchInput";
 import ArchiveDrawer from "../components/archiveDrawer";
 import BoardMinimap from "../components/boardMinimap";
@@ -266,7 +273,13 @@ const BoardLoadingSkeleton = () => (
                     padding: themeSpace.md
                 }}
             >
-                <Skeleton active paragraph={{ rows: 4 }} title />
+                <Skeleton
+                    className="mb-md h-6 w-1/2"
+                    data-testid="board-skeleton-title"
+                />
+                {[0, 1, 2, 3].map((row) => (
+                    <Skeleton key={row} className="mb-sm h-4 w-full" />
+                ))}
             </div>
         ))}
     </ColumnContainer>
@@ -797,12 +810,30 @@ const BoardPage = () => {
                         ) : null;
 
                         const projectAiSwitch = aiEnabled ? (
-                            <Popover
-                                content={
-                                    <Space
-                                        direction="vertical"
-                                        size={themeSpace.xs}
-                                        style={{ maxWidth: 280, width: "100%" }}
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        aria-label={
+                                            microcopy.a11y.boardCopilotSettings
+                                        }
+                                        size="icon"
+                                        variant="ghost"
+                                    >
+                                        <Settings aria-hidden />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                    align="end"
+                                    aria-label={
+                                        microcopy.a11y.boardCopilotSettings
+                                    }
+                                >
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: themeSpace.xs
+                                        }}
                                     >
                                         <Typography.Text type="secondary">
                                             {microcopy.ai.copilotLabel}
@@ -827,12 +858,11 @@ const BoardPage = () => {
                                                         .boardCopilotProjectToggle
                                                 }
                                                 checked={!aiDisabledForProject}
-                                                onChange={(checked) =>
+                                                onCheckedChange={(checked) =>
                                                     setProjectAiDisabled(
                                                         !checked
                                                     )
                                                 }
-                                                size="small"
                                             />
                                         </div>
                                         <Typography.Text
@@ -844,18 +874,8 @@ const BoardPage = () => {
                                                     .copilotProjectDisabledDescription
                                             }
                                         </Typography.Text>
-                                    </Space>
-                                }
-                                placement="bottomRight"
-                                trigger={["click"]}
-                            >
-                                <Button
-                                    aria-label={
-                                        microcopy.a11y.boardCopilotSettings
-                                    }
-                                    icon={<SettingOutlined aria-hidden />}
-                                    type="text"
-                                />
+                                    </div>
+                                </PopoverContent>
                             </Popover>
                         ) : null;
 
@@ -867,94 +887,84 @@ const BoardPage = () => {
                          * the bottom tier beside the search rail.
                          */
                         const phoneOverflowMenu = isPhone ? (
-                            <Dropdown
-                                menu={{
-                                    items: [
-                                        /*
-                                         * Copilot Ask / Brief — the phone
-                                         * capsule has no desktop bottom-tier
-                                         * CopilotMenu slot, so the overflow
-                                         * menu is the phone's launcher. Same
-                                         * gate (copilotLaunchersOn) and same
-                                         * drawer callbacks as the desktop
-                                         * split control.
-                                         */
-                                        ...(copilotLaunchersOn
-                                            ? [
-                                                  {
-                                                      key: "copilot-ask",
-                                                      label: microcopy.board
-                                                          .copilotMenuAsk,
-                                                      icon: (
-                                                          <MessageOutlined
-                                                              aria-hidden
-                                                          />
-                                                      ),
-                                                      onClick: () =>
-                                                          openChatDrawer()
-                                                  },
-                                                  {
-                                                      key: "copilot-brief",
-                                                      label: microcopy.board
-                                                          .copilotMenuBrief,
-                                                      icon: (
-                                                          <FileTextOutlined
-                                                              aria-hidden
-                                                          />
-                                                      ),
-                                                      onClick: () =>
-                                                          openBriefDrawer()
-                                                  }
-                                              ]
-                                            : []),
-                                        ...(aiEnabled
-                                            ? [
-                                                  {
-                                                      key: "project-ai",
-                                                      label: aiDisabledForProject
-                                                          ? microcopy.board
-                                                                .enableCopilotOnBoard
-                                                          : microcopy.board
-                                                                .copilotMenuProjectOff,
-                                                      icon: (
-                                                          <SettingOutlined
-                                                              aria-hidden
-                                                          />
-                                                      ),
-                                                      onClick: () =>
-                                                          setProjectAiDisabled(
-                                                              !aiDisabledForProject
-                                                          )
-                                                  }
-                                              ]
-                                            : []),
-                                        {
-                                            key: "trash",
-                                            label: microcopy.trashDrawer
-                                                .triggerAriaLabel,
-                                            icon: (
-                                                <DeleteOutlined aria-hidden />
-                                            ),
-                                            onClick: () => openTrashDrawer()
-                                        },
-                                        {
-                                            key: "archive",
-                                            label: microcopy.archiveDrawer
-                                                .triggerAriaLabel,
-                                            icon: <InboxOutlined aria-hidden />,
-                                            onClick: () => openArchiveDrawer()
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        aria-label={
+                                            microcopy.board.moreActionsAria
                                         }
-                                    ]
-                                }}
-                                trigger={["click"]}
-                            >
-                                <Button
-                                    aria-label={microcopy.board.moreActionsAria}
-                                    data-testid="board-more-actions"
-                                    icon={<MoreOutlined aria-hidden />}
-                                    type="text"
-                                />
-                            </Dropdown>
+                                        data-testid="board-more-actions"
+                                        size="icon"
+                                        variant="ghost"
+                                    >
+                                        <MoreHorizontal aria-hidden />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    {/*
+                                     * Copilot Ask / Brief — the phone capsule
+                                     * has no desktop bottom-tier CopilotMenu
+                                     * slot, so the overflow menu is the
+                                     * phone's launcher. Same gate
+                                     * (copilotLaunchersOn) and drawer
+                                     * callbacks as the desktop split control.
+                                     */}
+                                    {copilotLaunchersOn ? (
+                                        <>
+                                            <DropdownMenuItem
+                                                onSelect={() =>
+                                                    openChatDrawer()
+                                                }
+                                            >
+                                                <MessageSquare aria-hidden />
+                                                {microcopy.board.copilotMenuAsk}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onSelect={() =>
+                                                    openBriefDrawer()
+                                                }
+                                            >
+                                                <FileText aria-hidden />
+                                                {
+                                                    microcopy.board
+                                                        .copilotMenuBrief
+                                                }
+                                            </DropdownMenuItem>
+                                        </>
+                                    ) : null}
+                                    {aiEnabled ? (
+                                        <DropdownMenuItem
+                                            onSelect={() =>
+                                                setProjectAiDisabled(
+                                                    !aiDisabledForProject
+                                                )
+                                            }
+                                        >
+                                            <Settings aria-hidden />
+                                            {aiDisabledForProject
+                                                ? microcopy.board
+                                                      .enableCopilotOnBoard
+                                                : microcopy.board
+                                                      .copilotMenuProjectOff}
+                                        </DropdownMenuItem>
+                                    ) : null}
+                                    <DropdownMenuItem
+                                        onSelect={() => openTrashDrawer()}
+                                    >
+                                        <Trash2 aria-hidden />
+                                        {microcopy.trashDrawer.triggerAriaLabel}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onSelect={() => openArchiveDrawer()}
+                                    >
+                                        <Inbox aria-hidden />
+                                        {
+                                            microcopy.archiveDrawer
+                                                .triggerAriaLabel
+                                        }
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         ) : null;
 
                         const topTierControls = (
@@ -963,11 +973,15 @@ const BoardPage = () => {
                                     <Button
                                         aria-label={microcopy.actions.refresh}
                                         data-testid="board-refresh"
-                                        icon={<ReloadOutlined aria-hidden />}
                                         loading={boardRefreshing}
                                         onClick={handleRefresh}
-                                        type="text"
-                                    />
+                                        size="icon"
+                                        variant="ghost"
+                                    >
+                                        {!boardRefreshing && (
+                                            <RotateCw aria-hidden />
+                                        )}
+                                    </Button>
                                 )}
                                 <MemberPopover />
                                 {!isPhone && (
@@ -978,22 +992,24 @@ const BoardPage = () => {
                                                     .triggerAriaLabel
                                             }
                                             data-testid="board-trash"
-                                            icon={
-                                                <DeleteOutlined aria-hidden />
-                                            }
                                             onClick={() => openTrashDrawer()}
-                                            type="text"
-                                        />
+                                            size="icon"
+                                            variant="ghost"
+                                        >
+                                            <Trash2 aria-hidden />
+                                        </Button>
                                         <Button
                                             aria-label={
                                                 microcopy.archiveDrawer
                                                     .triggerAriaLabel
                                             }
                                             data-testid="board-archive"
-                                            icon={<InboxOutlined aria-hidden />}
                                             onClick={() => openArchiveDrawer()}
-                                            type="text"
-                                        />
+                                            size="icon"
+                                            variant="ghost"
+                                        >
+                                            <Inbox aria-hidden />
+                                        </Button>
                                     </>
                                 )}
                                 {isPhone && phoneOverflowMenu}
@@ -1056,10 +1072,9 @@ const BoardPage = () => {
                                                     minWidth: 0
                                                 }}
                                             >
-                                                <Skeleton.Input
-                                                    active
-                                                    size="large"
+                                                <Skeleton
                                                     style={{
+                                                        height: 32,
                                                         maxWidth: "100%",
                                                         width: 240
                                                     }}
@@ -1101,22 +1116,18 @@ const BoardPage = () => {
                                                         .lensesToggleAria
                                                 }
                                                 data-testid="board-lenses-toggle"
-                                                icon={
-                                                    <UnorderedListOutlined
-                                                        aria-hidden
-                                                    />
-                                                }
                                                 onClick={() =>
                                                     setLensesOpen(
                                                         (open) => !open
                                                     )
                                                 }
-                                                type={
+                                                variant={
                                                     lensesOpen || activeLens
                                                         ? "primary"
                                                         : "default"
                                                 }
                                             >
+                                                <List aria-hidden />
                                                 {microcopy.board.lensesToggle}
                                             </Button>
                                         </LensToggleRow>
@@ -1191,24 +1202,29 @@ const BoardPage = () => {
                     })()}
                     {bError || tError ? (
                         <Alert
-                            action={
+                            variant="destructive"
+                            style={{ marginBottom: themeSpace.md }}
+                        >
+                            <CircleAlert aria-hidden />
+                            <AlertTitle>
+                                {microcopy.feedback.loadFailed}
+                            </AlertTitle>
+                            <AlertDescription>
+                                {microcopy.feedback.retryHint}
+                            </AlertDescription>
+                            <div style={{ marginTop: themeSpace.sm }}>
                                 <Button
                                     onClick={() => {
                                         if (bError) refetchBoard();
                                         if (tError) refetchTasks();
                                     }}
-                                    size="small"
-                                    type="primary"
+                                    size="sm"
+                                    variant="primary"
                                 >
                                     {microcopy.actions.retry}
                                 </Button>
-                            }
-                            description={microcopy.feedback.retryHint}
-                            title={microcopy.feedback.loadFailed}
-                            showIcon
-                            style={{ marginBottom: themeSpace.md }}
-                            type="error"
-                        />
+                            </div>
+                        </Alert>
                     ) : null}
                     <SrOnlyLive>{filterStatusMessage}</SrOnlyLive>
                     {!(bLoading || tLoading) ? (
@@ -1222,7 +1238,7 @@ const BoardPage = () => {
                                     cta={
                                         <Button
                                             onClick={handleCreateFirstColumn}
-                                            type="primary"
+                                            variant="primary"
                                         >
                                             {microcopy.empty.board.cta}
                                         </Button>
@@ -1250,10 +1266,7 @@ const BoardPage = () => {
                                                 onClick={dismissSwipeHint}
                                                 type="button"
                                             >
-                                                <CloseOutlined
-                                                    aria-hidden
-                                                    style={{ fontSize: 10 }}
-                                                />
+                                                <X aria-hidden size={10} />
                                             </SwipeHintClose>
                                         </SwipeHint>
                                     )}

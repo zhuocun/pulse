@@ -616,6 +616,7 @@ export const enSource = {
         logoLabel: "Pulse home"
     },
     breadcrumb: {
+        ariaLabel: "Breadcrumb",
         projects: "Projects",
         reports: "Reports"
     },

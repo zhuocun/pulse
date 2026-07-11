@@ -233,6 +233,13 @@ const installAntdBrowserMocks = () => {
         writable: true,
         value: ResizeObserverMock
     });
+
+    // Radix `DropdownMenu` / `Popover` drive their triggers with
+    // pointer-capture + scroll APIs jsdom doesn't ship; polyfill them so
+    // the phone overflow menu can open under `userEvent`.
+    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+    Element.prototype.releasePointerCapture = jest.fn();
 };
 
 const renderBoard = (route = "/projects/project-1/board") => {
@@ -478,9 +485,9 @@ describe("BoardPage", () => {
             screen.getByLabelText("Loading project name")
         ).toBeInTheDocument();
         // The board no longer renders a redundant <Spin> alongside the
-        // skeleton placeholders; the skeleton itself carries the
-        // `.ant-skeleton` class.
-        expect(container.querySelector(".ant-skeleton")).toBeInTheDocument();
+        // skeleton placeholders; the `Skeleton` primitive carries the
+        // `animate-pulse` class.
+        expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
 
         resolveProject(response(project()));
         await act(async () => {
@@ -766,18 +773,18 @@ describe("BoardPage", () => {
             renderBoard();
             await screen.findByTestId("phone-board-title");
 
-            fireEvent.click(screen.getByTestId("board-more-actions"));
+            await userEvent.click(screen.getByTestId("board-more-actions"));
 
             const ask = await screen.findByText("Ask Copilot");
             expect(screen.getByText("Board brief")).toBeInTheDocument();
 
-            fireEvent.click(ask);
+            await userEvent.click(ask);
             expect(store.getState().overlays.chatDrawer.open).toBe(true);
 
             // Reopen the menu (an item click dismisses the dropdown)
             // and fire the Brief entry.
-            fireEvent.click(screen.getByTestId("board-more-actions"));
-            fireEvent.click(await screen.findByText("Board brief"));
+            await userEvent.click(screen.getByTestId("board-more-actions"));
+            await userEvent.click(await screen.findByText("Board brief"));
             expect(store.getState().overlays.boardBriefOpen).toBe(true);
         });
 
@@ -790,7 +797,7 @@ describe("BoardPage", () => {
             renderBoard();
             await screen.findByTestId("phone-board-title");
 
-            fireEvent.click(screen.getByTestId("board-more-actions"));
+            await userEvent.click(screen.getByTestId("board-more-actions"));
 
             // The menu is open (trash entry present) but carries no
             // Copilot launchers — same gate as the desktop CopilotMenu.

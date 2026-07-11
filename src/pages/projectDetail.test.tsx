@@ -90,21 +90,21 @@ describe("ProjectDetailPage", () => {
     });
 
     it("renders breadcrumb, current project, and the outlet content", () => {
-        const { container } = renderDetail("/projects/project-1/board");
+        renderDetail("/projects/project-1/board");
 
-        const crumb = container.querySelector(".ant-breadcrumb");
+        const crumb = screen.getByTestId("project-breadcrumb");
         expect(crumb).toBeTruthy();
         expect(
-            within(crumb as HTMLElement).getByRole("link", { name: "Projects" })
+            within(crumb).getByRole("link", { name: "Projects" })
         ).toHaveAttribute("href", "/projects");
         expect(screen.getByText("Atlas")).toBeInTheDocument();
         expect(screen.getByText("Board outlet")).toBeInTheDocument();
     });
 
     it("no longer renders a Tabs row inside the project detail chrome", () => {
-        const { container } = renderDetail("/projects/project-1/board");
+        renderDetail("/projects/project-1/board");
 
-        expect(container.querySelector(".ant-tabs")).toBeNull();
+        expect(screen.queryByRole("tablist")).toBeNull();
     });
 
     /*
@@ -169,13 +169,10 @@ describe("ProjectDetailPage", () => {
         it("declares coarse-pointer touch targets for breadcrumb and child-nav links", () => {
             renderDetail("/projects/project-1/board");
             const board = screen.getByRole("link", { name: "Board" });
-            const breadcrumbWrapper = screen
-                .getByTestId("project-detail-chrome")
-                .querySelector(".ant-breadcrumb")?.parentElement;
-            expect(breadcrumbWrapper).not.toBeNull();
+            const breadcrumbWrapper = screen.getByTestId("project-breadcrumb");
 
             const breadcrumbRuleText = ruleTextsFor(
-                styledClassFor(breadcrumbWrapper as Element) ?? ""
+                styledClassFor(breadcrumbWrapper) ?? ""
             ).join("\n");
             const childRuleText = ruleTextsFor(
                 styledClassFor(board) ?? ""
@@ -189,42 +186,33 @@ describe("ProjectDetailPage", () => {
             mockProjectName =
                 "Design system launch with a long-but-readable project name that should truncate";
             renderDetail("/projects/project-1/labels");
-            const breadcrumbWrapper = screen
-                .getByTestId("project-detail-chrome")
-                .querySelector(".ant-breadcrumb")?.parentElement;
-            expect(breadcrumbWrapper).not.toBeNull();
+            const breadcrumbWrapper = screen.getByTestId("project-breadcrumb");
 
             const breadcrumbRuleText = ruleTextsFor(
-                styledClassFor(breadcrumbWrapper as Element) ?? ""
+                styledClassFor(breadcrumbWrapper) ?? ""
             ).join("\n");
-            const rootCrumbRule = Array.from(document.styleSheets)
-                .flatMap((sheet) => Array.from(sheet.cssRules))
-                .filter((rule): rule is CSSStyleRule => "selectorText" in rule)
-                .find((rule) =>
-                    rule.selectorText.includes(
-                        ".ant-breadcrumb li:first-child a"
-                    )
-                );
             const styleRules = Array.from(document.styleSheets)
                 .flatMap((sheet) => Array.from(sheet.cssRules))
                 .filter((rule): rule is CSSStyleRule => "selectorText" in rule);
+            const rootCrumbRule = styleRules.find((rule) =>
+                rule.selectorText.includes("li:first-of-type a")
+            );
             // Stylis serializes the child combinator without spaces
-            // ("a>span"), so match it with a whitespace-tolerant regex.
+            // ("a>span") and may drop the attribute-value quotes, so match
+            // with a whitespace- and quote-tolerant regex.
             const spanSelector =
-                /\.ant-breadcrumb li:not\(:first-child\):not\(:last-child\) a\s*>\s*span/;
+                /data-breadcrumb=["']?middle["']?\] a\s*>\s*span/;
+            const middleAnchorSelector = /data-breadcrumb=["']?middle["']?\] a/;
             const middleCrumbAnchorRule = styleRules.find(
                 (rule) =>
-                    rule.selectorText.includes(
-                        ".ant-breadcrumb li:not(:first-child):not(:last-child) a"
-                    ) && !spanSelector.test(rule.selectorText)
+                    middleAnchorSelector.test(rule.selectorText) &&
+                    !spanSelector.test(rule.selectorText)
             );
             const middleCrumbSpanRule = styleRules.find((rule) =>
                 spanSelector.test(rule.selectorText)
             );
 
-            expect(breadcrumbRuleText).toContain(
-                ".ant-breadcrumb li:first-child"
-            );
+            expect(breadcrumbRuleText).toContain("li:first-of-type");
             expect(rootCrumbRule?.style.getPropertyValue("flex-shrink")).toBe(
                 "0"
             );

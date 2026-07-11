@@ -1,14 +1,11 @@
-import {
-    AppstoreOutlined,
-    BankOutlined,
-    PlusOutlined,
-    TeamOutlined
-} from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Alert, Badge, Button, Typography } from "antd";
+import { Building2, CircleAlert, LayoutGrid, Plus, Users } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Typography } from "@/components/ui/typography";
 import AiSearchInput from "../components/aiSearchInput";
 import AiSparkleIcon from "../components/aiSparkleIcon";
 import PageContainer from "../components/pageContainer";
@@ -147,7 +144,8 @@ const Toolbar = styled.div`
 
     @media (max-width: ${breakpoints.sm - 1}px) {
         flex-basis: 100%;
-        > .ant-btn {
+        > button,
+        > .relative {
             flex: 1 1 0;
         }
     }
@@ -242,7 +240,8 @@ const StatIcon = styled.span`
 
     /* Icon-glyph stays compact; the surrounding pill carries the colour. */
     svg {
-        font-size: 14px;
+        height: 14px;
+        width: 14px;
     }
 
     @media (max-width: ${breakpoints.sm - 1}px) {
@@ -250,7 +249,8 @@ const StatIcon = styled.span`
         width: 20px;
 
         svg {
-            font-size: 12px;
+            height: 12px;
+            width: 12px;
         }
     }
 `;
@@ -615,25 +615,25 @@ const ProjectPage = () => {
 
     const projectsErrorAlert =
         pError || mError ? (
-            <Alert
-                action={
+            <Alert variant="destructive" style={{ marginBottom: space.sm }}>
+                <CircleAlert aria-hidden />
+                <AlertTitle>{microcopy.feedback.loadFailed}</AlertTitle>
+                <AlertDescription>
+                    {microcopy.feedback.retryHint}
+                </AlertDescription>
+                <div style={{ marginTop: space.sm }}>
                     <Button
                         onClick={() => {
                             if (pError) refetchProjects();
                             if (mError) refetchMembers();
                         }}
-                        size="small"
-                        type="primary"
+                        size="sm"
+                        variant="primary"
                     >
                         {microcopy.actions.retry}
                     </Button>
-                }
-                description={microcopy.feedback.retryHint}
-                showIcon
-                style={{ marginBottom: space.sm }}
-                title={microcopy.feedback.loadFailed}
-                type="error"
-            />
+                </div>
+            </Alert>
         ) : null;
 
     const projectList = (
@@ -667,29 +667,37 @@ const ProjectPage = () => {
                         {aiEnabled &&
                             environment.copilotDockEnabled &&
                             !isPhone && (
-                                <Badge
+                                <div
                                     aria-label={copilotUnreadAriaLabel}
-                                    count={copilotInboxUnread}
+                                    className="relative inline-flex"
                                     data-testid="copilot-launcher-badge"
-                                    offset={[-4, 4]}
-                                    size="small"
                                 >
                                     <Button
                                         aria-label={microcopy.ai.askCopilot}
-                                        icon={<AiSparkleIcon aria-hidden />}
                                         onClick={() => openChatDrawer()}
-                                        type="default"
+                                        variant="default"
                                     >
+                                        <AiSparkleIcon aria-hidden />
                                         {microcopy.labels.askShort}
                                     </Button>
-                                </Badge>
+                                    {copilotInboxUnread > 0 ? (
+                                        <span
+                                            aria-hidden
+                                            className="pointer-events-none absolute -right-xxs -top-xxs inline-flex min-w-4 items-center justify-center rounded-pill bg-destructive px-[4px] text-[10px] font-semibold leading-4 text-destructive-foreground"
+                                        >
+                                            {copilotInboxUnread > 99
+                                                ? "99+"
+                                                : copilotInboxUnread}
+                                        </span>
+                                    ) : null}
+                                </div>
                             )}
                         <Button
                             aria-label={microcopy.actions.createProject}
-                            icon={<PlusOutlined aria-hidden />}
                             onClick={openModal}
-                            type="primary"
+                            variant="primary"
                         >
+                            <Plus aria-hidden />
                             {microcopy.actions.createProject}
                         </Button>
                     </Toolbar>
@@ -708,7 +716,7 @@ const ProjectPage = () => {
                         <StatCard>
                             <StatHeader>
                                 <StatIcon aria-hidden>
-                                    <AppstoreOutlined />
+                                    <LayoutGrid />
                                 </StatIcon>
                                 <StatLabel>
                                     {microcopy.projectsPage.totalProjects}
@@ -721,7 +729,7 @@ const ProjectPage = () => {
                         <StatCard>
                             <StatHeader>
                                 <StatIcon aria-hidden>
-                                    <BankOutlined />
+                                    <Building2 />
                                 </StatIcon>
                                 <StatLabel>
                                     {microcopy.projectsPage.organizations}
@@ -734,7 +742,7 @@ const ProjectPage = () => {
                         <StatCard>
                             <StatHeader>
                                 <StatIcon aria-hidden>
-                                    <TeamOutlined />
+                                    <Users />
                                 </StatIcon>
                                 <StatLabel>
                                     {microcopy.projectsPage.teamMembers}

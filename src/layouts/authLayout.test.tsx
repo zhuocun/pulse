@@ -20,7 +20,9 @@ describe("AuthLayout", () => {
 
         expect(screen.getByText("Login outlet content")).toBeInTheDocument();
         expect(container.querySelector("header")).toBeInTheDocument();
-        expect(container.querySelector(".ant-card")).toBeInTheDocument();
+        expect(
+            container.querySelector('[data-glass-context="true"]')
+        ).toBeInTheDocument();
     });
 
     it("uses a fluid width capped at 40rem for the form card", () => {
@@ -37,7 +39,9 @@ describe("AuthLayout", () => {
             </MemoryRouter>
         );
 
-        const card = container.querySelector(".ant-card") as HTMLElement;
+        const card = container.querySelector(
+            '[data-glass-context="true"]'
+        ) as HTMLElement;
         expect(card).toBeTruthy();
         const width = window.getComputedStyle(card).width;
         expect(width).toContain("min(");
@@ -148,7 +152,7 @@ describe("AuthLayout", () => {
                     </Routes>
                 </MemoryRouter>
             );
-            const card = container.querySelector(".ant-card");
+            const card = container.querySelector('[data-glass-context="true"]');
             expect(card).not.toBeNull();
             expect(card?.getAttribute("data-glass-context")).toBe("true");
         });

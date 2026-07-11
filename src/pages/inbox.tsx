@@ -1,8 +1,8 @@
 import styled from "@emotion/styled";
-import { Typography } from "antd";
 import { useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router";
 
+import { Typography } from "@/components/ui/typography";
 import { KIND_ICON } from "../components/activityKindIcon";
 import EmptyState from "../components/emptyState";
 import PageContainer from "../components/pageContainer";

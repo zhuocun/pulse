@@ -1,7 +1,7 @@
 import styled from "@emotion/styled";
-import { Typography } from "antd";
 import { useParams } from "react-router-dom";
 
+import { Typography } from "@/components/ui/typography";
 import MilestonesManager from "../components/milestonesManager";
 import PageContainer from "../components/pageContainer";
 import { microcopy } from "../constants/microcopy";

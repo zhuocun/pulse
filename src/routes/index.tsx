@@ -1,4 +1,3 @@
-import { Button } from "antd";
 import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import {
     Navigate,
@@ -8,6 +7,7 @@ import {
     useParams
 } from "react-router-dom";
 
+import { Button } from "@/components/ui/button";
 import CommandPalette from "../components/commandPalette";
 import EmptyState from "../components/emptyState";
 import environment from "../constants/env";
@@ -137,7 +137,7 @@ const NotFoundRoute = () => {
                     onClick={() =>
                         navigate("/projects", { viewTransition: true })
                     }
-                    type="primary"
+                    variant="primary"
                 >
                     {microcopy.empty.notFound.cta}
                 </Button>

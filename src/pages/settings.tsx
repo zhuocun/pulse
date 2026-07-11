@@ -1,23 +1,20 @@
-import {
-    BgColorsOutlined,
-    DesktopOutlined,
-    GlobalOutlined,
-    LogoutOutlined,
-    MoonOutlined,
-    RobotOutlined,
-    SunOutlined
-} from "@ant-design/icons";
 import styled from "@emotion/styled";
 import {
-    Button,
-    Card,
-    Collapse,
-    Segmented,
-    Space,
-    Switch,
-    Typography
-} from "antd";
+    Bot,
+    ChevronRight,
+    Globe,
+    LogOut,
+    Monitor,
+    Moon,
+    Palette,
+    Sun
+} from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Typography } from "@/components/ui/typography";
 import ColorThemeSelect from "../components/colorThemeSelect";
 import PageContainer from "../components/pageContainer";
 import SettingsSection, { SettingsRow } from "../components/settingsSection";
@@ -92,8 +89,8 @@ const SettingsList = styled.div`
  * on roomy viewports (>=sm) the label sits inline with the control on
  * the right, separated by `space-between`. Below `sm` the row stacks
  * — label on top, control stretched full-width below — because at
- * iPhone-width (393 px) the Theme row's 3-state Segmented (and to a
- * lesser extent the Language row's Segmented) couldn't fit alongside
+ * iPhone-width (393 px) the Theme row's 3-state toggle group (and to a
+ * lesser extent the Language row's toggle group) couldn't fit alongside
  * the label and was forcing the label ("Them\ne") and the option
  * pills ("Li…", "D…", "Syst…") to ellipsize. Stacking is applied
  * uniformly to every row so the four controls feel cut from the same
@@ -104,17 +101,15 @@ const SettingsList = styled.div`
  */
 const Row = styled(Card)`
     && {
-        border-radius: ${radius.lg}px;
-    }
-    && .ant-card-body {
         align-items: stretch;
+        border-radius: ${radius.lg}px;
         display: flex;
         flex-direction: column;
         gap: ${space.sm}px;
         padding: ${space.md}px ${space.lg}px;
     }
     @media (min-width: ${breakpoints.sm}px) {
-        && .ant-card-body {
+        && {
             align-items: center;
             flex-direction: row;
             gap: ${space.md}px;
@@ -127,7 +122,7 @@ const RowLabel = styled.div`
     align-items: center;
     display: flex;
     flex: 1 1 auto;
-    gap: ${space.sm}px;
+    gap: ${space.xs}px;
     min-width: 0;
 `;
 
@@ -135,6 +130,45 @@ const RowText = styled(Typography.Text)`
     && {
         font-size: ${fontSize.md}px;
         font-weight: ${fontWeight.medium};
+    }
+`;
+
+/*
+ * Phone-only disclosure for the colour-theme picker. A native
+ * `<details>`/`<summary>` gives keyboard + screen-reader-correct
+ * expand/collapse for free (replacing the antd ghost `Collapse`); the
+ * default marker is hidden in favour of a trailing chevron that rotates
+ * open, matching the grouped-table idiom of the surrounding rows.
+ */
+const ColorThemeDisclosure = styled.details`
+    & > summary {
+        align-items: center;
+        cursor: pointer;
+        display: flex;
+        gap: ${space.xs}px;
+        justify-content: space-between;
+        list-style: none;
+        min-height: 44px;
+        padding: ${space.sm}px 0;
+    }
+
+    & > summary::-webkit-details-marker {
+        display: none;
+    }
+
+    & > summary .disclosure-chevron {
+        color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
+        height: 16px;
+        transition: transform 150ms ease;
+        width: 16px;
+    }
+
+    &[open] > summary .disclosure-chevron {
+        transform: rotate(90deg);
+    }
+
+    & > div {
+        padding-bottom: ${space.sm}px;
     }
 `;
 
@@ -161,17 +195,17 @@ const SettingsPage = () => {
      */
     const themeIcon =
         scheme === "dark" ? (
-            <MoonOutlined aria-hidden />
+            <Moon aria-hidden className="size-4" />
         ) : (
-            <SunOutlined aria-hidden />
+            <Sun aria-hidden className="size-4" />
         );
-    const languageIcon = <GlobalOutlined aria-hidden />;
-    const colorThemeIcon = <BgColorsOutlined aria-hidden />;
-    const logoutIcon = <LogoutOutlined aria-hidden />;
-    const copilotIcon = <RobotOutlined aria-hidden />;
+    const languageIcon = <Globe aria-hidden className="size-4" />;
+    const colorThemeIcon = <Palette aria-hidden className="size-4" />;
+    const logoutIcon = <LogOut aria-hidden className="size-4" />;
+    const copilotIcon = <Bot aria-hidden className="size-4" />;
 
     /*
-     * 3-state Segmented preserves the underlying `useColorScheme()`
+     * 3-state toggle group preserves the underlying `useColorScheme()`
      * contract (light / dark / system). The previous 2-state Switch
      * collapsed `system` to either light or dark on toggle and left the
      * user no way back to "follow OS" once they touched it. Aria-label
@@ -179,70 +213,75 @@ const SettingsPage = () => {
      * purpose; each item carries its own visible label + icon.
      */
     const themeControl = (
-        <Segmented
+        <ToggleGroup
             aria-label={microcopy.settings.theme}
-            options={[
-                {
-                    label: microcopy.settings.themeLight,
-                    value: "light",
-                    icon: <SunOutlined aria-hidden />
-                },
-                {
-                    label: microcopy.settings.themeDark,
-                    value: "dark",
-                    icon: <MoonOutlined aria-hidden />
-                },
-                {
-                    label: microcopy.settings.themeSystem,
-                    value: "system",
-                    icon: <DesktopOutlined aria-hidden />
-                }
-            ]}
-            onChange={(value) =>
-                setPreference(value as "light" | "dark" | "system")
-            }
+            onValueChange={(value) => {
+                if (value) setPreference(value as "light" | "dark" | "system");
+            }}
+            type="single"
             value={themePreference}
-        />
+        >
+            <ToggleGroupItem value="light">
+                <Sun aria-hidden />
+                {microcopy.settings.themeLight}
+            </ToggleGroupItem>
+            <ToggleGroupItem value="dark">
+                <Moon aria-hidden />
+                {microcopy.settings.themeDark}
+            </ToggleGroupItem>
+            <ToggleGroupItem value="system">
+                <Monitor aria-hidden />
+                {microcopy.settings.themeSystem}
+            </ToggleGroupItem>
+        </ToggleGroup>
     );
 
     /* The colour-theme picker owns its own slice read/dispatch +
-     * Segmented (six palette swatches), so the page just slots the
+     * toggle group (palette swatches), so the page just slots the
      * element into both chassis branches like any other control. */
     const colorThemeControl = <ColorThemeSelect />;
 
     /* Native names ("English", "中文") so the option you want is always
      * readable in its own script. */
     const languageControl = (
-        <Segmented
+        <ToggleGroup
             aria-label={microcopy.settings.changeLanguage}
-            options={availableLocales.map((entry) => ({
-                label: entry.nativeName,
-                value: entry.code,
-                title: entry.englishName
-            }))}
-            onChange={(value) => setLocale(value as LocaleCode)}
+            onValueChange={(value) => {
+                if (value) setLocale(value as LocaleCode);
+            }}
+            type="single"
             value={locale}
-        />
+        >
+            {availableLocales.map((entry) => (
+                <ToggleGroupItem
+                    key={entry.code}
+                    title={entry.englishName}
+                    value={entry.code}
+                >
+                    {entry.nativeName}
+                </ToggleGroupItem>
+            ))}
+        </ToggleGroup>
     );
 
     const aiControl = (
         <Switch
             aria-label={microcopy.settings.toggleBoardCopilot}
             checked={aiEnabled}
-            onChange={setAiEnabled}
+            onCheckedChange={setAiEnabled}
         />
     );
 
     const logoutControl = (
         <Button
             aria-label={microcopy.actions.logOut}
-            danger
-            icon={<LogoutOutlined aria-hidden />}
+            className="text-destructive hover:text-destructive"
             onClick={() => {
                 logout();
             }}
-            type="text"
+            variant="ghost"
         >
+            <LogOut aria-hidden />
             {microcopy.actions.logOut}
         </Button>
     );
@@ -271,18 +310,16 @@ const SettingsPage = () => {
                         icon={languageIcon}
                         label={microcopy.settings.language}
                     />
-                    <Collapse
-                        bordered={false}
-                        data-testid="settings-color-theme-collapse"
-                        ghost
-                        items={[
-                            {
-                                key: "color-theme",
-                                label: microcopy.settings.colorTheme,
-                                children: colorThemeControl
-                            }
-                        ]}
-                    />
+                    <ColorThemeDisclosure data-testid="settings-color-theme-collapse">
+                        <summary>
+                            <span>{microcopy.settings.colorTheme}</span>
+                            <ChevronRight
+                                aria-hidden
+                                className="disclosure-chevron"
+                            />
+                        </summary>
+                        <div>{colorThemeControl}</div>
+                    </ColorThemeDisclosure>
                 </SettingsSection>
                 {aiAvailable ? (
                     <SettingsSection
@@ -323,50 +360,38 @@ const SettingsPage = () => {
             <SettingsList>
                 <Row data-testid="settings-row-theme">
                     <RowLabel>
-                        <Space size={space.xs}>
-                            {themeIcon}
-                            <RowText>{microcopy.settings.theme}</RowText>
-                        </Space>
+                        {themeIcon}
+                        <RowText>{microcopy.settings.theme}</RowText>
                     </RowLabel>
                     {themeControl}
                 </Row>
                 <Row data-testid="settings-row-language">
                     <RowLabel>
-                        <Space size={space.xs}>
-                            {languageIcon}
-                            <RowText>{microcopy.settings.language}</RowText>
-                        </Space>
+                        {languageIcon}
+                        <RowText>{microcopy.settings.language}</RowText>
                     </RowLabel>
                     {languageControl}
                 </Row>
                 <Row data-testid="settings-row-color-theme">
                     <RowLabel>
-                        <Space size={space.xs}>
-                            {colorThemeIcon}
-                            <RowText>{microcopy.settings.colorTheme}</RowText>
-                        </Space>
+                        {colorThemeIcon}
+                        <RowText>{microcopy.settings.colorTheme}</RowText>
                     </RowLabel>
                     {colorThemeControl}
                 </Row>
                 {aiAvailable ? (
                     <Row data-testid="settings-row-ai">
                         <RowLabel>
-                            <Space size={space.xs}>
-                                {copilotIcon}
-                                <RowText>
-                                    {microcopy.settings.aiEnabled}
-                                </RowText>
-                            </Space>
+                            {copilotIcon}
+                            <RowText>{microcopy.settings.aiEnabled}</RowText>
                         </RowLabel>
                         {aiControl}
                     </Row>
                 ) : null}
                 <Row data-testid="settings-row-logout">
                     <RowLabel>
-                        <Space size={space.xs}>
-                            {logoutIcon}
-                            <RowText>{microcopy.actions.logOut}</RowText>
-                        </Space>
+                        {logoutIcon}
+                        <RowText>{microcopy.actions.logOut}</RowText>
                     </RowLabel>
                     {logoutControl}
                 </Row>

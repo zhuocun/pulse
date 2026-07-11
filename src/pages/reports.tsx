@@ -1,7 +1,8 @@
 import styled from "@emotion/styled";
-import { Button, Typography } from "antd";
 import { useParams } from "react-router-dom";
 
+import { Button } from "@/components/ui/button";
+import { Typography } from "@/components/ui/typography";
 import AiSparkleIcon from "../components/aiSparkleIcon";
 import EmptyState from "../components/emptyState";
 import PageContainer from "../components/pageContainer";
@@ -95,21 +96,15 @@ const ReportsPage = () => {
                 variant="search"
                 cta={
                     /*
-                     * `<Button href>` renders a real anchor under the
-                     * hood so the link is keyboard-accessible and the
-                     * browser's middle-click / right-click menu work
-                     * (vs. an onClick-driven `window.open` which
-                     * doesn't carry the URL into context menus). We
-                     * leave `rel`/`target` defaults — mailto: doesn't
-                     * open a new tab in any browser worth caring
-                     * about, so the AntD button's normal href
-                     * handling is sufficient.
+                     * Render a real anchor (via `asChild`) so the link is
+                     * keyboard-accessible and the browser's middle-click /
+                     * right-click menu carry the URL. mailto: never opens a
+                     * new tab, so the default anchor handling suffices.
                      */
-                    <Button
-                        href={microcopy.reports.feedbackHref}
-                        type="primary"
-                    >
-                        {microcopy.reports.feedbackCta}
+                    <Button asChild variant="primary">
+                        <a href={microcopy.reports.feedbackHref}>
+                            {microcopy.reports.feedbackCta}
+                        </a>
                     </Button>
                 }
             />

@@ -337,8 +337,12 @@ describe("BoardPage · CopilotDock flag", () => {
         expect(screen.getByRole("tablist")).toBeInTheDocument();
         // GAP-006: with the kill-switch on, the board launchers are
         // live controls and must render so a click reaches the dock.
+        // The dock is a modal surface, so while it's open the board page
+        // (and its launcher) sits behind an `aria-hidden` scope — query
+        // with `hidden: true` to confirm the launcher still renders.
         expect(
             screen.getByRole("button", {
+                hidden: true,
                 name: microcopy.a11y.boardCopilotMenu
             })
         ).toBeInTheDocument();

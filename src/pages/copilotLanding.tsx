@@ -1,9 +1,11 @@
-import { RightOutlined } from "@ant-design/icons";
 import styled from "@emotion/styled";
-import { Button, Input, Typography } from "antd";
+import { ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Typography } from "@/components/ui/typography";
 import AiSparkleIcon from "../components/aiSparkleIcon";
 import EmptyState from "../components/emptyState";
 import PageContainer from "../components/pageContainer";
@@ -79,10 +81,33 @@ const ComposerRow = styled.div`
     }
 `;
 
+/*
+ * Prefix adornment slot. The primitive `Input` has no antd-style `prefix`,
+ * so the sparkle glyph is a sibling positioned inside the field and the
+ * input carries left padding to clear it.
+ */
+const ComposerField = styled.div`
+    flex: 1 1 auto;
+    min-width: 0;
+    position: relative;
+`;
+
+const ComposerPrefix = styled.span`
+    align-items: center;
+    color: var(--ant-color-primary, #ea580c);
+    display: inline-flex;
+    inset-inline-start: ${space.sm}px;
+    pointer-events: none;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+`;
+
 const BriefSecondary = styled(Button)`
     && {
         align-self: flex-start;
         color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
+        height: auto;
         padding-inline: 0;
     }
 
@@ -133,43 +158,41 @@ const CopilotLandingPage = () => {
             <PageSubtitle>{microcopy.copilotLanding.subtitle}</PageSubtitle>
             <ComposerShell data-testid="copilot-landing-ask">
                 <ComposerRow>
-                    <Input
-                        aria-label={microcopy.copilotLanding.askTitle}
-                        autoComplete="off"
-                        enterKeyHint="send"
-                        inputMode="text"
-                        onChange={(event) => setDraft(event.target.value)}
-                        onPressEnter={() => goToAsk(draft)}
-                        placeholder={
-                            microcopy.copilotLanding.composerPlaceholder
-                        }
-                        prefix={
-                            <AiSparkleIcon
-                                aria-hidden
-                                style={{
-                                    color: "var(--ant-color-primary, #EA580C)"
-                                }}
-                            />
-                        }
-                        size="large"
-                        value={draft}
-                    />
+                    <ComposerField>
+                        <ComposerPrefix>
+                            <AiSparkleIcon aria-hidden />
+                        </ComposerPrefix>
+                        <Input
+                            aria-label={microcopy.copilotLanding.askTitle}
+                            autoComplete="off"
+                            className="pl-xl"
+                            enterKeyHint="send"
+                            inputMode="text"
+                            onChange={(event) => setDraft(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") goToAsk(draft);
+                            }}
+                            placeholder={
+                                microcopy.copilotLanding.composerPlaceholder
+                            }
+                            value={draft}
+                        />
+                    </ComposerField>
                     <Button
                         onClick={() => goToAsk(draft)}
-                        size="large"
-                        type="primary"
+                        size="lg"
+                        variant="primary"
                     >
                         {microcopy.copilotLanding.askTitle}
                     </Button>
                 </ComposerRow>
                 <BriefSecondary
                     data-testid="copilot-landing-brief"
-                    icon={<RightOutlined aria-hidden />}
-                    iconPlacement="end"
                     onClick={goToBrief}
-                    type="link"
+                    variant="link"
                 >
                     {microcopy.copilotLanding.briefSecondaryAction}
+                    <ChevronRight aria-hidden />
                 </BriefSecondary>
             </ComposerShell>
         </PageContainer>

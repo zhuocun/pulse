@@ -1,8 +1,20 @@
 import styled from "@emotion/styled";
-import { Alert, Button, Card, Input, Select, Space, Typography } from "antd";
+import { Info } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from "@/components/ui/select";
+import { Typography } from "@/components/ui/typography";
 import EmptyState from "../components/emptyState";
 import PageContainer from "../components/pageContainer";
 import { PageSpin } from "../components/status";
@@ -81,6 +93,7 @@ const SummaryCard = styled(Card)`
     && {
         border-radius: ${radius.lg}px;
         margin-bottom: ${space.lg}px;
+        padding: ${space.lg}px;
     }
 `;
 
@@ -107,6 +120,7 @@ const SummarySection = styled.div`
 const FormCard = styled(Card)`
     && {
         border-radius: ${radius.lg}px;
+        padding: ${space.lg}px;
     }
 `;
 
@@ -390,7 +404,7 @@ const SharePage = () => {
                                     viewTransition: true
                                 })
                             }
-                            type="primary"
+                            variant="primary"
                         >
                             {microcopy.actions.createProject}
                         </Button>
@@ -420,7 +434,6 @@ const SharePage = () => {
                 <SummaryCard
                     aria-label={microcopy.share.headline}
                     data-testid="share-summary"
-                    variant="outlined"
                 >
                     {params.title ? (
                         <SummarySection>
@@ -450,28 +463,29 @@ const SharePage = () => {
             ) : (
                 <Alert
                     data-testid="share-nothing"
-                    description={microcopy.share.nothingDescription}
-                    showIcon
                     style={{ marginBottom: space.lg }}
-                    title={microcopy.share.nothingTitle}
-                    type="info"
-                />
+                    variant="info"
+                >
+                    <Info aria-hidden />
+                    <AlertTitle>{microcopy.share.nothingTitle}</AlertTitle>
+                    <AlertDescription>
+                        {microcopy.share.nothingDescription}
+                    </AlertDescription>
+                </Alert>
             )}
 
-            <FormCard variant="outlined">
+            <FormCard>
                 <FieldRow>
                     <FieldLabel htmlFor="share-task-name">
                         {microcopy.fields.taskName}
                     </FieldLabel>
                     {/*
-                     * Use the AntD `<Input>` so this field picks up
-                     * the same enterKeyHint / autoComplete / size
-                     * contract as the canonical task-name field in
-                     * `taskCreator`. The previous raw `<input>` lost
-                     * the iOS keyboard hint, the autoComplete=off
-                     * suppression, and the AntD focus styling, all
-                     * of which made the surface feel like a third-
-                     * party form drop-in instead of part of Pulse.
+                     * Share the primitive `<Input>` so this field picks
+                     * up the same enterKeyHint / autoComplete contract
+                     * (and themed focus styling) as the canonical
+                     * task-name field in `taskCreator`, rather than a
+                     * bare `<input>` that would feel like a third-party
+                     * form drop-in instead of part of Pulse.
                      */}
                     <Input
                         aria-label={microcopy.fields.taskName}
@@ -489,14 +503,26 @@ const SharePage = () => {
                         {microcopy.share.projectLabel}
                     </FieldLabel>
                     <Select
-                        aria-label={microcopy.share.projectLabel}
-                        id="share-project"
-                        loading={projectsLoading}
-                        onChange={(value) => setSelectedProjectId(value)}
-                        options={projectOptions}
-                        style={{ width: "100%" }}
+                        onValueChange={(value) => setSelectedProjectId(value)}
                         value={selectedProjectId}
-                    />
+                    >
+                        <SelectTrigger
+                            aria-label={microcopy.share.projectLabel}
+                            id="share-project"
+                        >
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {projectOptions.map((option) => (
+                                <SelectItem
+                                    key={option.value}
+                                    value={option.value}
+                                >
+                                    {option.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </FieldRow>
 
                 <FieldRow>
@@ -504,30 +530,40 @@ const SharePage = () => {
                         {microcopy.share.columnLabel}
                     </FieldLabel>
                     <Select
-                        aria-label={microcopy.share.columnLabel}
-                        id="share-column"
-                        loading={columnsLoading}
-                        onChange={(value) => setSelectedColumnId(value)}
-                        options={columnOptions}
-                        style={{ width: "100%" }}
+                        onValueChange={(value) => setSelectedColumnId(value)}
                         value={selectedColumnId}
-                    />
+                    >
+                        <SelectTrigger
+                            aria-label={microcopy.share.columnLabel}
+                            id="share-column"
+                        >
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {columnOptions.map((option) => (
+                                <SelectItem
+                                    key={option.value}
+                                    value={option.value}
+                                >
+                                    {option.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </FieldRow>
 
                 <ActionsRow>
-                    <Space>
-                        <Button onClick={onCancel}>
-                            {microcopy.actions.cancel}
-                        </Button>
-                        <Button
-                            disabled={!canSubmit}
-                            loading={submitting}
-                            onClick={onCreate}
-                            type="primary"
-                        >
-                            {microcopy.actions.createTask}
-                        </Button>
-                    </Space>
+                    <Button onClick={onCancel}>
+                        {microcopy.actions.cancel}
+                    </Button>
+                    <Button
+                        disabled={!canSubmit}
+                        loading={submitting}
+                        onClick={onCreate}
+                        variant="primary"
+                    >
+                        {microcopy.actions.createTask}
+                    </Button>
                 </ActionsRow>
             </FormCard>
         </PageContainer>
