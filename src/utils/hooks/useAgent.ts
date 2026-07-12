@@ -96,7 +96,11 @@ interface StartOptions {
  *   terminal    — last run ended in completed / error / cancelled.
  */
 export type AgentStatus =
-    "idle" | "connecting" | "streaming" | "interrupted" | "terminal";
+    | "idle"
+    | "connecting"
+    | "streaming"
+    | "interrupted"
+    | "terminal";
 
 export interface UseAgentResult {
     start: (input: unknown, options?: StartOptions) => Promise<void>;

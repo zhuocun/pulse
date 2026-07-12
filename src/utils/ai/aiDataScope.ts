@@ -183,7 +183,8 @@ export const sanitizeRemotePayloadForRoute = <
             continue;
         }
         const nestedContext = block.context as
-            Record<string, unknown> | undefined;
+            | Record<string, unknown>
+            | undefined;
         if (nestedContext && Array.isArray(nestedContext.tasks)) {
             next[key] = {
                 ...block,

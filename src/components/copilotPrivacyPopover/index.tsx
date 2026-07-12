@@ -36,7 +36,12 @@ const LIST_CLASS = "m-0 max-w-[24rem] ps-lg list-disc";
  * to the Radix `side` + `align` pair the primitive consumes.
  */
 export type CopilotPrivacyPlacement =
-    "top" | "topLeft" | "topRight" | "bottom" | "bottomLeft" | "bottomRight";
+    | "top"
+    | "topLeft"
+    | "topRight"
+    | "bottom"
+    | "bottomLeft"
+    | "bottomRight";
 
 const PLACEMENT_MAP: Record<
     CopilotPrivacyPlacement,

@@ -5,4 +5,5 @@ export * from "./feedbackPopover";
 
 /** Optional `surface` field on thumbs-feedback analytics payloads. */
 export type AiAnalyticsThumbsFeedbackSurface =
-    import("./copilotSurfaceFeedback").AiCopilotFeedbackSurface | "chat";
+    | import("./copilotSurfaceFeedback").AiCopilotFeedbackSurface
+    | "chat";

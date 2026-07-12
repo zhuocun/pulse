@@ -56,7 +56,12 @@ export type CopilotChipVariant =
     | "risk";
 
 export type CopilotChipTone =
-    "purple" | "green" | "blue" | "orange" | "red" | "default";
+    | "purple"
+    | "green"
+    | "blue"
+    | "orange"
+    | "red"
+    | "default";
 
 export interface CopilotChipProps extends Omit<
     React.HTMLAttributes<HTMLElement>,

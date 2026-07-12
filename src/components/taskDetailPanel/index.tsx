@@ -211,7 +211,12 @@ const STORY_POINT_OPTIONS: SelectFieldOption[] = [1, 2, 3, 5, 8, 13].map(
 );
 
 type TaskPanelField =
-    "coordinatorId" | "epic" | "note" | "storyPoints" | "taskName" | "type";
+    | "coordinatorId"
+    | "epic"
+    | "note"
+    | "storyPoints"
+    | "taskName"
+    | "type";
 
 const TASK_PANEL_FIELDS: readonly TaskPanelField[] = [
     "taskName",

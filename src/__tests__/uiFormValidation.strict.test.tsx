@@ -250,7 +250,8 @@ describe("TaskModal field hygiene", () => {
             expect(mutateAsync).toHaveBeenCalled();
         });
         const last = mutateAsync.mock.calls.at(-1)?.[0] as
-            { taskName?: string } | undefined;
+            | { taskName?: string }
+            | undefined;
         expect(last?.taskName).toBe("Plan v2 release");
     });
 });
@@ -322,7 +323,8 @@ describe("RegisterForm hygiene", () => {
             expect(mutateAsync).toHaveBeenCalled();
         });
         const last = mutateAsync.mock.calls.at(-1)?.[0] as
-            { email?: string } | undefined;
+            | { email?: string }
+            | undefined;
         expect(last?.email).toBe("alice@example.com");
     });
 });

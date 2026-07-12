@@ -1,5 +1,9 @@
 export type PasswordStrengthLevel =
-    "empty" | "tooShort" | "weak" | "fair" | "strong";
+    | "empty"
+    | "tooShort"
+    | "weak"
+    | "fair"
+    | "strong";
 
 const countCharacterClasses = (value: string): number =>
     [

@@ -376,7 +376,8 @@ export interface DragEndDecisionInput {
 }
 
 export type DragEndDecision =
-    { kind: "snap"; to: SheetDetent } | { kind: "dismiss" };
+    | { kind: "snap"; to: SheetDetent }
+    | { kind: "dismiss" };
 
 /**
  * Pure decision function for drag-end. Returns `dismiss` when the
