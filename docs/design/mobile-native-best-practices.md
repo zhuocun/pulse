@@ -123,7 +123,7 @@ In this repo:
 
 - `TOUCH_TARGET` (`src/components/ui/touchTarget.ts` — `coarse:min-h-[44px]`) is threaded into every interactive `ui/*` shadcn primitive, so even `size="sm"` controls hit the Apple HIG 44 px floor on touch; the `coarse:` variant maps to `@media (pointer: coarse)` in `tailwind.config.ts`.
 - `src/App.css:118–120` sets `-webkit-tap-highlight-color: transparent` and `text-size-adjust: 100%` at the body level.
-- View Transitions are wired on user-initiated route changes via React Router 7's `viewTransition` prop / `navigate(..., { viewTransition: true })`. Routed task-detail close opts out for `prefers-reduced-motion` and on phone chrome, where the bottom Sheet already owns the close animation. The sticky header opts out via `view-transition-name: pulse-header` so it stays anchored across route changes — see `src/components/header/index.tsx:30–47`, `src/components/taskDetailPanel/index.tsx`, and `src/App.css:230–248`.
+- View Transitions are wired on user-initiated route changes via React Router 7's `viewTransition` prop / `navigate(..., { viewTransition: true })`. Routed task-detail close opts out for `prefers-reduced-motion` and on phone chrome, where the bottom Sheet already owns the close animation. The sticky header opts out via `view-transition-name: pulse-header` so it stays anchored across route changes — see `src/components/header/index.tsx`, `src/components/taskDetailPanel/index.tsx`, and `src/App.css`.
 - The `motion` and `easing` token blocks at `src/theme/tokens.ts:147–158` standardize durations (60/120/200/320 ms) and curves so animations stay consistent.
 
 ### D. Forms (the highest-leverage area for mobile UX)
