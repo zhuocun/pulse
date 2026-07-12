@@ -47,7 +47,7 @@ npx vercel@latest env ls           # env vars (scope with --environment)
 
 ## Stack
 
-Stack: React 19 + Vite + Redux Toolkit + React Query + AntD + Emotion.
+Stack: React 19 + Vite + Redux Toolkit + React Query + Tailwind CSS + shadcn/ui (Radix primitives) + sonner.
 Backend: FastAPI + LangGraph. See `package.json` / `backend/pyproject.toml`
 for full deps.
 

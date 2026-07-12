@@ -35,9 +35,9 @@ export default [
             ...js.configs.recommended.rules,
             ...tsPlugin.configs.recommended.rules,
             ...jsxA11yPlugin.configs.recommended.rules,
-            // Allow text labels on AntD-styled custom components like
-            // <NoPaddingButton type="link">Logout</NoPaddingButton>; AntD
-            // renders these to real <button> elements with accessible names.
+            // Allow text labels on link-variant custom buttons like
+            // <NoPaddingButton variant="link">Logout</NoPaddingButton>, which
+            // render to real <button> elements with accessible names.
             "jsx-a11y/anchor-is-valid": "off",
             "jsx-a11y/click-events-have-key-events": "warn",
             "jsx-a11y/no-static-element-interactions": "warn",

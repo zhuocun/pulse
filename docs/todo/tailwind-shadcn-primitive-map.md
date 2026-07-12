@@ -1,10 +1,17 @@
 # Tailwind + shadcn/ui primitive map (S2)
 
+> **Status — migration complete (S3–S8.6 done, S9/S10 dependency purge landed).**
+> Ant Design, `@ant-design/icons`, Emotion, and `framer-motion` are fully
+> removed: zero runtime imports in `src`, and none in `package.json`. No
+> `--ant-*` CSS variable is emitted or read at runtime anymore — every
+> remaining `--ant-*` mention in the tree is a historical comment. The antd →
+> primitive map below is retained as the porting reference and rationale.
+
 The token-wired shadcn/ui primitive library lives in `src/components/ui/`.
 Every primitive is Tailwind-only, dark-mode-correct via the `--ui-*` token
 layer, axe-clean, and declares a ≥44px coarse-pointer touch target where it
-renders an interactive control. This note is the porting reference for the
-S3–S7 feature-migration workers: **which antd component maps to which
+renders an interactive control. This note is the porting reference the
+feature-migration workers used: **which antd component maps to which
 primitive, and the prop-mapping gotchas.**
 
 Do **not** re-derive colors or touch targets in feature code — thread the
@@ -21,8 +28,8 @@ primitives' props and the `--ui-*` / `--pulse-*` tokens.
 - `tailwind.config.ts` maps them to utilities as
   `hsl(var(--ui-…) / <alpha-value>)`, so opacity modifiers work
   (`bg-primary/90`, `bg-muted/50`, `border-destructive/50`).
-- The vars are namespaced `--ui-*` and are **independent of** `--ant-color-*`,
-  so the primitives keep working after AntD is removed.
+- The vars are namespaced `--ui-*` and were **independent of** the old
+  `--ant-color-*` layer, so the primitives kept working through AntD's removal.
 - `primary` = the brand orange (`#EA580C`); `destructive` = the error red.
   The pre-existing `brand` / `accent` / `aurora` / semantic (`success`,
   `warning`, `info`) Tailwind colors are untouched.
@@ -116,12 +123,14 @@ message.success(microcopy.feedback.saved);
 - `useUndoToast` (the interactive Undo toast) is a separate feature hook and is
   **out of scope** here; migrate it when its route migrates.
 
-## S8.5a — `--ant-color-*` → app-owned token map (page/layout migration)
+## S8.5a — `--ant-color-*` → app-owned token map (page/layout migration) — **done**
 
-The emotion-styled pages/layouts read AntD's `--ant-*` custom properties
-directly. S8.5a lands app-owned equivalents so S8.5/S8.6 workers can repoint
-pages off the `--ant-*` namespace without racing on the token modules and so
-the surfaces survive AntD's removal.
+The pages/layouts used to read AntD's `--ant-*` custom properties directly.
+S8.5a landed app-owned `--pulse-*` equivalents; S8.5/S8.6 then repointed every
+page off the `--ant-*` namespace, and S8.6 removed the AntD runtime. Pages now
+read the `--pulse-*` tokens directly — no `--ant-*` variable is emitted or
+consumed at runtime. The map below is the historical record of what mapped to
+what.
 
 **Where they live.** The typed source of truth is `src/theme/tokens.ts`
 (`text` / `fill` / `border` / `bg` / `status` exports + `brand.link`), each a
@@ -164,14 +173,14 @@ AntD's `rgba(0, 0, 0, 0.88)`.
 | `--ant-color-error` | `--pulse-error` | `status.error` | `#EF4444` | `#CE3D3D` |
 | `--ant-color-warning` | `--pulse-warning` | `status.warning` | `#F59E0B` | `#D3890C` |
 
-**Already app-owned (no new equivalent needed).** These `--ant-*` names are
-emitted by `cssVars.ts` itself — they are app-owned despite the `--ant-`
-prefix and survive AntD's removal, so pages may keep reading them as-is:
-`--ant-backdrop-filter-glass`, `--ant-backdrop-filter-glass-subtle`,
-`--ant-backdrop-filter-glass-strong`, `--ant-motion-tab-bar-minimize`,
-`--ant-motion-detent-snap`, `--ant-easing-detent`, `--ant-shadow-glass-lifted`,
-`--ant-color-link` (kept alongside the new `--pulse-link`),
-`--ant-chrome-inset-mobile`, and the `--ant-detent-*` ladder.
+**Formerly app-owned `--ant-*` vars — now on the `--pulse-*` namespace.**
+A set of glass / motion / chrome custom properties were app-owned despite the
+`--ant-` prefix (the backdrop-filter ladder, the tab-bar-minimize and detent
+motion tokens, the detent-snap easing, the glass lifted shadow, the mobile
+chrome inset, and the link colour). During AntD's removal these were renamed
+into the `--pulse-*` namespace (e.g. `--pulse-backdrop-filter-glass`,
+`--pulse-link`) so the tree carries a single custom-property namespace and no
+`--ant-*` variable remains at runtime.
 
 ## Deliberate deviations from stock shadcn
 

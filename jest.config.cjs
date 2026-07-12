@@ -25,10 +25,6 @@ module.exports = {
         // Node ESM at runtime); without this Jest's CJS resolver
         // looks for a literal ``_proxy.js`` and fails.
         "^(\\.{1,2}/.*)\\.js$": "$1",
-        "^@rc-component/picker/(.*)$":
-            "<rootDir>/node_modules/@rc-component/picker/lib/$1",
-        "^@rc-component/picker/locale/(.*)$":
-            "<rootDir>/node_modules/@rc-component/picker/lib/locale/$1",
         "^react-router$":
             "<rootDir>/node_modules/react-router/dist/development/index.js",
         "^react-router-dom$":

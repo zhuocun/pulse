@@ -71,19 +71,9 @@ export default defineConfig(({ mode }) => {
                                 test: /node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/
                             },
                             {
-                                name: "antd-vendor",
+                                name: "radix-vendor",
                                 priority: 30,
-                                test: /node_modules[\\/](antd|@ant-design|@rc-component|rc-)[\\/]/
-                            },
-                            {
-                                name: "antd-icons",
-                                priority: 35,
-                                test: /node_modules[\\/]@ant-design[\\/](icons|icons-svg)[\\/]/
-                            },
-                            {
-                                name: "motion-vendor",
-                                priority: 20,
-                                test: /node_modules[\\/](framer-motion|motion-dom|motion-utils|tslib)[\\/]/
+                                test: /node_modules[\\/]@radix-ui[\\/]/
                             },
                             {
                                 name: "app-vendor",
