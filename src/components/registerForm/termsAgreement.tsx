@@ -22,7 +22,7 @@ export const AuthTermsAgreement = ({
             {prefix}{" "}
             <Link
                 to={`/${AUTH_TERMS_PATH}`}
-                className="text-primary underline-offset-4 hover:underline"
+                className="text-primary underline-offset-4 hover:underline coarse:inline-flex coarse:min-h-[44px] coarse:items-center"
             >
                 {microcopy.auth.termsLink}
             </Link>

@@ -248,7 +248,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
     return (
         <button
             aria-label={ariaLabel}
-            className="inline-flex size-9 items-center justify-center rounded-md bg-transparent text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:outline-none coarse:size-[44px]"
+            className="inline-flex size-9 items-center justify-center rounded-md bg-transparent text-muted-foreground ring-offset-background transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:size-[44px]"
             data-testid="notification-bell"
             onClick={onClick}
             type="button"

@@ -137,6 +137,135 @@ const DRAG_DISTANCE_THRESHOLD = 0.4;
 /** Past-the-lowest-detent distance (px) that triggers dismiss. */
 const DRAG_DISMISS_PAST_PX = 120;
 
+const isVisibleFocusTarget = (element: HTMLElement): boolean => {
+    if (
+        !element.isConnected ||
+        element.hidden ||
+        element.closest('[hidden], [aria-hidden="true"], [inert]')
+    ) {
+        return false;
+    }
+    const style = window.getComputedStyle(element);
+    return style.display !== "none" && style.visibility !== "hidden";
+};
+
+const useFallbackFocusRestore = (enabled: boolean, open: boolean) => {
+    const openerRef = useRef<HTMLElement | null>(null);
+    const surfaceRef = useRef<HTMLDivElement | null>(null);
+    const wasOpenRef = useRef(false);
+    const restoreEligibleRef = useRef(false);
+    const restoreQueuedRef = useRef(false);
+
+    if (
+        enabled &&
+        open &&
+        !wasOpenRef.current &&
+        typeof document !== "undefined" &&
+        typeof HTMLElement !== "undefined"
+    ) {
+        const active = document.activeElement;
+        openerRef.current =
+            active instanceof HTMLElement && active !== document.body
+                ? active
+                : null;
+        restoreEligibleRef.current = true;
+        wasOpenRef.current = true;
+    }
+
+    const markRestoreEligibility = useCallback(() => {
+        if (typeof document === "undefined") return;
+        const active = document.activeElement;
+        restoreEligibleRef.current =
+            !(active instanceof HTMLElement) ||
+            active === document.body ||
+            Boolean(surfaceRef.current?.contains(active));
+    }, []);
+
+    const scheduleRestore = useCallback(() => {
+        if (
+            typeof document === "undefined" ||
+            typeof window === "undefined" ||
+            !restoreEligibleRef.current ||
+            !openerRef.current ||
+            restoreQueuedRef.current
+        ) {
+            return;
+        }
+
+        const opener = openerRef.current;
+        const surface = surfaceRef.current;
+        const active = document.activeElement;
+        if (
+            active instanceof HTMLElement &&
+            active !== document.body &&
+            !surface?.contains(active)
+        ) {
+            restoreEligibleRef.current = false;
+            openerRef.current = null;
+            return;
+        }
+
+        restoreQueuedRef.current = true;
+        window.queueMicrotask(() => {
+            restoreQueuedRef.current = false;
+            const current = document.activeElement;
+            if (
+                current instanceof HTMLElement &&
+                current !== document.body &&
+                !surface?.contains(current)
+            ) {
+                restoreEligibleRef.current = false;
+                openerRef.current = null;
+                return;
+            }
+            if (
+                surface?.isConnected &&
+                surface.getAttribute("data-state") === "open"
+            ) {
+                return;
+            }
+            if (isVisibleFocusTarget(opener)) {
+                opener.focus({ preventScroll: true });
+            }
+            restoreEligibleRef.current = false;
+            openerRef.current = null;
+        });
+    }, []);
+
+    useEffect(
+        () => () => {
+            if (!enabled || !wasOpenRef.current) return;
+            markRestoreEligibility();
+            scheduleRestore();
+        },
+        [enabled, markRestoreEligibility, scheduleRestore]
+    );
+
+    useEffect(() => {
+        if (!enabled || open) return;
+        wasOpenRef.current = false;
+    }, [enabled, open]);
+
+    const setSurfaceRef = useCallback((node: HTMLDivElement | null) => {
+        if (node) surfaceRef.current = node;
+    }, []);
+
+    const handleCloseAutoFocus = useCallback(
+        (event: Event) => {
+            event.preventDefault();
+            markRestoreEligibility();
+            scheduleRestore();
+        },
+        [markRestoreEligibility, scheduleRestore]
+    );
+
+    return {
+        handleCloseAutoFocus,
+        markRestoreEligibility,
+        setSurfaceRef
+    };
+};
+
 /* -- Helpers ----------------------------------------------------------- */
 
 const parseCssLength = (raw: string, fallback: number): number => {
@@ -663,6 +792,10 @@ const Sheet: React.FC<SheetProps> = ({
     const isPhone = useIsPhoneChrome();
     const reducedMotion = useReducedMotion();
     const useAnimatedBranch = isPhone && !reducedMotion && !forceDrawerFallback;
+    const fallbackFocusRestore = useFallbackFocusRestore(
+        !useAnimatedBranch,
+        open
+    );
     const resolvedCloseAriaLabel =
         closeAriaLabel ?? microcopyString(microcopy.actions.close);
 
@@ -679,7 +812,10 @@ const Sheet: React.FC<SheetProps> = ({
             <UISheet
                 open={open}
                 onOpenChange={(next) => {
-                    if (!next) onClose();
+                    if (!next) {
+                        fallbackFocusRestore.markRestoreEligibility();
+                        onClose();
+                    }
                 }}
             >
                 <UISheetContent
@@ -687,6 +823,7 @@ const Sheet: React.FC<SheetProps> = ({
                     className={cn("flex flex-col gap-0 p-0", rootClassName)}
                     data-testid={dataTestid}
                     hideClose
+                    onCloseAutoFocus={fallbackFocusRestore.handleCloseAutoFocus}
                     // `maskClosable=false` mirrors AntD's masked-but-not-
                     // dismissible drawer: block scrim / outside-click close
                     // while Escape and the close button still dismiss.
@@ -695,6 +832,7 @@ const Sheet: React.FC<SheetProps> = ({
                             ? undefined
                             : (event) => event.preventDefault()
                     }
+                    ref={fallbackFocusRestore.setSurfaceRef}
                     side={side}
                 >
                     {title ? (
@@ -716,7 +854,7 @@ const Sheet: React.FC<SheetProps> = ({
                     {closable ? (
                         <UISheetClose
                             aria-label={resolvedCloseAriaLabel}
-                            className="absolute right-md top-md rounded-sm text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
+                            className="absolute right-md top-md inline-flex size-8 items-center justify-center rounded-sm text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring coarse:size-11"
                         >
                             <X aria-hidden className="size-4" />
                         </UISheetClose>

@@ -25,8 +25,8 @@ const MemberPopover: React.FC = () => {
                     aria-label={microcopy.a11y.viewTeamMembers}
                     className={cn(
                         "inline-flex min-h-[32px] items-center gap-xs whitespace-nowrap rounded-md px-sm py-xxs font-medium text-foreground",
-                        "cursor-pointer border-0 bg-transparent transition-colors",
-                        "hover:bg-muted focus-visible:bg-muted focus-visible:outline-none",
+                        "cursor-pointer border-0 bg-transparent ring-offset-background transition-colors",
+                        "hover:bg-muted focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                         "coarse:min-h-[44px]"
                     )}
                     type="button"

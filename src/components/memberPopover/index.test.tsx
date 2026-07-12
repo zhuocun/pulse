@@ -61,6 +61,9 @@ describe("MemberPopover", () => {
             name: "View team members"
         });
 
+        expect(trigger).toHaveClass("focus-visible:ring-2");
+        expect(trigger).toHaveClass("focus-visible:ring-ring");
+        expect(trigger).toHaveClass("focus-visible:ring-offset-2");
         expect(within(trigger).getByText("2")).toBeInTheDocument();
         expect(within(trigger).getByText("A")).toBeInTheDocument();
         expect(within(trigger).getByText("B")).toBeInTheDocument();

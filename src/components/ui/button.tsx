@@ -20,6 +20,7 @@ const buttonVariants = cva(
         "ring-offset-background transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         "disabled:pointer-events-none disabled:opacity-50",
+        "coarse:min-w-[44px]",
         "[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
         TOUCH_TARGET
     ),
@@ -101,9 +102,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                 ref={ref}
                 className={cn(
                     buttonVariants({ variant, size, block }),
+                    loading && "disabled:opacity-100",
                     className
                 )}
-                disabled={disabled ?? loading}
+                disabled={disabled || loading}
                 aria-busy={loading || undefined}
                 {...props}
             >

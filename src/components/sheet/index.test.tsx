@@ -104,6 +104,43 @@ const Harness: React.FC<HarnessProps> = ({
     </Sheet>
 );
 
+const FocusRestoreHarness: React.FC<{
+    removeOpenerOnClose?: boolean;
+    unmountWhenClosed?: boolean;
+}> = ({ removeOpenerOnClose = false, unmountWhenClosed = false }) => {
+    const [open, setOpen] = React.useState(false);
+    const [showOpener, setShowOpener] = React.useState(true);
+    const close = () => {
+        if (removeOpenerOnClose) setShowOpener(false);
+        setOpen(false);
+    };
+
+    return (
+        <>
+            {showOpener ? (
+                <button onClick={() => setOpen(true)} type="button">
+                    Open controlled sheet
+                </button>
+            ) : null}
+            <button type="button">Alternate target</button>
+            {unmountWhenClosed && !open ? null : (
+                <Sheet onClose={close} open={open} title="Controlled sheet">
+                    <button type="button">Controlled body action</button>
+                </Sheet>
+            )}
+        </>
+    );
+};
+
+const flushAnimationFrame = async () => {
+    await act(
+        async () =>
+            new Promise<void>((resolve) => {
+                window.requestAnimationFrame(() => resolve());
+            })
+    );
+};
+
 describe("Sheet — animated phone branch", () => {
     let restoreAntdBrowserMocks: () => void;
     beforeAll(() => {
@@ -302,9 +339,43 @@ describe("Sheet — desktop drawer fallback", () => {
 
     it("uses a caller-supplied close button label", () => {
         render(<Harness closeAriaLabel="Dismiss sheet" />);
-        expect(
-            screen.getByRole("button", { name: "Dismiss sheet" })
-        ).toBeInTheDocument();
+        const close = screen.getByRole("button", { name: "Dismiss sheet" });
+        expect(close).toHaveClass("size-8");
+        expect(close).toHaveClass("coarse:size-11");
+    });
+
+    it("restores a connected opener after Escape", async () => {
+        const user = userEvent.setup();
+        render(<FocusRestoreHarness />);
+        const opener = screen.getByRole("button", {
+            name: "Open controlled sheet"
+        });
+        await user.click(opener);
+        expect(screen.getByRole("dialog")).toContainElement(
+            document.activeElement as HTMLElement
+        );
+
+        await user.keyboard("{Escape}");
+        await flushAnimationFrame();
+
+        expect(opener).toHaveFocus();
+    });
+
+    it("does not steal focus moved outside during close", async () => {
+        const user = userEvent.setup();
+        render(<FocusRestoreHarness />);
+        const opener = screen.getByRole("button", {
+            name: "Open controlled sheet"
+        });
+        const alternate = screen.getByRole("button", {
+            name: "Alternate target"
+        });
+        await user.click(opener);
+        await user.keyboard("{Escape}");
+        alternate.focus();
+        await flushAnimationFrame();
+
+        expect(alternate).toHaveFocus();
     });
 
     it("passes axe with no a11y violations in the fallback branch", async () => {
@@ -344,6 +415,35 @@ describe("Sheet — reduced-motion fallback", () => {
         expect(
             screen.getByRole("button", { name: "Dismiss reduced sheet" })
         ).toBeInTheDocument();
+    });
+
+    it("restores the opener after the close button unmounts the routed sheet", async () => {
+        const user = userEvent.setup();
+        render(<FocusRestoreHarness unmountWhenClosed />);
+        const opener = screen.getByRole("button", {
+            name: "Open controlled sheet"
+        });
+        await user.click(opener);
+        await user.click(screen.getByRole("button", { name: "Close" }));
+        await flushAnimationFrame();
+
+        expect(opener).toHaveFocus();
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("does not restore a detached opener", async () => {
+        const user = userEvent.setup();
+        render(<FocusRestoreHarness removeOpenerOnClose unmountWhenClosed />);
+        const opener = screen.getByRole("button", {
+            name: "Open controlled sheet"
+        });
+        await user.click(opener);
+        const focus = jest.spyOn(opener, "focus");
+        await user.click(screen.getByRole("button", { name: "Close" }));
+        await flushAnimationFrame();
+
+        expect(opener).not.toBeInTheDocument();
+        expect(focus).not.toHaveBeenCalled();
     });
 
     it("passes axe with no a11y violations in the reduced-motion branch", async () => {

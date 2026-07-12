@@ -41,6 +41,26 @@ describe("toast module", () => {
         );
     });
 
+    it("keeps the desktop offset and clears the floating mobile navigation", async () => {
+        render(<Toaster />);
+        act(() => {
+            message.info("Offset probe");
+        });
+        await waitFor(() =>
+            expect(
+                document.querySelector<HTMLElement>("[data-sonner-toaster]")
+            ).not.toBeNull()
+        );
+        const toaster = document.querySelector<HTMLElement>(
+            "[data-sonner-toaster]"
+        );
+        expect(toaster).not.toBeNull();
+        expect(toaster?.style.getPropertyValue("--offset-bottom")).toBe("16px");
+        expect(toaster?.style.getPropertyValue("--mobile-offset-bottom")).toBe(
+            "calc(66px + max(24px, calc(env(safe-area-inset-bottom) + 12px)) + 8px)"
+        );
+    });
+
     it("has no axe violations for the Toaster region", async () => {
         const { container } = render(<Toaster />);
         expect(await axe(container)).toHaveNoViolations();

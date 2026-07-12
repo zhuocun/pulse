@@ -342,7 +342,7 @@ const ProjectSearchPanel: React.FC<Props> = ({
                                             value === ALL_MANAGERS ? "" : value
                                     })
                                 }
-                                value={param.managerId || undefined}
+                                value={param.managerId || ALL_MANAGERS}
                             >
                                 <SelectTrigger
                                     aria-label={microcopy.a11y.filterByManager}

@@ -156,11 +156,21 @@ const useAppMessage = (): MessageApi => message;
 
 export type ToasterProps = React.ComponentProps<typeof SonnerToaster>;
 
+const MOBILE_TOAST_OFFSET = {
+    bottom: "calc(66px + max(24px, calc(env(safe-area-inset-bottom) + 12px)) + 8px)"
+};
+
 /**
  * Themed sonner `<Toaster>`. Mount once near the app root. Registers itself
  * so `message.*` stops no-op'ing; unmount reverts to the test-safe fallback.
  */
-const Toaster = ({ className, toastOptions, ...props }: ToasterProps) => {
+const Toaster = ({
+    className,
+    toastOptions,
+    offset = 16,
+    mobileOffset = MOBILE_TOAST_OFFSET,
+    ...props
+}: ToasterProps) => {
     React.useEffect(() => {
         mountedToasters += 1;
         return () => {
@@ -185,6 +195,8 @@ const Toaster = ({ className, toastOptions, ...props }: ToasterProps) => {
                 },
                 ...toastOptions
             }}
+            offset={offset}
+            mobileOffset={mobileOffset}
             {...props}
         />
     );

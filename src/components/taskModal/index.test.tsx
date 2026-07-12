@@ -23,6 +23,7 @@ import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useReducedMotion from "../../utils/hooks/useReducedMotion";
 
 import TaskModal from ".";
+import { MultiSelectField } from "./formControls";
 
 /*
  * The transient Undo toast and the delete-failure error toast both route
@@ -291,6 +292,28 @@ const renderModal = (
         </Provider>
     );
 };
+
+describe("MultiSelectField touch targets", () => {
+    it("keeps the trigger and Clear as separate 44px coarse targets", () => {
+        render(
+            <MultiSelectField
+                aria-label="Labels"
+                onChange={jest.fn()}
+                options={[{ label: "Backend", value: "backend" }]}
+                value={["backend"]}
+            />
+        );
+
+        const trigger = screen.getByRole("combobox", { name: "Labels" });
+        const clear = screen.getByRole("button", {
+            name: microcopy.actions.clear as string
+        });
+        expect(trigger).toHaveClass("coarse:min-h-[44px]");
+        expect(trigger).toHaveClass("coarse:min-w-[44px]");
+        expect(clear).toHaveClass("coarse:size-11");
+        expect(trigger.contains(clear)).toBe(false);
+    });
+});
 
 describe("TaskModal", () => {
     const fetchMock = jest.spyOn(global, "fetch");
