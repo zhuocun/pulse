@@ -67,8 +67,8 @@ const GlassActionCluster = React.forwardRef<
             className={cn(
                 "inline-flex items-center rounded-pill border px-xxs py-xxs",
                 "[background:var(--glass-surface)] [border-color:var(--glass-border)]",
-                "[backdrop-filter:var(--ant-backdrop-filter-glass)]",
-                "[-webkit-backdrop-filter:var(--ant-backdrop-filter-glass)]",
+                "[backdrop-filter:var(--pulse-backdrop-filter-glass)]",
+                "[-webkit-backdrop-filter:var(--pulse-backdrop-filter-glass)]",
                 "shadow-[var(--gac-shadow)]",
                 TOUCH_TARGET,
                 // Strip per-button chrome so controls read as concentric,
@@ -96,7 +96,7 @@ const GlassActionCluster = React.forwardRef<
             ref={ref}
             style={
                 {
-                    "--gac-shadow": `var(--ant-shadow-glass-lifted, ${shadow.lift})`
+                    "--gac-shadow": `var(--pulse-shadow-glass-lifted, ${shadow.lift})`
                 } as React.CSSProperties
             }
             {...rest}

@@ -113,14 +113,14 @@ const LIST_CONTAINER_CLASS =
 
 const KIND_GROUP_CLASS = cn(
     "mb-xxs mt-xs px-sm text-xs font-semibold",
-    "[color:var(--ant-color-text-secondary,rgba(15,23,42,0.65))]"
+    "[color:var(--pulse-text-secondary,rgba(15,23,42,0.65))]"
 );
 
 const rowClass = (active: boolean): string =>
     cn(
         "flex min-w-0 cursor-pointer items-center gap-sm rounded-md px-sm py-xs",
         active
-            ? "[background:var(--ant-color-primary-bg,rgba(234,88,12,0.10))]"
+            ? "[background:var(--pulse-brand-primary-bg,rgba(234,88,12,0.10))]"
             : "bg-transparent"
     );
 
@@ -135,13 +135,13 @@ const MODE_BANNER_CLASS = cn(
     "mt-sm flex items-center gap-xs rounded-md border px-sm py-xs text-xs",
     "[background:var(--color-copilot-bg-subtle)]",
     "border-[color:var(--color-copilot-bg-medium)]",
-    "[color:var(--ant-color-text-secondary,rgba(15,23,42,0.65))]"
+    "[color:var(--pulse-text-secondary,rgba(15,23,42,0.65))]"
 );
 
 const SAMPLE_PROMPT_ROW_CLASS = cn(
     "block w-full cursor-pointer rounded-md border-0 bg-transparent px-sm py-xs text-left",
-    "hover:[background:var(--ant-color-fill-tertiary,rgba(15,23,42,0.04))]",
-    "focus-visible:[background:var(--ant-color-fill-tertiary,rgba(15,23,42,0.04))]"
+    "hover:[background:var(--pulse-fill-tertiary,rgba(15,23,42,0.04))]",
+    "focus-visible:[background:var(--pulse-fill-tertiary,rgba(15,23,42,0.04))]"
 );
 
 /**
@@ -671,7 +671,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
                             </Typography.Paragraph>
                             {/* P3-A: No-results → "Ask Board Copilot" CTA */}
                             {!isColdCache && query.trim().length >= 3 && (
-                                <div className="border-t border-[color:var(--ant-color-border-secondary)] px-sm py-xs">
+                                <div className="border-t border-[color:var(--pulse-border-secondary)] px-sm py-xs">
                                     <Button
                                         onClick={() => {
                                             dispatchAiPrompt(query.trim());
@@ -703,6 +703,14 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
                             }
                             const entry = item.entry;
                             return (
+                                // APG combobox pattern: keyboard interaction
+                                // lives on the combobox <input> above (Arrow
+                                // keys move `activeIndex`, Enter selects via
+                                // `handleKeyDown`). This option row only needs
+                                // the pointer affordances — a per-row key
+                                // handler would be a second, conflicting
+                                // keyboard surface.
+                                // eslint-disable-next-line jsx-a11y/click-events-have-key-events
                                 <li
                                     aria-selected={index === activeIndex}
                                     className={rowClass(index === activeIndex)}

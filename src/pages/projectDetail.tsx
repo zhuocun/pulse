@@ -38,7 +38,7 @@ const TOP_BAR_CLASS = cn(
     "sticky z-10 flex flex-wrap items-center justify-between gap-xxs min-w-0",
     "[top:var(--header-height,44px)]",
     "[background:var(--glass-surface-subtle)] [border-bottom:1px_solid_var(--glass-border)]",
-    "[backdrop-filter:var(--ant-backdrop-filter-glass)] [-webkit-backdrop-filter:var(--ant-backdrop-filter-glass)]",
+    "[backdrop-filter:var(--pulse-backdrop-filter-glass)] [-webkit-backdrop-filter:var(--pulse-backdrop-filter-glass)]",
     "py-xs px-sm",
     "[padding-inline-start:max(var(--pulse-space-sm),env(safe-area-inset-left))]",
     "[padding-inline-end:max(var(--pulse-space-sm),env(safe-area-inset-right))]",

@@ -39,11 +39,9 @@ const LanguageContext = createContext<LanguageContextValue>({
  * Top-level provider that owns the active locale.
  *
  * Components subscribe via `useLocale` (locale code + setter) or
- * `useTranslation` (dictionary). AntD's `ConfigProvider` is wired up in
- * `ThemedShell` so the locale and theme share a single config boundary —
- * here we just manage state, side-effects (singleton, dayjs, `<html
- * lang>`, persistence), and force a remount of the subtree on every
- * language switch.
+ * `useTranslation` (dictionary). Here we manage locale state,
+ * side-effects (singleton, dayjs, `<html lang>`, persistence), and force
+ * a remount of the subtree on every language switch.
  *
  * The keyed remount is the safety net for components that read the static
  * `microcopy` Proxy rather than `useTranslation` — without it, they would

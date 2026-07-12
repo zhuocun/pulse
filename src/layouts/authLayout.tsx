@@ -138,9 +138,9 @@ const AUTH_SUBTITLE_CLASS = cn(
  * and forced-colors utilities below drop the rims + blur for those modes.
  *
  * The blur is a literal `blur(28px) saturate(180%)` (the STRONG-regular recipe)
- * rather than the app-owned `--ant-backdrop-filter-glass-strong` var: this
- * cluster is repointed off every `--ant-*` name, and no `--pulse-*` alias for
- * the glass intensity lever exists yet.
+ * rather than the `--pulse-backdrop-filter-glass-strong` intensity lever, so
+ * the auth showpiece keeps its fixed strong blur independent of the global
+ * glass-intensity toggle.
  */
 const FORM_CARD_CLASS = cn(
     "relative w-[min(40rem,100%-2rem)] max-w-[40rem] rounded-lg text-left",

@@ -75,6 +75,11 @@ const toSonnerOptions = (
 
 type SonnerVariant = "success" | "error" | "info" | "warning" | "loading";
 
+/** antd `message.open` config: a `MessageArgs` plus the toast `type`. */
+export interface OpenArgs extends MessageArgs {
+    type?: SonnerVariant;
+}
+
 const emit = (
     variant: SonnerVariant,
     input: MessageInput,
@@ -116,6 +121,11 @@ export interface MessageApi {
         duration?: number,
         onClose?: () => void
     ): HideToast;
+    /**
+     * antd `message.open({ content, type, duration, key, … })` — a single
+     * config-object entrypoint. `type` defaults to `info`.
+     */
+    open(args: OpenArgs): HideToast;
     /** Dismiss one toast by key, or all when omitted (antd `message.destroy`). */
     destroy(key?: string | number): void;
 }
@@ -130,6 +140,7 @@ export const message: MessageApi = {
         emit("warning", input, duration, onClose),
     loading: (input, duration, onClose) =>
         emit("loading", input, duration, onClose),
+    open: ({ type = "info", ...rest }) => emit(type, rest),
     destroy: (key) => {
         if (mountedToasters === 0) return;
         sonnerToast.dismiss(key);

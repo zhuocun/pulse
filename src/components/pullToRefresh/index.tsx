@@ -142,7 +142,7 @@ export const resolvePull = ({
 /* -- Surface class recipes --------------------------------------------- */
 
 /**
- * The pull indicator. Solid `--ant-color-bg-container` token background
+ * The pull indicator. Solid `--pulse-bg-container` token background
  * (NOT glass) per the brief — a translucent indicator over scrolling
  * content reads as muddy, and glass would need the reduced-transparency
  * / forced-colors gating dance for no benefit here. It is parked just
@@ -151,7 +151,7 @@ export const resolvePull = ({
  */
 const INDICATOR_CLASS = cn(
     "absolute left-0 right-0 top-[-44px] z-[1] flex h-[44px] items-center justify-center gap-xs",
-    "[color:var(--ant-color-text-secondary,rgba(15,23,42,0.65))]"
+    "[color:var(--pulse-text-secondary,rgba(15,23,42,0.65))]"
 );
 
 /**
@@ -162,14 +162,14 @@ const INDICATOR_CLASS = cn(
  */
 const INDICATOR_PILL_CLASS = cn(
     "inline-flex h-xl items-center gap-xxs rounded-pill px-sm",
-    "[background:var(--ant-color-bg-container,#ffffff)]",
-    "[color:var(--ant-color-primary,#ea580c)]",
+    "[background:var(--pulse-bg-container,#ffffff)]",
+    "[color:var(--pulse-brand-primary,#ea580c)]",
     "shadow-[0_1px_2px_rgba(15,23,42,0.05),0_1px_3px_rgba(15,23,42,0.06)]",
     "forced-colors:border forced-colors:border-[CanvasText] forced-colors:shadow-none"
 );
 
 const INDICATOR_LABEL_CLASS =
-    "text-sm font-medium [color:var(--ant-color-text-secondary,rgba(15,23,42,0.65))]";
+    "text-sm font-medium [color:var(--pulse-text-secondary,rgba(15,23,42,0.65))]";
 
 /**
  * Snap-back transition applied to both the indicator and the content

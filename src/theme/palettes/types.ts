@@ -5,7 +5,6 @@
  *
  *   - `tokens.ts` reads `brand`, `accent`, `aurora`, `avatarGradients` from
  *     the active palette
- *   - `antdTheme.ts` (already importing tokens) picks up colors automatically
  *   - `index.tsx` injects `paletteToCss(palette)` synchronously before
  *     React renders, so the runtime CSS vars (`--color-copilot-*`,
  *     `--glass-*`, `--pulse-*`, `--aurora-*`) all flip in one shot

@@ -118,12 +118,11 @@ export const fontWeight = {
 
 /**
  * Body/label copy set at `fontSize.sm` (13 px) reads below the 14 px mobile
- * floor once `buildAntdTheme` lifts the coarse AntD base to 16 px — a 13 px
- * paragraph next to 16 px system copy looks like a shrunk afterthought on a
- * phone. Drop this snippet into a styled block in place of a bare
+ * floor next to the 16 px native controls App.css lifts on coarse pointers —
+ * a 13 px paragraph next to 16 px system copy looks like a shrunk afterthought
+ * on a phone. Drop this snippet into a styled block in place of a bare
  * `font-size: ${fontSize.sm}px` so the copy keeps the dense 13 px on fine
- * pointers but lifts to `fontSize.base` (14 px) on coarse pointers, matching
- * the AntD `fontSizeSM` step in `antdTheme.ts`.
+ * pointers but lifts to `fontSize.base` (14 px) on coarse pointers.
  *
  * This is ONLY for genuine body/label copy. Intentional micro-captions
  * (badges, pills, chips, timestamps, meta rows) stay at their `fontSize.xs`
@@ -160,11 +159,6 @@ export const letterSpacing = {
  * paint — and any environment where the palette CSS is absent (SSR / a
  * stripped test DOM) — keeps the historical brand. AA contrast on white
  * is enforced at the palette level, not here.
- *
- * NOTE: AntD's `buildAntdTheme` does NOT read these — it takes the active
- * Palette OBJECT and uses real hexes (AntD derives shades algorithmically
- * and cannot consume `var()` here). These tokens feed the emotion /
- * styled-component surface only.
  */
 export const brand = {
     primary: `var(--pulse-brand-primary, ${palette.brand.primary})`,
@@ -361,7 +355,7 @@ export const glass = {
     /*
      * Intensity presets — three discrete configs Wave 2's user-intensity
      * toggle picks from. Components consume them via the
-     * `--ant-backdrop-filter-glass` CSS var; Wave 2 will swap the var
+     * `--pulse-backdrop-filter-glass` CSS var; the toggle swaps the var
      * value globally so every glass surface flips in one shot.
      *
      * `clear`    — most translucent (lowest surface opacity, modest blur)
@@ -382,7 +376,7 @@ export const glass = {
          * than oversaturated when paired with the lower surface
          * opacity. The cssVars renderer composes
          * `blur(${blur}px) saturate(${saturation}%)` for the
-         * `--ant-backdrop-filter-glass` var override at this intensity.
+         * `--pulse-backdrop-filter-glass` var override at this intensity.
          */
         saturation: 170,
         border: "rgba(15, 23, 42, 0.04)",
@@ -426,9 +420,9 @@ export const blur = {
 
 /**
  * Semantic palette aligned with the new brand. We expose explicit hexes here
- * because AntD's defaults (e.g. red-5 = #ff4d4f) are too saturated for the
- * refined neutral surface treatment. Components reading `--ant-color-*`
- * still pick up AntD's auto-derived variants.
+ * because the stock defaults (e.g. red-5 = #ff4d4f) are too saturated for the
+ * refined neutral surface treatment. The app-owned `status` tokens below
+ * expose the mode-flipping `--pulse-*` equivalents consumers should read.
  */
 export const semantic = {
     success: "#10B981",

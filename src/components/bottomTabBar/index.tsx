@@ -196,21 +196,28 @@ const BottomTabBar: React.FC = () => {
         : { display: "none" };
 
     return (
+        // Intentional container-level keyboard handler (`onKeyDown` below):
+        // the nav landmark implements roving Arrow/Home/End focus movement
+        // across its child tab links (an APG-style composite-widget
+        // enhancement). The listener never handles activation — Enter/click
+        // still fire on the individual links — so the non-interactive
+        // landmark stays a pure focus router. jsx-a11y can't see that intent.
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
         <nav
             aria-label={microcopy.nav.primaryLandmarkLabel}
             className={cn(
                 "fixed left-1/2 z-[15] flex items-stretch rounded-pill border p-xxs",
                 "-translate-x-1/2",
                 "[background:var(--glass-surface-strong)] [border-color:var(--glass-border)]",
-                "[backdrop-filter:var(--ant-backdrop-filter-glass)] [-webkit-backdrop-filter:var(--ant-backdrop-filter-glass)]",
-                "shadow-[var(--ant-shadow-glass-lifted)]",
+                "[backdrop-filter:var(--pulse-backdrop-filter-glass)] [-webkit-backdrop-filter:var(--pulse-backdrop-filter-glass)]",
+                "shadow-[var(--pulse-shadow-glass-lifted)]",
                 "bottom-[max(24px,calc(env(safe-area-inset-bottom)+12px))]",
                 "w-[min(calc(100%-32px),480px)]",
                 "[view-transition-name:pulse-tabbar]",
                 keyboardOpen
                     ? "pointer-events-none translate-y-[calc(100%+env(safe-area-inset-bottom)+32px)] opacity-0"
                     : "pointer-events-auto translate-y-0 opacity-100",
-                "[transition:opacity_120ms_ease-out,transform_var(--ant-motion-tab-bar-minimize,280ms)_var(--ant-easing-detent,ease-out)]",
+                "[transition:opacity_120ms_ease-out,transform_var(--pulse-motion-tab-bar-minimize,280ms)_var(--pulse-easing-detent,ease-out)]",
                 "motion-reduce:[transition:none]",
                 "data-[minimized=true]:py-0",
                 // Top-leading specular rim + companion bottom-trailing trough.
@@ -239,7 +246,7 @@ const BottomTabBar: React.FC = () => {
                     "pointer-events-none absolute bottom-xxs top-xxs z-0 block rounded-[995px] bg-muted",
                     "left-[var(--indicator-left,0)] w-[var(--indicator-width,0)]",
                     "[view-transition-name:pulse-tab-indicator]",
-                    "[transition:left_var(--ant-motion-tab-bar-minimize,280ms)_var(--easing-spring-snap,ease-out),width_var(--ant-motion-tab-bar-minimize,280ms)_var(--easing-spring-snap,ease-out)]",
+                    "[transition:left_var(--pulse-motion-tab-bar-minimize,280ms)_var(--easing-spring-snap,ease-out),width_var(--pulse-motion-tab-bar-minimize,280ms)_var(--easing-spring-snap,ease-out)]",
                     "motion-reduce:[transition:none]",
                     "forced-colors:bg-[CanvasText] forced-colors:opacity-15"
                 )}
@@ -253,7 +260,7 @@ const BottomTabBar: React.FC = () => {
                             className={cn(
                                 "inline-flex origin-center items-center justify-center leading-none",
                                 "[&_svg]:size-[22px]",
-                                "[transition:transform_var(--ant-motion-tab-bar-minimize,280ms)_var(--ant-easing-detent,ease-out)]",
+                                "[transition:transform_var(--pulse-motion-tab-bar-minimize,280ms)_var(--pulse-easing-detent,ease-out)]",
                                 "motion-reduce:[transition:none]",
                                 minimized ? "scale-[0.82]" : "scale-100"
                             )}
@@ -263,7 +270,7 @@ const BottomTabBar: React.FC = () => {
                         <span
                             className={cn(
                                 "max-w-full overflow-hidden text-ellipsis whitespace-nowrap leading-[13.2px]",
-                                "[transition:opacity_var(--ant-motion-tab-bar-minimize,280ms)_var(--ant-easing-detent,ease-out),max-height_var(--ant-motion-tab-bar-minimize,280ms)_var(--ant-easing-detent,ease-out)]",
+                                "[transition:opacity_var(--pulse-motion-tab-bar-minimize,280ms)_var(--pulse-easing-detent,ease-out),max-height_var(--pulse-motion-tab-bar-minimize,280ms)_var(--pulse-easing-detent,ease-out)]",
                                 "motion-reduce:[transition:none]",
                                 minimized
                                     ? "max-h-0 opacity-0"

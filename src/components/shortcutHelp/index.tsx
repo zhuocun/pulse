@@ -24,20 +24,20 @@ import useShortcut from "../../utils/hooks/useShortcut";
 
 const SCOPE_HEADING_CLASS = cn(
     "m-0 mb-xs text-xs font-semibold uppercase tracking-[0.04em]",
-    "[color:var(--ant-color-text-secondary,rgba(15,23,42,0.65))]"
+    "[color:var(--pulse-text-secondary,rgba(15,23,42,0.65))]"
 );
 
 const ROW_CLASS = cn(
     "flex items-center justify-between gap-md py-xs",
-    "[&+&]:border-t [&+&]:border-[color:var(--ant-color-border-secondary,rgba(15,23,42,0.06))]"
+    "[&+&]:border-t [&+&]:border-[color:var(--pulse-border-secondary,rgba(15,23,42,0.06))]"
 );
 
 const KEY_CLASS = cn(
     "min-w-[1.5em] rounded-sm border px-xs py-[2px] text-center font-[inherit] text-xs font-medium leading-[1.4]",
-    "[background:var(--ant-color-fill-tertiary,rgba(15,23,42,0.06))]",
-    "border-[color:var(--ant-color-border,rgba(15,23,42,0.12))]",
-    "shadow-[0_1px_0_var(--ant-color-border,rgba(15,23,42,0.12))]",
-    "[color:var(--ant-color-text,inherit)]"
+    "[background:var(--pulse-fill-tertiary,rgba(15,23,42,0.06))]",
+    "border-[color:var(--pulse-border,rgba(15,23,42,0.12))]",
+    "shadow-[0_1px_0_var(--pulse-border,rgba(15,23,42,0.12))]",
+    "[color:var(--pulse-text-base,inherit)]"
 );
 
 /**
@@ -56,7 +56,7 @@ const ComboKeys: React.FC<{ entry: ShortcutEntry }> = ({ entry }) => {
                     className="inline-flex gap-[2px]"
                 >
                     {segmentIndex > 0 ? (
-                        <span className="self-center text-xs [color:var(--ant-color-text-tertiary,rgba(15,23,42,0.45))]">
+                        <span className="self-center text-xs [color:var(--pulse-text-tertiary,rgba(15,23,42,0.45))]">
                             {then}
                         </span>
                     ) : null}
@@ -151,7 +151,7 @@ const ShortcutHelp: React.FC<ShortcutHelpProps> = ({
                             </h3>
                             {group.entries.map((entry) => (
                                 <div className={ROW_CLASS} key={entry.id}>
-                                    <span className="min-w-0 [color:var(--ant-color-text,inherit)] [overflow-wrap:anywhere]">
+                                    <span className="min-w-0 [color:var(--pulse-text-base,inherit)] [overflow-wrap:anywhere]">
                                         {describeShortcut(entry)}
                                     </span>
                                     <ComboKeys entry={entry} />

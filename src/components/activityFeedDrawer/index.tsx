@@ -231,7 +231,7 @@ const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
                             key={bucket}
                             data-testid={`activity-feed-group-${bucket}`}
                         >
-                            <Typography.Text className="text-xs font-semibold [color:var(--ant-color-text-tertiary,rgba(15,23,42,0.5))]">
+                            <Typography.Text className="text-xs font-semibold [color:var(--pulse-text-tertiary,rgba(15,23,42,0.5))]">
                                 {BUCKET_LABEL[bucket]}
                             </Typography.Text>
                             <ul className="m-0 flex list-none flex-col gap-xxs p-0">
@@ -246,7 +246,7 @@ const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
                                                 "flex items-start gap-xs rounded-md px-sm py-xs",
                                                 event.isRead
                                                     ? "bg-transparent"
-                                                    : "[background:var(--ant-color-primary-bg,rgba(234,88,12,0.06))]"
+                                                    : "[background:var(--pulse-brand-primary-bg,rgba(234,88,12,0.06))]"
                                             )}
                                             key={event.id}
                                             data-testid="activity-feed-row"
@@ -257,7 +257,7 @@ const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
                                             }
                                         >
                                             <span
-                                                className="inline-flex size-6 flex-none items-center justify-center text-md [color:var(--ant-color-text-secondary,rgba(15,23,42,0.6))]"
+                                                className="inline-flex size-6 flex-none items-center justify-center text-md [color:var(--pulse-text-secondary,rgba(15,23,42,0.6))]"
                                                 data-testid={`activity-feed-icon-${event.kind}`}
                                             >
                                                 {KIND_ICON[event.kind]}
@@ -266,7 +266,7 @@ const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
                                                 <Typography.Text className="text-sm break-words">
                                                     {event.summary}
                                                 </Typography.Text>
-                                                <Typography.Text className="text-xs [color:var(--ant-color-text-tertiary,rgba(15,23,42,0.45))]">
+                                                <Typography.Text className="text-xs [color:var(--pulse-text-tertiary,rgba(15,23,42,0.45))]">
                                                     {formatRelative(
                                                         event.timestamp,
                                                         now
@@ -378,7 +378,7 @@ export const ActivityFeedBell: React.FC<BellTriggerProps> = ({
     return (
         <button
             aria-label={ariaLabel}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border-none bg-transparent p-0 cursor-pointer [color:var(--ant-color-text-secondary,rgba(15,23,42,0.65))] coarse:h-[44px] coarse:w-[44px]"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border-none bg-transparent p-0 cursor-pointer [color:var(--pulse-text-secondary,rgba(15,23,42,0.65))] coarse:h-[44px] coarse:w-[44px]"
             data-testid="activity-feed-bell"
             onClick={onClick}
             type="button"

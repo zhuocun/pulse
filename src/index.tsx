@@ -1,7 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 
-import "antd/dist/reset.css";
 import App from "./App";
 import { setAnalyticsSink } from "./constants/analytics";
 import environment from "./constants/env";
@@ -188,12 +187,11 @@ if ("serviceWorker" in navigator) {
                  * `updatefound` → `installed` and — only when there's
                  * already a controlling SW (otherwise this is the
                  * first install, no toast needed) — mount SwUpdateToast
-                 * inside the React tree so it picks up the AntD
-                 * notification context.
+                 * inside the React tree (wrapped in `AppProviders`) so it
+                 * picks up the sonner `Toaster` context.
                  *
-                 * Lazy-imported so the toast component (and its AntD
-                 * dependency surface) doesn't bloat the SW
-                 * registration codepath when no update is pending.
+                 * Lazy-imported so the toast component doesn't bloat the
+                 * SW registration codepath when no update is pending.
                  */
                 const promptUpdate = async () => {
                     if (!navigator.serviceWorker.controller) return;

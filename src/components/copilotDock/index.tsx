@@ -1,6 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Title } from "@/components/ui/typography";
+import { Text } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 
 import { microcopy } from "../../constants/microcopy";
@@ -327,13 +327,22 @@ export const CopilotDockShell: React.FC<CopilotDockShellProps> = ({
             title={
                 <span className="inline-flex items-center gap-xs">
                     <AiSparkleIcon aria-hidden />
-                    <Title
-                        className="m-0 font-semibold text-[length:inherit]"
+                    {/*
+                     * Non-heading text carrier: the Sheet's own title slot
+                     * is the single dialog heading (Radix `SheetTitle`, an
+                     * <h2>, in the desktop fallback). Rendering the visible
+                     * label as a plain <span> here — mirroring the taskModal
+                     * title pattern — keeps `#copilot-dock-title` as the
+                     * sole accessible-name carrier without stacking a second
+                     * heading level inside the h2 (which skipped h3 → h4 and
+                     * tripped axe `heading-order`).
+                     */}
+                    <Text
+                        className="font-semibold text-[length:inherit]"
                         id="copilot-dock-title"
-                        level={4}
                     >
                         {microcopy.copilotDock.title}
-                    </Title>
+                    </Text>
                 </span>
             }
         >

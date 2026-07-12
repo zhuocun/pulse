@@ -182,6 +182,7 @@ prefix and survive AntD's removal, so pages may keep reading them as-is:
 - z-index values are literal Tailwind arbitrary values that mirror the
   `zIndex` token ladder (`dropdown` 1050, `drawer` 1000, `modal` 1100) because
   class strings must be static for Tailwind JIT.
-- Preflight stays OFF during AntD coexistence, so primitives always pair a
+- Preflight is ON now that AntD is fully removed. Primitives still pair a
   `border` width utility with an explicit border-color utility
-  (`border-input` / `border-border`); there is no global border reset.
+  (`border-input` / `border-border`) so a `ui/*` subtree always reads the
+  theme border rather than `currentColor`.

@@ -223,10 +223,10 @@ const dotForColumn = (id: string): string => {
  * never the sole carrier of meaning.
  */
 const PRIORITY_TINT: Record<Exclude<TaskPriorityLevel, "none">, string> = {
-    low: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45))",
-    medium: "var(--ant-color-info, #2563eb)",
+    low: "var(--pulse-text-tertiary, rgba(15, 23, 42, 0.45))",
+    medium: "var(--pulse-brand-primary, #ea580c)",
     high: "var(--pulse-priority-high, #b45309)",
-    urgent: "var(--ant-color-error, #dc2626)"
+    urgent: "var(--pulse-error, #dc2626)"
 };
 
 // Column categories shown in the edit picker — same source of truth the
@@ -1200,7 +1200,7 @@ const ColumnComponent = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
                             between
                             className={cn(
                                 "rounded-[2px] bg-card/85 px-xs py-xxs",
-                                "[backdrop-filter:var(--ant-backdrop-filter-glass-subtle)] [-webkit-backdrop-filter:var(--ant-backdrop-filter-glass-subtle)]",
+                                "[backdrop-filter:var(--pulse-backdrop-filter-glass-subtle)] [-webkit-backdrop-filter:var(--pulse-backdrop-filter-glass-subtle)]",
                                 "before:pointer-events-none before:absolute before:inset-0 before:z-0 before:rounded-[inherit] before:content-[''] before:[background:var(--glass-specular-top)]",
                                 "after:pointer-events-none after:absolute after:inset-0 after:z-0 after:rounded-[inherit] after:content-[''] after:[background:var(--glass-specular-bottom)]",
                                 "[&>*]:relative [&>*]:z-[1]",

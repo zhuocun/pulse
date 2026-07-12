@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import App from "../App";
@@ -7,6 +7,7 @@ import { store } from "../store";
 import { overlaysActions } from "../store/reducers/overlaysSlice";
 import { projectActions } from "../store/reducers/projectModalSlice";
 import AppProviders from "../utils/appProviders";
+import { ONBOARDING_DISMISSED_KEY } from "../utils/hooks/useOnboardingTour";
 
 // Lazy route loading + multi-step navigation chains (login → projects →
 // board → drawer) push these end-to-end flows past the 5s default,
@@ -174,6 +175,14 @@ describe("Board AI integration (App + local engine)", () => {
         fetchMock.mockReset();
         localStorage.clear();
         sessionStorage.clear();
+        // Suppress the one-shot first-login onboarding tour. It is unrelated
+        // to these Board-Copilot flows, and its `aria-modal` card marks the
+        // board content `aria-hidden` (Radix `hideOthers`), which removes the
+        // board title heading and toolbar controls from the accessibility
+        // tree that these queries drive. Seeding the dismissed flag AFTER the
+        // `localStorage.clear()` above keeps each test's board fully
+        // interactive, mirroring a returning user who has seen the tour.
+        localStorage.setItem(ONBOARDING_DISMISSED_KEY, "true");
         for (const part of document.cookie.split(";")) {
             const name = part.split("=")[0]?.trim();
             if (name) document.cookie = `${name}=; Path=/; Max-Age=0`;
@@ -183,6 +192,12 @@ describe("Board AI integration (App + local engine)", () => {
         store.dispatch(overlaysActions.closeBoardBrief());
         store.dispatch(overlaysActions.closeTaskModal());
         store.dispatch(overlaysActions.closeAiDraft());
+        // The CopilotDock open flag lives on the shared store singleton and
+        // is NOT reset by the drawer closers above. A test that opens the
+        // dock (chat / brief) leaves it open for the next test, where its
+        // Radix modal marks the freshly-rendered board `aria-hidden` and
+        // removes the board title heading + toolbar from the query surface.
+        store.dispatch(overlaysActions.closeCopilotDock());
         store.dispatch(projectActions.closeModal());
     });
 
@@ -372,15 +387,15 @@ describe("Board AI integration (App + local engine)", () => {
             );
         });
 
-        const briefClose = document.querySelector(
-            ".ant-drawer-open .ant-drawer-close"
-        ) as HTMLElement | null;
-        expect(briefClose).toBeTruthy();
-        await user.click(briefClose!);
+        const briefClose = within(screen.getByTestId("copilot-dock")).getByRole(
+            "button",
+            { name: /close copilot/i }
+        );
+        await user.click(briefClose);
 
         await waitFor(() => {
             expect(
-                document.querySelector(".ant-drawer-open")
+                screen.queryByTestId("copilot-dock")
             ).not.toBeInTheDocument();
         });
     });
@@ -401,15 +416,15 @@ describe("Board AI integration (App + local engine)", () => {
             ).toBeInTheDocument();
         });
 
-        const chatClose = document.querySelector(
-            ".ant-drawer-open .ant-drawer-close"
-        ) as HTMLElement | null;
-        expect(chatClose).toBeTruthy();
-        await user.click(chatClose!);
+        const chatClose = within(screen.getByTestId("copilot-dock")).getByRole(
+            "button",
+            { name: /close copilot/i }
+        );
+        await user.click(chatClose);
 
         await waitFor(() => {
             expect(
-                document.querySelector(".ant-drawer-open")
+                screen.queryByTestId("copilot-dock")
             ).not.toBeInTheDocument();
         });
     });

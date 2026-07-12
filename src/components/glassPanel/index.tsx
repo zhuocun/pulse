@@ -69,9 +69,9 @@ const INTENSITY_SURFACE: Record<GlassPanelIntensity, string> = {
 };
 
 const INTENSITY_BACKDROP_FILTER: Record<GlassPanelIntensity, string> = {
-    strong: "var(--ant-backdrop-filter-glass)",
-    regular: "var(--ant-backdrop-filter-glass)",
-    subtle: "var(--ant-backdrop-filter-glass-subtle)"
+    strong: "var(--pulse-backdrop-filter-glass)",
+    regular: "var(--pulse-backdrop-filter-glass)",
+    subtle: "var(--pulse-backdrop-filter-glass-subtle)"
 };
 
 const INTENSITY_BORDER: Record<GlassPanelIntensity, string> = {

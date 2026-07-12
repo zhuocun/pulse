@@ -15,10 +15,9 @@ import {
  * `colorTheme` (palette name) from the slice, resolves it to the matching
  * `Palette` object, and re-renders that palette's CSS custom properties
  * into the `#pulse-theme-vars` style element `index.tsx` seeded with the
- * orange default before first paint. Returns the resolved palette so the
- * caller (`ThemedShell`) can thread it into `buildAntdTheme` — AntD needs
- * the REAL hex (it derives shades algorithmically and can't consume the
- * `var()` references the styled-component tokens use).
+ * orange default before first paint. Returns the resolved palette for any
+ * caller that needs the concrete `Palette` object (the styled-component
+ * tokens read the `--pulse-*` vars this renders).
  *
  * Mirrors `useGlassIntensity` but without the media-query ladder: a
  * colour theme is a pure user choice with no OS-level signal that should

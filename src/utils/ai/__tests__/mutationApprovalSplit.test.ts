@@ -1,5 +1,6 @@
-import { message } from "antd";
 import { QueryClient } from "@tanstack/react-query";
+
+import { message } from "@/components/ui/toast";
 
 import {
     applyApprovedMutationTool,
@@ -13,19 +14,14 @@ import {
 } from "../feTools/requestMutationApproval";
 import type { FeToolContext } from "../feTools/types";
 
-jest.mock("antd", () => {
-    const actual = jest.requireActual("antd");
-    return {
-        ...actual,
-        message: {
-            ...actual.message,
-            open: jest.fn(),
-            destroy: jest.fn(),
-            success: jest.fn(),
-            error: jest.fn()
-        }
-    };
-});
+jest.mock("@/components/ui/toast", () => ({
+    message: {
+        open: jest.fn(),
+        destroy: jest.fn(),
+        success: jest.fn(),
+        error: jest.fn()
+    }
+}));
 
 const buildCtx = (
     overrides: Partial<FeToolContext> & {

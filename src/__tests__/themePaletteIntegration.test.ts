@@ -1,35 +1,26 @@
 /**
- * Integration tests for the theme / palette / CSS-vars / AntD-theme stack.
+ * Integration tests for the theme / palette / CSS-vars stack.
  *
- * The visual identity ships through four parallel surfaces:
+ * The visual identity ships through three parallel surfaces:
  *
  *  1. `src/theme/palettes/index.ts` — the single source of truth.
  *  2. `src/theme/tokens.ts` — JS tokens used by styled-components / emotion.
  *  3. `src/theme/palettes/cssVars.ts` — CSS custom properties injected
  *     before React's first paint (consumed by `App.css` and inline
  *     styles).
- *  4. `src/theme/antdTheme.ts` — AntD's `ThemeConfig` consumed by
- *     `<ConfigProvider>` (drives Buttons, Inputs, Modals, etc.).
  *
  * A regression that updates the palette but forgets to thread the new
  * value through one of these surfaces would split the brand identity in
- * half — the AntD primary would stay orange while the glass borders
- * tinted in a new hue, for instance. This suite pins the cross-surface
- * contract: a single palette swap propagates to all three downstream
- * surfaces consistently.
+ * half — the glass borders would tint in a new hue while a styled
+ * component stayed orange, for instance. This suite pins the cross-surface
+ * contract: a single palette swap propagates to every downstream surface
+ * consistently.
  */
 import { palette } from "../theme/palettes";
 import { paletteToCss } from "../theme/palettes/cssVars";
 import { emeraldPalette } from "../theme/palettes/emerald";
 import { orangePalette } from "../theme/palettes/orange";
-import {
-    brand,
-    accent,
-    aurora,
-    avatarGradients,
-    fontSize
-} from "../theme/tokens";
-import { buildAntdTheme } from "../theme/antdTheme";
+import { brand, accent, aurora, avatarGradients } from "../theme/tokens";
 
 describe("theme/palette integration", () => {
     describe("active palette is propagated to every downstream surface", () => {
@@ -83,14 +74,6 @@ describe("theme/palette integration", () => {
             });
         });
 
-        it("AntD theme.colorPrimary lands on the palette brand primary (real hex)", () => {
-            // AntD derives shades algorithmically and cannot consume a
-            // `var()`, so buildAntdTheme reads the active Palette OBJECT
-            // and emits a real hex — the orange default here.
-            const cfg = buildAntdTheme("light");
-            expect(cfg.token?.colorPrimary).toBe(palette.brand.primary);
-        });
-
         it("paletteToCss(activePalette) embeds the active brand primary", () => {
             const css = paletteToCss(palette);
             expect(css).toContain(palette.brand.primary);
@@ -100,7 +83,7 @@ describe("theme/palette integration", () => {
     describe("palette swap propagates through every surface", () => {
         // Build hypothetical "what would emerald look like?" outputs and
         // assert they differ from the orange outputs. This catches a
-        // regression where one of the four surfaces hard-codes orange.
+        // regression where one of the surfaces hard-codes orange.
         it("paletteToCss output differs between emerald and orange", () => {
             const orangeCss = paletteToCss(orangePalette);
             const emeraldCss = paletteToCss(emeraldPalette);
@@ -132,81 +115,6 @@ describe("theme/palette integration", () => {
             );
             expect(emeraldPalette.brand.primaryDark).not.toBe(
                 orangePalette.brand.primaryDark
-            );
-        });
-    });
-
-    describe("AntD theme stays internally consistent across modes", () => {
-        it("light and dark both ship every Button / Modal / Tabs override", () => {
-            const light = buildAntdTheme("light");
-            const dark = buildAntdTheme("dark");
-            for (const comp of [
-                "Button",
-                "Modal",
-                "Tabs",
-                "Tag",
-                "Tooltip",
-                "Layout"
-            ] as const) {
-                expect(light.components?.[comp]).toBeDefined();
-                expect(dark.components?.[comp]).toBeDefined();
-            }
-        });
-
-        it("coarse-pointer override applies in both light and dark", () => {
-            const lightCoarse = buildAntdTheme("light", true);
-            const darkCoarse = buildAntdTheme("dark", true);
-            const lightHeight = (
-                lightCoarse.components?.Button as { controlHeight?: number }
-            )?.controlHeight;
-            const darkHeight = (
-                darkCoarse.components?.Button as { controlHeight?: number }
-            )?.controlHeight;
-            expect(lightHeight).toBe(darkHeight);
-            expect(lightHeight).toBeGreaterThanOrEqual(44);
-        });
-
-        it("desktop (fine pointer) keeps the dense 14 / 13 / 16 body ladder", () => {
-            const desktop = buildAntdTheme("light");
-            expect(desktop.token?.fontSize).toBe(fontSize.base);
-            expect(desktop.token?.fontSizeSM).toBe(fontSize.sm);
-            expect(desktop.token?.fontSizeLG).toBe(fontSize.md);
-        });
-
-        it("coarse pointer lifts the body type scale one step (16 / 14 / 18)", () => {
-            // Native iOS/Android body copy reads ~16 px; 14 px feels cramped
-            // on a phone. The coarse branch bumps base -> md, SM -> base,
-            // LG -> lg so touch body/label copy lands at least 14 px. A
-            // regression that drops this back to the dense desktop ladder
-            // must fail loudly here.
-            const coarse = buildAntdTheme("light", true);
-            expect(coarse.token?.fontSize).toBe(fontSize.md);
-            expect(coarse.token?.fontSizeSM).toBe(fontSize.base);
-            expect(coarse.token?.fontSizeLG).toBe(fontSize.lg);
-            expect(coarse.token?.fontSize).toBe(16);
-            expect(coarse.token?.fontSizeSM).toBe(14);
-            expect(coarse.token?.fontSizeLG).toBe(18);
-        });
-
-        it("coarse type-scale lift is identical in light and dark", () => {
-            const light = buildAntdTheme("light", true);
-            const dark = buildAntdTheme("dark", true);
-            expect(dark.token?.fontSize).toBe(light.token?.fontSize);
-            expect(dark.token?.fontSizeSM).toBe(light.token?.fontSizeSM);
-            expect(dark.token?.fontSizeLG).toBe(light.token?.fontSizeLG);
-        });
-
-        it("headings stay unchanged between fine and coarse pointers", () => {
-            const desktop = buildAntdTheme("light");
-            const coarse = buildAntdTheme("light", true);
-            expect(coarse.token?.fontSizeHeading1).toBe(
-                desktop.token?.fontSizeHeading1
-            );
-            expect(coarse.token?.fontSizeHeading2).toBe(
-                desktop.token?.fontSizeHeading2
-            );
-            expect(coarse.token?.fontSizeHeading3).toBe(
-                desktop.token?.fontSizeHeading3
             );
         });
     });

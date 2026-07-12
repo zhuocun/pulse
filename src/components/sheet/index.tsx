@@ -47,7 +47,7 @@ import useFocusTrap from "./useFocusTrap";
  *      the consumer-supplied `desktopPlacement` (right by default). Same
  *      content, no animated branch.
  *
- * Detent geometry consumes the `--ant-detent-*` CSS vars — `peek=96px`,
+ * Detent geometry consumes the `--pulse-detent-*` CSS vars — `peek=96px`,
  * `medium=50dvh`, `large=92dvh`. Reading the vars at runtime keeps the
  * source of truth in the cssVars layer.
  */
@@ -183,16 +183,16 @@ const resolveCssLength = (cssVar: string, fallback: number): number => {
 const detentExposedPx = (d: SheetDetent): number => {
     switch (d) {
         case "peek":
-            return resolveCssLength("--ant-detent-peek", 96);
+            return resolveCssLength("--pulse-detent-peek", 96);
         case "medium":
             return resolveCssLength(
-                "--ant-detent-medium",
+                "--pulse-detent-medium",
                 typeof window !== "undefined" ? window.innerHeight * 0.5 : 400
             );
         case "large":
         default:
             return resolveCssLength(
-                "--ant-detent-large",
+                "--pulse-detent-large",
                 typeof window !== "undefined" ? window.innerHeight * 0.92 : 736
             );
     }
@@ -393,7 +393,7 @@ const AnimatedSheet: React.FC<AnimatedSheetProps> = ({
         const update = () => {
             setSurfaceHeight(
                 resolveCssLength(
-                    "--ant-detent-large",
+                    "--pulse-detent-large",
                     typeof window !== "undefined"
                         ? window.innerHeight * 0.92
                         : 736

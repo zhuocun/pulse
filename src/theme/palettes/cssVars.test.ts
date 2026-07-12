@@ -105,36 +105,30 @@ const REQUIRED_LIGHT_VARS = [
     "--motion-gel-flex",
     "--easing-spring-soft",
     "--easing-spring-snap",
-    "--ant-backdrop-filter-glass",
+    "--pulse-backdrop-filter-glass",
     // Wave 2 integration — per-surface-tier intensity vars so the user
     // toggle reaches subtle / regular / strong surfaces without forcing
     // a uniform-blur compromise.
-    "--ant-backdrop-filter-glass-subtle",
-    "--ant-backdrop-filter-glass-strong",
+    "--pulse-backdrop-filter-glass-subtle",
+    "--pulse-backdrop-filter-glass-strong",
     // Phase 6 Wave 1 — iOS-26 foundation tokens: mobile chrome inset,
     // sheet detent ladder (peek/medium/large), additional motion +
     // easing curves for the Sheet snap and tab-bar minimize. Defined
     // in both palette blocks for symmetry (these are geometry/timing,
     // not color-mode dependent — but shipping in both keeps "every var
     // defined for one mode is defined for both" enforceable).
-    "--ant-chrome-inset-mobile",
-    "--ant-detent-peek",
-    "--ant-detent-medium",
-    "--ant-detent-large",
-    "--ant-motion-detent-snap",
-    "--ant-motion-tab-bar-minimize",
-    "--ant-easing-detent",
+    "--pulse-chrome-inset-mobile",
+    "--pulse-detent-peek",
+    "--pulse-detent-medium",
+    "--pulse-detent-large",
+    "--pulse-motion-detent-snap",
+    "--pulse-motion-tab-bar-minimize",
+    "--pulse-easing-detent",
     // Phase 6 Wave 2 — lifted glass shadow recipe with a per-mode
     // value (stronger in light because the cream page background
     // drowns out the 6% inks of shadow.lg; softer in dark because
     // the dark glass already pops against the dark page).
-    "--ant-shadow-glass-lifted",
-    // Link colour pair — antdTheme.ts pins colorLink/-Hover to the
-    // light-page palette steps for BOTH modes, so the dark block must
-    // override them (auth links otherwise fail AA on the dark page).
-    // The light block mirrors antdTheme's output for parity.
-    "--ant-color-link",
-    "--ant-color-link-hover",
+    "--pulse-shadow-glass-lifted",
     "--aurora-blob",
     "--aurora-blob-strong",
     "--aurora-blob-faint"
@@ -294,12 +288,12 @@ describe("paletteToCss", () => {
             );
         });
 
-        it("--ant-backdrop-filter-glass defaults to the regular blur+saturate combo", () => {
+        it("--pulse-backdrop-filter-glass defaults to the regular blur+saturate combo", () => {
             // The default (:root) value is the Regular preset
             // recipe — `blur(20px) saturate(180%)` — and is what the
-            // unmodified chrome consumes after the Wave 2 T4 line
-            // migration (`backdrop-filter: var(--ant-backdrop-filter-
-            // glass)`). The user-intensity toggle in Wave 2 T4 ships
+            // unmodified chrome consumes via `backdrop-filter:
+            // var(--pulse-backdrop-filter-glass)`. The user-intensity
+            // toggle in Wave 2 T4 ships
             // `html[data-glass-intensity="clear" | "solid"]` overrides
             // that swap this default; tests for those overrides live
             // in the dedicated `glass-intensity overrides` describe
@@ -309,10 +303,10 @@ describe("paletteToCss", () => {
             // don't accidentally match the override block's value.
             const rootBlock = lightBlockOf(css);
             expect(rootBlock).toMatch(
-                /--ant-backdrop-filter-glass:\s*blur\(20px\)\s*saturate\(180%\);/
+                /--pulse-backdrop-filter-glass:\s*blur\(20px\)\s*saturate\(180%\);/
             );
             expect(darkBlockOf(css)).toMatch(
-                /--ant-backdrop-filter-glass:\s*blur\(20px\)\s*saturate\(180%\);/
+                /--pulse-backdrop-filter-glass:\s*blur\(20px\)\s*saturate\(180%\);/
             );
         });
 
@@ -370,7 +364,7 @@ describe("paletteToCss", () => {
     /*
      * Phase 5 Wave 2 T4 — user-facing glass-intensity toggle. The
      * cssVars renderer emits `html[data-glass-intensity="clear" |
-     * "solid"]` selectors that override `--ant-backdrop-filter-glass`,
+     * "solid"]` selectors that override `--pulse-backdrop-filter-glass`,
      * plus a `prefers-reduced-transparency` belt-and-suspenders block
      * that pins the var to `none` regardless of the user choice.
      * "regular" inherits the :root default and intentionally has no
@@ -385,7 +379,7 @@ describe("paletteToCss", () => {
             // catches a regression where the token shape diverges
             // from the cssVars renderer.
             expect(css).toMatch(
-                /html\[data-glass-intensity="clear"\]\s*\{\s*--ant-backdrop-filter-glass:\s*blur\(14px\)\s*saturate\(170%\);/
+                /html\[data-glass-intensity="clear"\]\s*\{\s*--pulse-backdrop-filter-glass:\s*blur\(14px\)\s*saturate\(170%\);/
             );
         });
 
@@ -399,7 +393,7 @@ describe("paletteToCss", () => {
             // out entirely on platforms that interpret blur(0px) as
             // "the filter is still active".
             expect(css).toMatch(
-                /html\[data-glass-intensity="solid"\]\s*\{\s*--ant-backdrop-filter-glass:\s*none;/
+                /html\[data-glass-intensity="solid"\]\s*\{\s*--pulse-backdrop-filter-glass:\s*none;/
             );
         });
 
@@ -420,7 +414,7 @@ describe("paletteToCss", () => {
             // wipes GlassPanel's prop-driven blur on the same query.
             const css = paletteToCss(orangePalette);
             expect(css).toMatch(
-                /@media \(prefers-reduced-transparency: reduce\)[\s\S]*--ant-backdrop-filter-glass:\s*none;/
+                /@media \(prefers-reduced-transparency: reduce\)[\s\S]*--pulse-backdrop-filter-glass:\s*none;/
             );
         });
 
@@ -435,7 +429,7 @@ describe("paletteToCss", () => {
             const emeraldCss = paletteToCss(emeraldPalette);
             const extractClearOverride = (css: string) =>
                 css.match(
-                    /html\[data-glass-intensity="clear"\]\s*\{\s*--ant-backdrop-filter-glass:\s*([^;]+);/
+                    /html\[data-glass-intensity="clear"\]\s*\{\s*--pulse-backdrop-filter-glass:\s*([^;]+);/
                 )?.[1];
             expect(extractClearOverride(orangeCss)).toBe(
                 extractClearOverride(emeraldCss)
@@ -461,18 +455,18 @@ describe("paletteToCss", () => {
             // sibling presets in the cssVars mirror.
             expect(css).toMatch(
                 new RegExp(
-                    `html\\[data-glass-intensity="clear"\\]\\s*\\{[\\s\\S]*?--ant-backdrop-filter-glass:\\s*blur\\(${glass.intensityClear.blur}px\\)\\s*saturate\\(${glass.intensityClear.saturation}%\\);`
+                    `html\\[data-glass-intensity="clear"\\]\\s*\\{[\\s\\S]*?--pulse-backdrop-filter-glass:\\s*blur\\(${glass.intensityClear.blur}px\\)\\s*saturate\\(${glass.intensityClear.saturation}%\\);`
                 )
             );
             // Solid override → blur === 0 composes to "none" for all
             // three vars.
             expect(glass.intensitySolid.blur).toBe(0);
             expect(css).toMatch(
-                /html\[data-glass-intensity="solid"\]\s*\{\s*--ant-backdrop-filter-glass:\s*none;[\s\S]*?--ant-backdrop-filter-glass-subtle:\s*none;[\s\S]*?--ant-backdrop-filter-glass-strong:\s*none;[\s\S]*?\}/
+                /html\[data-glass-intensity="solid"\]\s*\{\s*--pulse-backdrop-filter-glass:\s*none;[\s\S]*?--pulse-backdrop-filter-glass-subtle:\s*none;[\s\S]*?--pulse-backdrop-filter-glass-strong:\s*none;[\s\S]*?\}/
             );
             // Regular default at :root → uses glass.intensityRegular.
             expect(css).toContain(
-                `--ant-backdrop-filter-glass: blur(${glass.intensityRegular.blur}px) saturate(${glass.intensityRegular.saturation}%);`
+                `--pulse-backdrop-filter-glass: blur(${glass.intensityRegular.blur}px) saturate(${glass.intensityRegular.saturation}%);`
             );
         });
 
@@ -483,27 +477,27 @@ describe("paletteToCss", () => {
          * 28 px (auth FormCard) can keep their blur character while
          * still flipping under the user toggle.
          */
-        it("emits --ant-backdrop-filter-glass-subtle at the subtle tier default", () => {
+        it("emits --pulse-backdrop-filter-glass-subtle at the subtle tier default", () => {
             const css = paletteToCss(orangePalette);
             // Subtle tier default: 12 px / 180% (matches the column
             // header's pre-toggle recipe pixel-for-pixel).
             expect(lightBlockOf(css)).toMatch(
-                /--ant-backdrop-filter-glass-subtle:\s*blur\(12px\)\s*saturate\(180%\);/
+                /--pulse-backdrop-filter-glass-subtle:\s*blur\(12px\)\s*saturate\(180%\);/
             );
             expect(darkBlockOf(css)).toMatch(
-                /--ant-backdrop-filter-glass-subtle:\s*blur\(12px\)\s*saturate\(180%\);/
+                /--pulse-backdrop-filter-glass-subtle:\s*blur\(12px\)\s*saturate\(180%\);/
             );
         });
 
-        it("emits --ant-backdrop-filter-glass-strong at the strong tier default", () => {
+        it("emits --pulse-backdrop-filter-glass-strong at the strong tier default", () => {
             const css = paletteToCss(orangePalette);
             // Strong tier default: 28 px / 180% (matches the auth
             // FormCard's pre-toggle showpiece recipe pixel-for-pixel).
             expect(lightBlockOf(css)).toMatch(
-                /--ant-backdrop-filter-glass-strong:\s*blur\(28px\)\s*saturate\(180%\);/
+                /--pulse-backdrop-filter-glass-strong:\s*blur\(28px\)\s*saturate\(180%\);/
             );
             expect(darkBlockOf(css)).toMatch(
-                /--ant-backdrop-filter-glass-strong:\s*blur\(28px\)\s*saturate\(180%\);/
+                /--pulse-backdrop-filter-glass-strong:\s*blur\(28px\)\s*saturate\(180%\);/
             );
         });
 
@@ -512,87 +506,24 @@ describe("paletteToCss", () => {
             // to 8 px / 170%, strong drops to 20 px / 180%.
             const css = paletteToCss(orangePalette);
             expect(css).toMatch(
-                /html\[data-glass-intensity="clear"\][\s\S]*?--ant-backdrop-filter-glass-subtle:\s*blur\(8px\)\s*saturate\(170%\);/
+                /html\[data-glass-intensity="clear"\][\s\S]*?--pulse-backdrop-filter-glass-subtle:\s*blur\(8px\)\s*saturate\(170%\);/
             );
             expect(css).toMatch(
-                /html\[data-glass-intensity="clear"\][\s\S]*?--ant-backdrop-filter-glass-strong:\s*blur\(20px\)\s*saturate\(180%\);/
+                /html\[data-glass-intensity="clear"\][\s\S]*?--pulse-backdrop-filter-glass-strong:\s*blur\(20px\)\s*saturate\(180%\);/
             );
         });
 
         it("wipes the subtle + strong vars under solid intensity (all become none)", () => {
             const css = paletteToCss(orangePalette);
             expect(css).toMatch(
-                /html\[data-glass-intensity="solid"\][\s\S]*?--ant-backdrop-filter-glass-subtle:\s*none;[\s\S]*?--ant-backdrop-filter-glass-strong:\s*none;/
+                /html\[data-glass-intensity="solid"\][\s\S]*?--pulse-backdrop-filter-glass-subtle:\s*none;[\s\S]*?--pulse-backdrop-filter-glass-strong:\s*none;/
             );
         });
 
         it("wipes the subtle + strong vars under prefers-reduced-transparency (OS wins)", () => {
             const css = paletteToCss(orangePalette);
             expect(css).toMatch(
-                /@media \(prefers-reduced-transparency: reduce\)[\s\S]*?--ant-backdrop-filter-glass-subtle:\s*none;[\s\S]*?--ant-backdrop-filter-glass-strong:\s*none;/
-            );
-        });
-    });
-
-    /*
-     * Dark-mode link contrast. antdTheme.ts sets `colorLink` to
-     * `primaryHover` and `colorLinkHover` to `primaryActive` for both
-     * modes — AA on the light page but ~3:1 (or worse) on the dark
-     * page, so auth links (Forgot password, Terms) failed contrast in
-     * dark mode. The BASE dark block must override both vars, not
-     * only the `prefers-contrast: more` media block.
-     */
-    describe("dark-mode link contrast overrides", () => {
-        /*
-         * Slice the BASE dark block only — it ends where the
-         * glass-intensity override selectors begin. `darkBlockOf`
-         * captures everything after the dark selector including the
-         * `prefers-contrast` media block, which declares its own
-         * `--ant-color-link` and would mask a regression here.
-         */
-        const baseDarkBlockOf = (css: string): string => {
-            const darkStart = css.indexOf('html[data-color-scheme="dark"]');
-            const glassStart = css.indexOf(
-                'html[data-glass-intensity="clear"]'
-            );
-            if (darkStart < 0 || glassStart < 0 || glassStart < darkStart) {
-                throw new Error("rendered CSS missing dark or glass block");
-            }
-            return css.slice(darkStart, glassStart);
-        };
-
-        it("declares --ant-color-link from brand.primaryDark in the base dark block", () => {
-            const css = paletteToCss(orangePalette);
-            expect(baseDarkBlockOf(css)).toContain(
-                `--ant-color-link: ${orangePalette.brand.primaryDark};`
-            );
-        });
-
-        it("declares --ant-color-link-hover from aurora.mid in the base dark block (primaryActive would fail on dark)", () => {
-            const css = paletteToCss(orangePalette);
-            expect(baseDarkBlockOf(css)).toContain(
-                `--ant-color-link-hover: ${orangePalette.aurora.mid};`
-            );
-        });
-
-        it("mirrors antdTheme's light link pair in the light block (both-modes parity contract)", () => {
-            const css = paletteToCss(orangePalette);
-            const light = lightBlockOf(css);
-            expect(light).toContain(
-                `--ant-color-link: ${orangePalette.brand.primaryHover};`
-            );
-            expect(light).toContain(
-                `--ant-color-link-hover: ${orangePalette.brand.primaryActive};`
-            );
-        });
-
-        it("follows the active palette (emerald)", () => {
-            const css = paletteToCss(emeraldPalette);
-            expect(baseDarkBlockOf(css)).toContain(
-                `--ant-color-link: ${emeraldPalette.brand.primaryDark};`
-            );
-            expect(baseDarkBlockOf(css)).toContain(
-                `--ant-color-link-hover: ${emeraldPalette.aurora.mid};`
+                /@media \(prefers-reduced-transparency: reduce\)[\s\S]*?--pulse-backdrop-filter-glass-subtle:\s*none;[\s\S]*?--pulse-backdrop-filter-glass-strong:\s*none;/
             );
         });
     });
@@ -606,17 +537,17 @@ describe("paletteToCss", () => {
      * review — these are load-bearing for the mobile chrome contract.
      */
     describe("Phase 6 Wave 1 mobile foundation vars", () => {
-        it("emits --ant-chrome-inset-mobile at 16px in both blocks", () => {
+        it("emits --pulse-chrome-inset-mobile at 16px in both blocks", () => {
             // 16 px = iOS 26 ~21pt mapped to web density. Mirrors
             // `space.md` so the chrome floats with the same gutter the
             // rest of the layout uses, but stays named for the
             // BottomTabBar / Sheet consumers in Waves 2 and 3.
             const css = paletteToCss(orangePalette);
             expect(lightBlockOf(css)).toContain(
-                "--ant-chrome-inset-mobile: 16px;"
+                "--pulse-chrome-inset-mobile: 16px;"
             );
             expect(darkBlockOf(css)).toContain(
-                "--ant-chrome-inset-mobile: 16px;"
+                "--pulse-chrome-inset-mobile: 16px;"
             );
         });
 
@@ -628,12 +559,12 @@ describe("paletteToCss", () => {
             const css = paletteToCss(orangePalette);
             const light = lightBlockOf(css);
             const dark = darkBlockOf(css);
-            expect(light).toContain("--ant-detent-peek: 96px;");
-            expect(light).toContain("--ant-detent-medium: 50dvh;");
-            expect(light).toContain("--ant-detent-large: 92dvh;");
-            expect(dark).toContain("--ant-detent-peek: 96px;");
-            expect(dark).toContain("--ant-detent-medium: 50dvh;");
-            expect(dark).toContain("--ant-detent-large: 92dvh;");
+            expect(light).toContain("--pulse-detent-peek: 96px;");
+            expect(light).toContain("--pulse-detent-medium: 50dvh;");
+            expect(light).toContain("--pulse-detent-large: 92dvh;");
+            expect(dark).toContain("--pulse-detent-peek: 96px;");
+            expect(dark).toContain("--pulse-detent-medium: 50dvh;");
+            expect(dark).toContain("--pulse-detent-large: 92dvh;");
         });
 
         it("emits the new motion + easing tokens (detent snap, tab-bar minimize, detent curve)", () => {
@@ -645,19 +576,19 @@ describe("paletteToCss", () => {
             const css = paletteToCss(orangePalette);
             const light = lightBlockOf(css);
             const dark = darkBlockOf(css);
-            expect(light).toContain("--ant-motion-detent-snap: 360ms;");
-            expect(light).toContain("--ant-motion-tab-bar-minimize: 280ms;");
+            expect(light).toContain("--pulse-motion-detent-snap: 360ms;");
+            expect(light).toContain("--pulse-motion-tab-bar-minimize: 280ms;");
             expect(light).toContain(
-                "--ant-easing-detent: cubic-bezier(0.32, 0.72, 0, 1);"
+                "--pulse-easing-detent: cubic-bezier(0.32, 0.72, 0, 1);"
             );
-            expect(dark).toContain("--ant-motion-detent-snap: 360ms;");
-            expect(dark).toContain("--ant-motion-tab-bar-minimize: 280ms;");
+            expect(dark).toContain("--pulse-motion-detent-snap: 360ms;");
+            expect(dark).toContain("--pulse-motion-tab-bar-minimize: 280ms;");
             expect(dark).toContain(
-                "--ant-easing-detent: cubic-bezier(0.32, 0.72, 0, 1);"
+                "--pulse-easing-detent: cubic-bezier(0.32, 0.72, 0, 1);"
             );
         });
 
-        it("--ant-shadow-glass-lifted ships a stronger ink in light mode than the achromatic shadow.lg token", () => {
+        it("--pulse-shadow-glass-lifted ships a stronger ink in light mode than the achromatic shadow.lg token", () => {
             // The Phase 6 Wave 2 floating BottomTabBar capsule used to
             // ship shadow.lg (`rgba(15, 23, 42, 0.06)` + 0.08), which
             // is invisible against the warm-cream page (#fffaf5). The
@@ -666,7 +597,7 @@ describe("paletteToCss", () => {
             const css = paletteToCss(orangePalette);
             const light = lightBlockOf(css);
             const liftedMatch = light.match(
-                /--ant-shadow-glass-lifted:\s*([^;]+);/
+                /--pulse-shadow-glass-lifted:\s*([^;]+);/
             );
             expect(liftedMatch).not.toBeNull();
             // Extract the first alpha number from the rgba(...) inks.
@@ -687,13 +618,13 @@ describe("paletteToCss", () => {
             const light = lightBlockOf(css);
             const dark = darkBlockOf(css);
             const foundationVars = [
-                "--ant-chrome-inset-mobile",
-                "--ant-detent-peek",
-                "--ant-detent-medium",
-                "--ant-detent-large",
-                "--ant-motion-detent-snap",
-                "--ant-motion-tab-bar-minimize",
-                "--ant-easing-detent"
+                "--pulse-chrome-inset-mobile",
+                "--pulse-detent-peek",
+                "--pulse-detent-medium",
+                "--pulse-detent-large",
+                "--pulse-motion-detent-snap",
+                "--pulse-motion-tab-bar-minimize",
+                "--pulse-easing-detent"
             ];
             for (const name of foundationVars) {
                 const lightMatch = light.match(

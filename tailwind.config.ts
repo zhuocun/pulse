@@ -15,13 +15,15 @@ import {
 } from "./src/theme/tailwindBridge";
 
 /*
- * Tailwind coexists with Ant Design during the migration. Two deliberate
- * choices keep the two from stepping on each other:
+ * Ant Design is fully removed, so Tailwind owns the base layer:
  *
- *   - Preflight is OFF. Tailwind's reset zeroes `border-width` on every
- *     element and strips element defaults, which erases AntD's own borders
- *     and control styling. Utilities work fine without it; re-enable once
- *     AntD is gone.
+ *   - Preflight is ON (the Tailwind default). The shadcn/ui primitives are
+ *     authored against Tailwind's reset — bare `border` utilities assume the
+ *     `border-width: 0` baseline, headings/lists ship without UA margins, and
+ *     `button` inherits font + resets its native chrome. `App.css` layers its
+ *     own resets (box-sizing, page background, focus ring, a11y fallbacks) on
+ *     top. It used to be OFF only so Tailwind's reset wouldn't erase AntD's
+ *     control borders; with AntD gone that constraint no longer applies.
  *   - Colors and the non-color scales resolve to CSS variables, not baked
  *     literals. `brand` / `accent` / `aurora` come from `tokens.ts` as
  *     `var(--pulse-*, <fallback>)` strings and the glass / page surfaces
@@ -34,9 +36,6 @@ import {
 const config: Config = {
     darkMode: ["selector", '[data-color-scheme="dark"]'],
     content: ["./index.html", "./src/**/*.{ts,tsx}"],
-    corePlugins: {
-        preflight: false
-    },
     theme: {
         extend: {
             colors: {
@@ -47,8 +46,8 @@ const config: Config = {
                  * `<alpha-value>` opacity modifiers (`bg-primary/90`,
                  * `bg-muted/50`) resolve and dark mode flips via the
                  * `[data-color-scheme="dark"]` selector. Namespaced `--ui-`
-                 * so they never collide with the `--pulse-*` / `--ant-*`
-                 * runtime palette vars the AntD surface still reads.
+                 * so they never collide with the `--pulse-*` runtime
+                 * palette vars the page chrome reads.
                  */
                 background: "hsl(var(--ui-background) / <alpha-value>)",
                 foreground: "hsl(var(--ui-foreground) / <alpha-value>)",

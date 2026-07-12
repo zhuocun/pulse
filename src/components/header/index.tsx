@@ -77,7 +77,7 @@ export const resolveMobileHeaderTitle = (path: string): string | null => {
 const HEADER_CLASS = cn(
     "sticky top-0 z-10 flex items-center justify-between gap-xs",
     "[background:var(--glass-surface-subtle)] [border-bottom:1px_solid_var(--glass-border)]",
-    "[backdrop-filter:var(--ant-backdrop-filter-glass)] [-webkit-backdrop-filter:var(--ant-backdrop-filter-glass)]",
+    "[backdrop-filter:var(--pulse-backdrop-filter-glass)] [-webkit-backdrop-filter:var(--pulse-backdrop-filter-glass)]",
     "[view-transition-name:pulse-header]",
     "[padding:2px_12px]",
     "[padding-block-start:max(2px,env(safe-area-inset-top))]",
@@ -124,8 +124,8 @@ const PILL_TRIGGER_CLASS = cn(
     "rounded-pill border-none bg-transparent [color:inherit] [font:inherit] cursor-pointer",
     "will-change-transform",
     "[transition:background-color_120ms_ease-out,color_120ms_ease-out,transform_var(--motion-gel-flex,220ms)_var(--easing-spring-snap,ease-out)]",
-    "hover:[background:var(--ant-color-bg-text-hover,rgba(15,23,42,0.05))]",
-    "focus-visible:[background:var(--ant-color-bg-text-hover,rgba(15,23,42,0.05))]",
+    "hover:[background:var(--pulse-bg-text-hover,rgba(15,23,42,0.05))]",
+    "focus-visible:[background:var(--pulse-bg-text-hover,rgba(15,23,42,0.05))]",
     "active:scale-[0.97]",
     "motion-reduce:[transition:background-color_120ms_ease-out,color_120ms_ease-out] motion-reduce:active:scale-100",
     "coarse:h-[44px]"
@@ -138,11 +138,11 @@ const PILL_TRIGGER_CLASS = cn(
  */
 const ICON_BUTTON_CLASS = cn(
     "inline-flex h-9 w-9 items-center justify-center p-0 rounded-md",
-    "[color:var(--ant-color-text-secondary,rgba(15,23,42,0.65))]",
+    "[color:var(--pulse-text-secondary,rgba(15,23,42,0.65))]",
     "border-none bg-transparent cursor-pointer will-change-transform",
     "[transition:background-color_120ms_ease-out,color_120ms_ease-out,transform_var(--motion-gel-flex,220ms)_var(--easing-spring-snap,ease-out)]",
-    "hover:[background:var(--ant-color-bg-text-hover,rgba(15,23,42,0.05))] hover:[color:var(--ant-color-text,rgba(15,23,42,0.9))]",
-    "focus-visible:[background:var(--ant-color-bg-text-hover,rgba(15,23,42,0.05))] focus-visible:[color:var(--ant-color-text,rgba(15,23,42,0.9))]",
+    "hover:[background:var(--pulse-bg-text-hover,rgba(15,23,42,0.05))] hover:[color:var(--pulse-text-base,rgba(15,23,42,0.9))]",
+    "focus-visible:[background:var(--pulse-bg-text-hover,rgba(15,23,42,0.05))] focus-visible:[color:var(--pulse-text-base,rgba(15,23,42,0.9))]",
     "active:scale-[0.97]",
     "motion-reduce:[transition:background-color_120ms_ease-out,color_120ms_ease-out] motion-reduce:active:scale-100",
     "coarse:h-[44px] coarse:w-[44px]",
@@ -175,12 +175,12 @@ const BRAND_LINK_CLASS = cn(
 const NAV_TAB_CLASS = cn(
     "inline-flex items-center gap-xxs h-8 px-sm rounded-pill no-underline whitespace-nowrap",
     "text-sm font-medium leading-tight",
-    "[color:var(--ant-color-text-secondary,rgba(15,23,42,0.65))]",
+    "[color:var(--pulse-text-secondary,rgba(15,23,42,0.65))]",
     "[transition:background-color_120ms_ease-out,color_120ms_ease-out]",
-    "hover:[background:var(--ant-color-bg-text-hover,rgba(15,23,42,0.05))] hover:[color:var(--ant-color-text,rgba(15,23,42,0.9))]",
-    "focus-visible:[background:var(--ant-color-bg-text-hover,rgba(15,23,42,0.05))] focus-visible:[color:var(--ant-color-text,rgba(15,23,42,0.9))]",
-    "aria-[current=page]:[background:var(--ant-color-bg-text-active,rgba(15,23,42,0.08))]",
-    "aria-[current=page]:[color:var(--ant-color-text,rgba(15,23,42,0.95))]",
+    "hover:[background:var(--pulse-bg-text-hover,rgba(15,23,42,0.05))] hover:[color:var(--pulse-text-base,rgba(15,23,42,0.9))]",
+    "focus-visible:[background:var(--pulse-bg-text-hover,rgba(15,23,42,0.05))] focus-visible:[color:var(--pulse-text-base,rgba(15,23,42,0.9))]",
+    "aria-[current=page]:[background:var(--pulse-bg-text-active,rgba(15,23,42,0.08))]",
+    "aria-[current=page]:[color:var(--pulse-text-base,rgba(15,23,42,0.95))]",
     "aria-[current=page]:font-semibold",
     "forced-colors:aria-[current=page]:border forced-colors:aria-[current=page]:border-[CanvasText]",
     "coarse:h-[44px]",
@@ -235,8 +235,8 @@ const AgentHealthBadge: React.FC = () => {
             className={cn(
                 "inline-block size-2 flex-none rounded-full",
                 status === "offline"
-                    ? "[background:var(--ant-color-error,#EF4444)]"
-                    : "[background:var(--ant-color-warning,#F59E0B)]"
+                    ? "[background:var(--pulse-error,#EF4444)]"
+                    : "[background:var(--pulse-warning,#F59E0B)]"
             )}
             role="img"
             title={label}
@@ -372,7 +372,7 @@ const Header: React.FC = () => {
                         className={cn(
                             "max-w-full overflow-hidden text-ellipsis whitespace-nowrap",
                             "text-md font-semibold leading-tight tracking-tight",
-                            "[color:var(--ant-color-text,rgba(15,23,42,0.9))]",
+                            "[color:var(--pulse-text-base,rgba(15,23,42,0.9))]",
                             "motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1"
                         )}
                         key={mobileTitle}
@@ -473,7 +473,7 @@ const Header: React.FC = () => {
                                 </span>
                                 <ChevronDown
                                     aria-hidden
-                                    className="hidden size-[10px] md:inline [color:var(--ant-color-text-tertiary,rgba(15,23,42,0.45))]"
+                                    className="hidden size-[10px] md:inline [color:var(--pulse-text-tertiary,rgba(15,23,42,0.45))]"
                                 />
                             </button>
                         </PopoverTrigger>

@@ -272,7 +272,7 @@ const TrashDrawer: React.FC<TrashDrawerProps> = ({
                                 <Typography.Text className="text-sm font-medium break-words">
                                     {trashedTask.taskName}
                                 </Typography.Text>
-                                <Typography.Text className="text-xs [color:var(--ant-color-text-tertiary,rgba(15,23,42,0.45))]">
+                                <Typography.Text className="text-xs [color:var(--pulse-text-tertiary,rgba(15,23,42,0.45))]">
                                     {trashedTask.type}
                                 </Typography.Text>
                             </div>

@@ -43,7 +43,7 @@ describe("ProjectDetailPage breadcrumb", () => {
         expect(detailSource).not.toMatch(/\b5\s+px\b/);
         expect(detailSource).toMatch(/shadow\.sm/);
 
-        const { container } = renderAt("/projects/project-1");
+        renderAt("/projects/project-1");
 
         const chrome = screen.getByTestId("project-detail-chrome");
         const chromeStyles = getComputedStyle(chrome);
@@ -51,14 +51,16 @@ describe("ProjectDetailPage breadcrumb", () => {
             expect(chromeStyles.boxShadow).not.toMatch(/5\s+px/);
         }
 
-        const crumb = container.querySelector(".ant-breadcrumb");
+        const crumb = screen.getByTestId("project-breadcrumb");
         expect(crumb).toBeTruthy();
-        const projectsLink = within(crumb as HTMLElement).getByRole("link", {
+        expect(crumb.tagName).toBe("NAV");
+        expect(crumb).toHaveAttribute("aria-label", "Breadcrumb");
+        const projectsLink = within(crumb).getByRole("link", {
             name: "Projects"
         });
         expect(projectsLink).toHaveAttribute("href", "/projects");
 
-        const current = within(crumb as HTMLElement).getByText("Atlas");
+        const current = within(crumb).getByText("Atlas");
         expect(current).toHaveAttribute("aria-current", "page");
 
         expect(screen.getByTestId("location")).toHaveTextContent(
