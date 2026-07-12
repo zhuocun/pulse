@@ -223,7 +223,7 @@ const BottomTabBar: React.FC = () => {
                 // Top-leading specular rim + companion bottom-trailing trough.
                 "before:pointer-events-none before:absolute before:inset-0 before:z-0 before:rounded-[inherit] before:bg-[image:var(--glass-specular-top)] before:content-['']",
                 "after:pointer-events-none after:absolute after:inset-0 after:z-0 after:rounded-[inherit] after:bg-[image:var(--glass-specular-bottom)] after:content-['']",
-                "[&>*]:relative [&>*]:z-[1]",
+                "[&>a]:relative [&>a]:z-[1] [&>button]:relative [&>button]:z-[1]",
                 "[@media(prefers-reduced-transparency:reduce)]:[background:var(--page-background)]",
                 "[@media(prefers-reduced-transparency:reduce)]:[background-attachment:fixed]",
                 "[@media(prefers-reduced-transparency:reduce)]:[backdrop-filter:none]",

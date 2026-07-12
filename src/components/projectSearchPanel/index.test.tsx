@@ -134,36 +134,69 @@ describe("ProjectSearchPanel", () => {
         expect(screen.getAllByText("Bob").length).toBeGreaterThanOrEqual(1);
     });
 
-    it("renders manager options and updates the manager id on selection", async () => {
+    it("keeps the manager Select controlled through selection and clear", async () => {
         const setParam = jest.fn();
         const param = { projectName: "Roadmap", managerId: "" };
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+        try {
+            const { rerender } = render(
+                <ProjectSearchPanel
+                    loading={false}
+                    members={members}
+                    param={param}
+                    setParam={setParam}
+                />
+            );
 
-        render(
-            <ProjectSearchPanel
-                loading={false}
-                members={members}
-                param={param}
-                setParam={setParam}
-            />
-        );
+            const menuUser = userEvent.setup();
+            openAdvancedFilters();
+            const manager = screen.getByTestId("project-search-panel-manager");
+            expect(manager).toHaveTextContent("Managers");
+            await menuUser.click(manager);
+            expect(
+                await screen.findByRole("option", { name: "Alice" })
+            ).toBeInTheDocument();
+            await menuUser.click(screen.getByRole("option", { name: "Bob" }));
+            expect(setParam).toHaveBeenLastCalledWith({
+                managerId: "u2",
+                projectName: "Roadmap"
+            });
 
-        const menuUser = userEvent.setup();
-        openAdvancedFilters();
-        await menuUser.click(screen.getByRole("combobox"));
+            rerender(
+                <ProjectSearchPanel
+                    loading={false}
+                    members={members}
+                    param={{ ...param, managerId: "u2" }}
+                    setParam={setParam}
+                />
+            );
+            expect(manager).toHaveTextContent("Bob");
+            await menuUser.click(manager);
+            await menuUser.click(
+                await screen.findByRole("option", { name: "Managers" })
+            );
+            expect(setParam).toHaveBeenLastCalledWith({
+                managerId: "",
+                projectName: "Roadmap"
+            });
 
-        expect(
-            await screen.findByRole("option", { name: "Managers" })
-        ).toBeInTheDocument();
-        expect(
-            screen.getByRole("option", { name: "Alice" })
-        ).toBeInTheDocument();
-
-        await menuUser.click(screen.getByRole("option", { name: "Bob" }));
-
-        expect(setParam).toHaveBeenCalledWith({
-            managerId: "u2",
-            projectName: "Roadmap"
-        });
+            rerender(
+                <ProjectSearchPanel
+                    loading={false}
+                    members={members}
+                    param={param}
+                    setParam={setParam}
+                />
+            );
+            expect(manager).toHaveTextContent("Managers");
+            expect(warn).not.toHaveBeenCalledWith(
+                expect.stringContaining(
+                    "changing from uncontrolled to controlled"
+                )
+            );
+        } finally {
+            warn.mockRestore();
+        }
     });
 
     it("shows the placeholder and loading state while managers load", () => {

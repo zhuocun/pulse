@@ -56,11 +56,29 @@ const ADD_COLUMN_BUTTON_CLASS = cn(
 // input starts there and only a deliberate positive value enforces a cap.
 const DEFAULT_WIP_LIMIT = 0;
 
-const ColumnCreator: React.FC = () => {
+interface ColumnCreatorProps {
+    editing?: boolean;
+    onEditingChange?: (editing: boolean) => void;
+}
+
+const ColumnCreator: React.FC<ColumnCreatorProps> = ({
+    editing: controlledEditing,
+    onEditingChange
+}) => {
     const [columnName, setColumnName] = useState("");
     const [category, setCategory] = useState<ColumnCategory>(DEFAULT_CATEGORY);
     const [wipLimit, setWipLimit] = useState<number>(DEFAULT_WIP_LIMIT);
-    const [editing, setEditing] = useState(false);
+    const [uncontrolledEditing, setUncontrolledEditing] = useState(false);
+    const editing = controlledEditing ?? uncontrolledEditing;
+    const setEditing = useCallback(
+        (next: boolean) => {
+            if (controlledEditing === undefined) {
+                setUncontrolledEditing(next);
+            }
+            onEditingChange?.(next);
+        },
+        [controlledEditing, onEditingChange]
+    );
     const inputRef = useRef<HTMLInputElement>(null);
     const { projectId } = useParams<{ projectId: string }>();
     const { mutateAsync, isLoading } = useReactMutation<IColumn>(
@@ -88,7 +106,7 @@ const ColumnCreator: React.FC = () => {
         setColumnName("");
         setCategory(DEFAULT_CATEGORY);
         setWipLimit(DEFAULT_WIP_LIMIT);
-    }, []);
+    }, [setEditing]);
 
     const submit = async () => {
         const trimmed = columnName.trim();

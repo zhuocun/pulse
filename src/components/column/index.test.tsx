@@ -229,8 +229,10 @@ const renderColumn = ({
     param = defaultParam,
     boardDensity = "comfortable",
     labels = [],
+    members = [],
     milestones = [],
     selection = false,
+    suppressFilteredEmptyHint = false,
     tasks = [
         task(),
         task({
@@ -254,8 +256,10 @@ const renderColumn = ({
     boardAiOn?: boolean;
     boardDensity?: "comfortable" | "compact";
     labels?: ILabel[];
+    members?: IMember[];
     milestones?: IMilestone[];
     selection?: boolean;
+    suppressFilteredEmptyHint?: boolean;
 } = {}) => {
     // The component calls `useReactMutation` several times: the column
     // DELETE (endpoint="boards", method="DELETE"), the column re-create
@@ -294,8 +298,10 @@ const renderColumn = ({
             dragDisabledByFilters={dragDisabledByFilters}
             isDragDisabled={isDragDisabled}
             labels={labels}
+            members={members}
             milestones={milestones}
             param={param}
+            suppressFilteredEmptyHint={suppressFilteredEmptyHint}
             taskDragDisabled={taskDragDisabled}
             tasks={tasks}
         />
@@ -550,6 +556,9 @@ describe("Column", () => {
                 jest.runAllTimers();
             });
 
+            expect(
+                screen.getByRole("button", { name: "Open task Build task" })
+            ).toHaveFocus();
             // openTask is wired; the legacy modal-opening startEditing is
             // not called at all when the flag is on.
             expect(openTask).toHaveBeenCalledTimes(1);
@@ -707,6 +716,20 @@ describe("Column", () => {
 
     it("does not show the filtered-empty hint when the column has no tasks at all", () => {
         renderColumn({ tasks: [] });
+
+        expect(
+            screen.queryByText("No tasks match the current filters")
+        ).not.toBeInTheDocument();
+    });
+
+    it("suppresses the local filtered-empty hint when the board owns recovery", () => {
+        renderColumn({
+            param: {
+                ...defaultParam,
+                taskName: "no-such-task"
+            },
+            suppressFilteredEmptyHint: true
+        });
 
         expect(
             screen.queryByText("No tasks match the current filters")
@@ -1565,6 +1588,56 @@ describe("Column", () => {
                 "aria-label",
                 microcopy.a11y.milestoneTask.replace("{name}", "Beta launch")
             );
+        });
+
+        it("bounds and wraps rich metadata while keeping points and assignee together", () => {
+            const longMilestoneName =
+                "Internationalized launch readiness milestone";
+            renderColumn({
+                members: [
+                    {
+                        _id: "member-1",
+                        email: "maya@example.com",
+                        username: "Maya Chen"
+                    }
+                ],
+                milestones: [
+                    milestone({
+                        name: longMilestoneName
+                    })
+                ],
+                tasks: [
+                    task({
+                        blockedBy: ["task-blocker"],
+                        milestoneId: "milestone-1",
+                        priority: "urgent",
+                        storyPoints: 8
+                    })
+                ]
+            });
+
+            expect(screen.getByTestId("task-card-footer")).toHaveClass(
+                "min-w-0"
+            );
+            expect(screen.getByTestId("task-card-meta")).toHaveClass(
+                "min-w-0",
+                "flex-wrap"
+            );
+            const milestoneBadge = screen.getByTestId("task-card-milestone");
+            expect(milestoneBadge).toHaveAttribute("title", longMilestoneName);
+            expect(milestoneBadge).toHaveClass(
+                "min-w-0",
+                "overflow-hidden",
+                "flex-[1_1_8ch]"
+            );
+            const trailing = screen.getByTestId("task-card-trailing-meta");
+            expect(trailing).toHaveClass("shrink-0", "whitespace-nowrap");
+            expect(trailing).toHaveTextContent("8 pts");
+            expect(
+                screen.getByRole("button", {
+                    name: "Open task Build task"
+                })
+            ).toHaveTextContent("Task");
         });
 
         it("renders NO milestone badge when the task has no milestoneId", () => {

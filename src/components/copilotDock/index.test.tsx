@@ -320,6 +320,46 @@ describe("CopilotDock", () => {
         });
     });
 
+    it("keeps inactive desktop panes mounted but removes them from layout", async () => {
+        renderControlled({ initialTab: "chat" });
+
+        const panes = () =>
+            Array.from(
+                document.querySelectorAll<HTMLElement>("[role=tabpanel]")
+            );
+        expect(panes()).toHaveLength(3);
+        expect(
+            panes().every((pane) =>
+                pane.className.includes("data-[state=inactive]:hidden")
+            )
+        ).toBe(true);
+        expect(
+            panes().filter((pane) => pane.dataset.state === "active")
+        ).toHaveLength(1);
+
+        fireEvent.mouseDown(
+            screen.getByRole("tab", {
+                name: microcopy.copilotDock.inboxTab.title as string
+            })
+        );
+
+        await waitFor(() => {
+            expect(
+                screen.getByRole("tab", {
+                    name: microcopy.copilotDock.inboxTab.title as string,
+                    selected: true
+                })
+            ).toBeInTheDocument();
+        });
+        expect(panes()).toHaveLength(3);
+        expect(
+            panes().filter((pane) => pane.dataset.state === "active")
+        ).toHaveLength(1);
+        expect(
+            panes().filter((pane) => pane.dataset.state === "inactive")
+        ).toHaveLength(2);
+    });
+
     it("renders the chat composer when the Chat tab is active", async () => {
         renderDock({ activeTab: "chat" });
 

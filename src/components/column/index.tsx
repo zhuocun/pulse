@@ -172,7 +172,11 @@ const FILTERED_EMPTY_BUTTON_CLASS = cn(
     "coarse:min-h-[44px] coarse:px-sm coarse:py-xs"
 );
 
-const CARD_META_CLASS = "inline-flex items-center gap-xs";
+const CARD_META_CLASS =
+    "flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-xs gap-y-xxs";
+
+const CARD_TRAILING_META_CLASS =
+    "inline-flex shrink-0 items-center gap-xs whitespace-nowrap";
 
 const CARD_TITLE_CLASS = cn(
     "line-clamp-2 font-medium leading-[1.4] text-foreground [word-break:break-word]",
@@ -180,7 +184,7 @@ const CARD_TITLE_CLASS = cn(
 );
 
 const CARD_FOOTER_CLASS =
-    "flex items-center justify-between gap-xs text-muted-foreground [font-size:var(--density-card-footer-fs,12px)]";
+    "flex min-w-0 items-start gap-xs text-muted-foreground [font-size:var(--density-card-footer-fs,12px)]";
 
 /**
  * Overdue rule: the task carries a `dueDate` whose LOCAL calendar date is
@@ -762,6 +766,7 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
             }
             openTimerRef.current = setTimeout(() => {
                 openTimerRef.current = null;
+                cardRef.current?.focus();
                 onOpen();
             }, 250);
         }, [onOpen]);
@@ -887,11 +892,14 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                         {task.taskName}
                     </div>
                 )}
-                <div className={CARD_FOOTER_CLASS}>
+                <div
+                    className={CARD_FOOTER_CLASS}
+                    data-testid="task-card-footer"
+                >
                     {/* The label "Bug"/"Task" reads as the visible text and
                      * the icon is decorative, so no Tooltip is needed. */}
                     <span
-                        className="inline-flex items-center gap-xxs font-medium"
+                        className="inline-flex shrink-0 items-center gap-xxs font-medium"
                         style={{
                             color: isBug
                                 ? "#DB2777"
@@ -915,7 +923,10 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                                 : microcopy.options.taskTypes.task}
                         </span>
                     </span>
-                    <span className={CARD_META_CLASS}>
+                    <span
+                        className={CARD_META_CLASS}
+                        data-testid="task-card-meta"
+                    >
                         {completed ? (
                             <span
                                 aria-label={completedLabel}
@@ -976,7 +987,7 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                         {task.milestoneId && milestone ? (
                             <span
                                 aria-label={milestoneLabel}
-                                className="inline-flex min-w-0 max-w-[12ch] items-center gap-xxs overflow-hidden whitespace-nowrap font-medium text-muted-foreground [&>span]:overflow-hidden [&>span]:text-ellipsis [&_svg]:size-4"
+                                className="inline-flex min-w-0 max-w-[12ch] flex-[1_1_8ch] items-center gap-xxs overflow-hidden whitespace-nowrap font-medium text-muted-foreground [&>span]:overflow-hidden [&>span]:text-ellipsis [&_svg]:size-4"
                                 data-testid="task-card-milestone"
                                 title={milestone.name}
                             >
@@ -987,39 +998,51 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                         {strength ? (
                             <AiMatchStrengthBadge strength={strength} />
                         ) : null}
-                        {typeof task.storyPoints === "number" ? (
-                            <Badge
-                                className="m-0 font-semibold tabular-nums"
-                                variant="secondary"
+                        {typeof task.storyPoints === "number" || coordinator ? (
+                            <span
+                                className={CARD_TRAILING_META_CLASS}
+                                data-testid="task-card-trailing-meta"
                             >
-                                {microcopy.brief.markdownStoryPoints.replace(
-                                    "{count}",
-                                    String(task.storyPoints)
-                                )}
-                            </Badge>
-                        ) : null}
-                        {coordinator ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <span className="inline-flex">
-                                        <UserAvatar
-                                            aria-label={formatTemplate(
+                                {typeof task.storyPoints === "number" ? (
+                                    <Badge
+                                        className="m-0 font-semibold tabular-nums"
+                                        variant="secondary"
+                                    >
+                                        {microcopy.brief.markdownStoryPoints.replace(
+                                            "{count}",
+                                            String(task.storyPoints)
+                                        )}
+                                    </Badge>
+                                ) : null}
+                                {coordinator ? (
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className="inline-flex">
+                                                <UserAvatar
+                                                    aria-label={formatTemplate(
+                                                        microcopy.a11y
+                                                            .assignedTo as string,
+                                                        {
+                                                            name: coordinator.username
+                                                        }
+                                                    )}
+                                                    id={coordinator._id}
+                                                    name={coordinator.username}
+                                                />
+                                            </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            {formatTemplate(
                                                 microcopy.a11y
                                                     .assignedTo as string,
-                                                { name: coordinator.username }
+                                                {
+                                                    name: coordinator.username
+                                                }
                                             )}
-                                            id={coordinator._id}
-                                            name={coordinator.username}
-                                        />
-                                    </span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    {formatTemplate(
-                                        microcopy.a11y.assignedTo as string,
-                                        { name: coordinator.username }
-                                    )}
-                                </TooltipContent>
-                            </Tooltip>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                ) : null}
+                            </span>
                         ) : null}
                     </span>
                 </div>
@@ -1104,6 +1127,7 @@ type ColumnComponentProps = React.HTMLAttributes<HTMLDivElement> & {
     /** Project milestones, threaded down to each card to resolve `milestoneId`. */
     milestones?: IMilestone[];
     onResetFilters?: () => void;
+    suppressFilteredEmptyHint?: boolean;
 };
 
 const ColumnComponent = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
@@ -1120,6 +1144,7 @@ const ColumnComponent = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
             labels = [],
             milestones = [],
             onResetFilters,
+            suppressFilteredEmptyHint = false,
             className,
             style,
             ...props
@@ -1395,7 +1420,8 @@ const ColumnComponent = React.forwardRef<HTMLDivElement, ColumnComponentProps>(
                                     columnId={column._id}
                                     disabled={isDragDisabled}
                                 />
-                                {hasTasksHiddenByFilter ? (
+                                {hasTasksHiddenByFilter &&
+                                !suppressFilteredEmptyHint ? (
                                     <div
                                         aria-live="polite"
                                         className={FILTERED_EMPTY_CLASS}

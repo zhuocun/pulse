@@ -22,7 +22,7 @@ const LoginPage = () => {
             <p className={SWITCH_ROW_CLASS}>
                 {microcopy.auth.switchToRegister}{" "}
                 <Link
-                    className="[color:var(--pulse-link)]"
+                    className="[color:var(--pulse-link)] coarse:inline-flex coarse:min-h-[44px] coarse:items-center"
                     state={location.state}
                     to="/register"
                 >

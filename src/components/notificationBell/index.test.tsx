@@ -80,6 +80,9 @@ describe("NotificationBell", () => {
         expect(bell).toHaveAccessibleName(
             microcopy.notifications.bellAriaLabelZero
         );
+        expect(bell).toHaveClass("focus-visible:ring-2");
+        expect(bell).toHaveClass("focus-visible:ring-ring");
+        expect(bell).toHaveClass("focus-visible:ring-offset-2");
     });
 
     it("renders the unread count in the badge and the singular aria-label", () => {

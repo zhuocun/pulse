@@ -3,6 +3,7 @@ import {
     fireEvent,
     render,
     screen,
+    within,
     waitFor
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -540,6 +541,49 @@ describe("BoardPage", () => {
         ).toBeInTheDocument();
     });
 
+    it("renders one board-wide recovery action when filters match no tasks", async () => {
+        renderBoard(
+            "/projects/project-1/board?taskName=definitely-no-such-task&lens=mine"
+        );
+
+        expect(await screen.findByText("Roadmap")).toBeInTheDocument();
+        const recovery = await screen.findByTestId("board-filtered-empty");
+        expect(
+            screen.getAllByText("No tasks match the current filters")
+        ).toHaveLength(1);
+        const reset = within(recovery).getByRole("button", {
+            name: "Reset filters"
+        });
+        fireEvent.click(reset);
+
+        await waitFor(() => {
+            expect(
+                screen.queryByTestId("board-filtered-empty")
+            ).not.toBeInTheDocument();
+            expect(screen.getByText("Build task")).toBeInTheDocument();
+            expect(screen.getByText("Fix bug")).toBeInTheDocument();
+            expect(screen.getByTestId("current-search")).not.toHaveTextContent(
+                "taskName"
+            );
+            expect(screen.getByTestId("current-search")).not.toHaveTextContent(
+                "lens"
+            );
+        });
+    });
+
+    it("preserves a local empty-column hint when another column has a match", async () => {
+        renderBoard("/projects/project-1/board?taskName=Build");
+
+        expect(await screen.findByText("Roadmap")).toBeInTheDocument();
+        expect(screen.getByText("Build task")).toBeInTheDocument();
+        expect(
+            screen.queryByTestId("board-filtered-empty")
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getAllByText("No tasks match the current filters")
+        ).toHaveLength(1);
+    });
+
     it("opens the task modal when the Redux store has an editingTaskId", async () => {
         renderBoard();
         store.dispatch(overlaysActions.startEditingTask("task-1"));
@@ -584,7 +628,7 @@ describe("BoardPage", () => {
         });
     });
 
-    it("renders an empty board with a first-column CTA and fallback creator", async () => {
+    it("uses the first-column CTA as the empty board's only creation trigger", async () => {
         fetchMock.mockImplementation((input) => {
             const url = String(input);
 
@@ -611,14 +655,17 @@ describe("BoardPage", () => {
             screen.getByRole("button", { name: "Create your first column" })
         ).toBeInTheDocument();
         expect(
-            screen.getByRole("button", { name: "Add column" })
-        ).toBeInTheDocument();
+            screen.queryByRole("button", { name: "Add column" })
+        ).not.toBeInTheDocument();
         fireEvent.click(
             screen.getByRole("button", { name: "Create your first column" })
         );
+        const input = await screen.findByLabelText("New column name");
+        expect(input).toBeInTheDocument();
+        expect(input).toHaveFocus();
         expect(
-            await screen.findByLabelText("New column name")
-        ).toBeInTheDocument();
+            screen.queryByRole("button", { name: "Add column" })
+        ).not.toBeInTheDocument();
         expect(
             screen.queryByRole("heading", { level: 4 })
         ).not.toBeInTheDocument();

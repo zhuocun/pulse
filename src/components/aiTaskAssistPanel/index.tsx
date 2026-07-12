@@ -1146,7 +1146,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                                                       : "info";
                                             return (
                                                 <Alert
-                                                    className="relative mb-xxs"
+                                                    className="relative mb-xxs coarse:pr-16"
                                                     key={`${issue.field}-${issue.message}`}
                                                     variant={severityVariant(
                                                         issueSeverity
@@ -1190,7 +1190,7 @@ const AiTaskAssistPanel: React.FC<AiTaskAssistPanelProps> = ({
                                                             microcopy.actions
                                                                 .close
                                                         }
-                                                        className="absolute right-sm top-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                        className="absolute right-sm top-md inline-flex size-8 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:size-11"
                                                         onClick={() => {
                                                             setDismissedKeys(
                                                                 (prev) => {

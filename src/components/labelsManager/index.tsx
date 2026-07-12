@@ -1,6 +1,7 @@
-import { Pencil, Trash2 } from "lucide-react";
+import { AlertCircle, Pencil, Trash2 } from "lucide-react";
 import React, { useCallback, useMemo, useState } from "react";
 
+import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -221,6 +222,8 @@ const LabelsManager: React.FC<LabelsManagerProps> = ({ projectId }) => {
     const {
         labels: labelData,
         isLoading,
+        isError,
+        refetch,
         createLabel,
         isCreating,
         updateLabel,
@@ -241,16 +244,10 @@ const LabelsManager: React.FC<LabelsManagerProps> = ({ projectId }) => {
         [rosterData]
     );
 
-    // The list query has no `isError` flag (it shares `useLabels`'s read
-    // path, which normalizes a non-array payload to `undefined`); a hard
-    // fetch failure surfaces as a still-loading state that never
-    // resolves, so we lean on the skeleton + empty hint rather than a
-    // dedicated error alert. Reuse the same role mechanism the members /
-    // milestones managers use: the project manager is an implicit owner,
-    // otherwise the caller's roster role must be editor-or-above. Fail
-    // closed until both the project (for `managerId`) and the caller
-    // identity have resolved so a cold deep-link race can't briefly
-    // expose writes that would 403.
+    // Reuse the same role mechanism the members / milestones managers use:
+    // the project manager is an implicit owner, otherwise the caller's roster
+    // role must be editor-or-above. Fail closed until both the project and
+    // caller identity resolve so a cold deep-link cannot briefly expose writes.
     const canManage = useMemo(() => {
         if (!currentUserId) return false;
         if (!project) return false;
@@ -324,13 +321,65 @@ const LabelsManager: React.FC<LabelsManagerProps> = ({ projectId }) => {
         [message, removeLabel]
     );
 
+    if (isError) {
+        return (
+            <Alert data-testid="labels-load-error" variant="destructive">
+                <AlertCircle aria-hidden />
+                <AlertTitle>
+                    {microcopyString(microcopy.projectLabels.loadError)}
+                </AlertTitle>
+                <div className="mt-sm">
+                    <Button
+                        onClick={() => void refetch()}
+                        size="sm"
+                        variant="primary"
+                    >
+                        {microcopy.actions.retry}
+                    </Button>
+                </div>
+            </Alert>
+        );
+    }
+
     if (isLoading && labels.length === 0) {
         return (
-            <div className="flex flex-col gap-xs" data-testid="labels-loading">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-2/3" />
-            </div>
+            <section
+                className="flex flex-col gap-md"
+                data-testid="labels-loading"
+            >
+                <div className="flex flex-col gap-xs">
+                    {[0, 1, 2].map((index) => (
+                        <div
+                            className="flex items-center gap-sm rounded-md border border-border p-sm"
+                            data-testid="label-skeleton-row"
+                            key={index}
+                        >
+                            <div className="min-w-0 flex-1">
+                                <Skeleton className="h-6 w-32 max-w-full rounded-full" />
+                            </div>
+                            {canManage ? (
+                                <div className="ms-auto flex items-center gap-xs">
+                                    <Skeleton className="size-9 rounded-md" />
+                                    <Skeleton className="size-9 rounded-md" />
+                                </div>
+                            ) : null}
+                        </div>
+                    ))}
+                </div>
+                {canManage ? (
+                    <div
+                        className="flex flex-col gap-xs border-t border-border pt-md"
+                        data-testid="label-add-skeleton"
+                    >
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-10 w-full rounded-md" />
+                        <div className="flex items-center gap-xs">
+                            <Skeleton className="h-10 flex-1 rounded-md" />
+                            <Skeleton className="h-10 w-24 rounded-md" />
+                        </div>
+                    </div>
+                ) : null}
+            </section>
         );
     }
 
@@ -367,8 +416,10 @@ const LabelsManager: React.FC<LabelsManagerProps> = ({ projectId }) => {
                             >
                                 <div className="flex min-w-0 flex-[1_1_12rem] items-center gap-sm">
                                     <Badge
+                                        className="max-w-full min-w-0 truncate"
                                         data-testid="label-chip"
                                         style={chipStyle(label.color)}
+                                        title={label.name}
                                         variant="outline"
                                     >
                                         {label.name}

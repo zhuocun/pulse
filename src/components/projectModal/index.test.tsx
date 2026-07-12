@@ -157,6 +157,17 @@ const renderProjectModal = (
                             path="/projects"
                             element={
                                 <>
+                                    <button
+                                        data-testid="project-modal-opener"
+                                        onClick={() =>
+                                            store.dispatch(
+                                                projectActions.openModal()
+                                            )
+                                        }
+                                        type="button"
+                                    >
+                                        Open project modal
+                                    </button>
                                     <ProjectModal />
                                     <LocationProbe />
                                 </>
@@ -303,6 +314,49 @@ describe("ProjectModal", () => {
             screen.getByText(zhCN.placeholders.selectManager)
         ).toBeInTheDocument();
         expect(screen.queryByText(/Select a manager/i)).not.toBeInTheDocument();
+    });
+
+    it("renders the desktop Manager list above the dialog overlay", async () => {
+        const user = userEvent.setup();
+        renderProjectModal({ type: "open" });
+
+        await screen.findByRole("dialog", { name: "Create project" });
+        await user.click(screen.getByRole("combobox", { name: "Manager" }));
+
+        const listbox = await screen.findByRole("listbox");
+        expect(listbox.className).toContain("z-[1200]");
+        await user.click(screen.getByRole("option", { name: "Alice" }));
+        expect(
+            screen.getByRole("combobox", { name: "Manager" })
+        ).toHaveTextContent("Alice");
+    });
+
+    it("opens the phone project form at the large detent", async () => {
+        const originalMatchMedia = window.matchMedia;
+        Object.defineProperty(window, "matchMedia", {
+            writable: true,
+            value: (query: string) => ({
+                addEventListener: jest.fn(),
+                addListener: jest.fn(),
+                dispatchEvent: jest.fn(),
+                matches: query === "(pointer: coarse)",
+                media: query,
+                onchange: null,
+                removeEventListener: jest.fn(),
+                removeListener: jest.fn()
+            })
+        });
+
+        renderProjectModal({ type: "open" });
+
+        expect(await screen.findByTestId("sheet-surface")).toHaveAttribute(
+            "data-detent",
+            "large"
+        );
+        Object.defineProperty(window, "matchMedia", {
+            writable: true,
+            value: originalMatchMedia
+        });
     });
 
     it("validates required create fields", async () => {
@@ -473,6 +527,85 @@ describe("ProjectModal", () => {
         );
     });
 
+    it("restores the connected opener after a clean close", async () => {
+        const user = userEvent.setup();
+        renderProjectModal();
+        const opener = screen.getByTestId("project-modal-opener");
+
+        await user.click(opener);
+        await screen.findByRole("dialog", { name: "Create project" });
+        await user.keyboard("{Escape}");
+
+        await waitFor(() =>
+            expect(
+                screen.queryByRole("dialog", { name: "Create project" })
+            ).not.toBeInTheDocument()
+        );
+        await waitFor(() => expect(opener).toHaveFocus());
+    });
+
+    it("restores the opener after confirming a dirty close", async () => {
+        const user = userEvent.setup();
+        renderProjectModal();
+        const opener = screen.getByTestId("project-modal-opener");
+
+        await user.click(opener);
+        await screen.findByRole("dialog", { name: "Create project" });
+        await user.type(screen.getByLabelText("Project name"), "Draft");
+        await user.click(screen.getByRole("button", { name: "Cancel" }));
+        await user.click(
+            await screen.findByRole("button", { name: "Discard" })
+        );
+
+        await waitFor(() =>
+            expect(
+                screen.queryByRole("dialog", { name: "Create project" })
+            ).not.toBeInTheDocument()
+        );
+        await waitFor(() => expect(opener).toHaveFocus());
+    });
+
+    it("keeps focus inside the project form when discard is cancelled", async () => {
+        const user = userEvent.setup();
+        renderProjectModal();
+
+        await user.click(screen.getByTestId("project-modal-opener"));
+        const projectDialog = await screen.findByRole("dialog", {
+            name: "Create project"
+        });
+        await user.type(screen.getByLabelText("Project name"), "Draft");
+        await user.click(screen.getByRole("button", { name: "Cancel" }));
+        await user.click(
+            await screen.findByRole("button", { name: "Keep editing" })
+        );
+
+        await waitFor(() =>
+            expect(
+                screen.queryByRole("dialog", { name: "Discard changes?" })
+            ).not.toBeInTheDocument()
+        );
+        expect(projectDialog.contains(document.activeElement)).toBe(true);
+    });
+
+    it("does not focus a detached opener after close", async () => {
+        const user = userEvent.setup();
+        const opener = document.createElement("button");
+        document.body.appendChild(opener);
+        opener.focus();
+        renderProjectModal({ type: "open" });
+
+        await screen.findByRole("dialog", { name: "Create project" });
+        opener.remove();
+        await user.keyboard("{Escape}");
+
+        await waitFor(() =>
+            expect(
+                screen.queryByRole("dialog", { name: "Create project" })
+            ).not.toBeInTheDocument()
+        );
+        expect(document.body).toHaveFocus();
+    });
+
     it("shows edit loading, populates the form, and updates the project", async () => {
         let resolveProject: (value: Response) => void = () => undefined;
         fetchMock.mockImplementation((input, init) => {
@@ -530,6 +663,119 @@ describe("ProjectModal", () => {
                 )
             ).toBe(true)
         );
+    });
+
+    it("hydrates and submits the existing manager on the coarse-pointer edit branch", async () => {
+        const originalMatchMedia = window.matchMedia;
+        Object.defineProperty(window, "matchMedia", {
+            writable: true,
+            value: (query: string) => ({
+                addEventListener: jest.fn(),
+                addListener: jest.fn(),
+                dispatchEvent: jest.fn(),
+                matches: query === "(pointer: coarse)",
+                media: query,
+                onchange: null,
+                removeEventListener: jest.fn(),
+                removeListener: jest.fn()
+            })
+        });
+        renderProjectModal({ type: "edit", id: "project-1" });
+
+        expect(
+            await screen.findByRole("dialog", { name: "Edit project" })
+        ).toBeInTheDocument();
+        await waitFor(() =>
+            expect(
+                screen.getByRole("combobox", { name: "Manager" })
+            ).toHaveTextContent("Alice")
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        await waitFor(() => {
+            const putCall = fetchMock.mock.calls.find(
+                ([url, init]) =>
+                    String(url).includes("/api/v1/projects") &&
+                    init?.method === "PUT"
+            );
+            expect(putCall).toBeDefined();
+            expect(JSON.parse(putCall![1]!.body as string).managerId).toBe(
+                "member-1"
+            );
+        });
+        Object.defineProperty(window, "matchMedia", {
+            writable: true,
+            value: originalMatchMedia
+        });
+    });
+
+    it("preserves the hydrated manager across a responsive branch remount", async () => {
+        const originalMatchMedia = window.matchMedia;
+        let isCoarse = false;
+        const listeners = new Set<(event: MediaQueryListEvent) => void>();
+        const coarseMedia = {
+            get matches() {
+                return isCoarse;
+            },
+            media: "(pointer: coarse)",
+            onchange: null,
+            addEventListener: (
+                event: string,
+                listener: (event: MediaQueryListEvent) => void
+            ) => {
+                if (event === "change") listeners.add(listener);
+            },
+            removeEventListener: (
+                event: string,
+                listener: (event: MediaQueryListEvent) => void
+            ) => {
+                if (event === "change") listeners.delete(listener);
+            },
+            addListener: jest.fn(),
+            removeListener: jest.fn(),
+            dispatchEvent: jest.fn()
+        } as unknown as MediaQueryList;
+        Object.defineProperty(window, "matchMedia", {
+            writable: true,
+            value: (query: string) =>
+                query === "(pointer: coarse)"
+                    ? coarseMedia
+                    : ({
+                          matches: false,
+                          media: query,
+                          onchange: null,
+                          addEventListener: jest.fn(),
+                          removeEventListener: jest.fn(),
+                          addListener: jest.fn(),
+                          removeListener: jest.fn(),
+                          dispatchEvent: jest.fn()
+                      } as unknown as MediaQueryList)
+        });
+        renderProjectModal({ type: "edit", id: "project-1" });
+
+        await waitFor(() =>
+            expect(
+                screen.getByRole("combobox", { name: "Manager" })
+            ).toHaveTextContent("Alice")
+        );
+        isCoarse = true;
+        act(() => {
+            listeners.forEach((listener) =>
+                listener({ matches: true } as MediaQueryListEvent)
+            );
+        });
+
+        expect(await screen.findByTestId("sheet-surface")).toHaveAttribute(
+            "data-detent",
+            "large"
+        );
+        expect(
+            screen.getByRole("combobox", { name: "Manager" })
+        ).toHaveTextContent("Alice");
+        Object.defineProperty(window, "matchMedia", {
+            writable: true,
+            value: originalMatchMedia
+        });
     });
 
     it("caps the modal body height with env(keyboard-inset-height) AND clamps it via max() so landscape + keyboard cannot produce a negative max-height (Bug 6)", async () => {

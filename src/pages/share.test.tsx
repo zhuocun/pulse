@@ -2,6 +2,7 @@ import "@testing-library/jest-dom";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { message } from "@/components/ui/toast";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -102,6 +103,9 @@ beforeAll(() => {
         writable: true,
         value: ResizeObserverMock
     });
+    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+    Element.prototype.releasePointerCapture = jest.fn();
 });
 
 const LocationProbe = () => {
@@ -243,6 +247,99 @@ describe("SharePage", () => {
                 "/projects/project-1/board"
             )
         );
+    });
+
+    it("keeps both Selects controlled while delayed columns resolve", async () => {
+        let delayedColumns: IColumn[] | undefined;
+        let columnsLoading = true;
+        mockedUseReactQuery.mockImplementation(((
+            endpoint: string,
+            params?: { [key: string]: unknown }
+        ) => {
+            if (endpoint === "projects" && !params) {
+                return stubQuery(projectsFixture) as never;
+            }
+            if (endpoint === "boards") {
+                return stubQuery(delayedColumns, columnsLoading) as never;
+            }
+            return stubQuery(undefined) as never;
+        }) as unknown as typeof mockedUseReactQuery);
+        mockedUseReactMutation.mockReturnValue(stubMutation(jest.fn()));
+        const consoleError = jest.spyOn(console, "error");
+        const consoleWarn = jest.spyOn(console, "warn");
+
+        renderShare("/share?title=Ship%20it");
+
+        const projectSelect = screen.getByLabelText(
+            microcopy.share.projectLabel
+        );
+        const columnSelect = screen.getByLabelText(microcopy.share.columnLabel);
+        await waitFor(() => expect(projectSelect).toHaveTextContent("Atlas"));
+        expect(columnSelect).not.toHaveTextContent("Backlog");
+
+        delayedColumns = columnsFixture;
+        columnsLoading = false;
+        fireEvent.change(screen.getByLabelText(microcopy.fields.taskName), {
+            target: { value: "Ship it now" }
+        });
+
+        await waitFor(() => expect(columnSelect).toHaveTextContent("Backlog"));
+        const diagnostics = [
+            ...consoleError.mock.calls,
+            ...consoleWarn.mock.calls
+        ]
+            .flat()
+            .map(String)
+            .join(" ");
+        expect(diagnostics).not.toMatch(/uncontrolled.*controlled/i);
+
+        consoleError.mockRestore();
+        consoleWarn.mockRestore();
+    });
+
+    it("resets the column and defaults to the new project's first column", async () => {
+        const user = userEvent.setup();
+        const secondProjectColumns: IColumn[] = [
+            {
+                _id: "column-3",
+                columnName: "Ready",
+                index: 0,
+                projectId: "project-2"
+            }
+        ];
+        mockedUseReactQuery.mockImplementation(((
+            endpoint: string,
+            params?: { [key: string]: unknown }
+        ) => {
+            if (endpoint === "projects" && !params) {
+                return stubQuery(projectsFixture) as never;
+            }
+            if (endpoint === "boards") {
+                return stubQuery(
+                    params?.projectId === "project-2"
+                        ? secondProjectColumns
+                        : columnsFixture
+                ) as never;
+            }
+            return stubQuery(undefined) as never;
+        }) as unknown as typeof mockedUseReactQuery);
+        mockedUseReactMutation.mockReturnValue(stubMutation(jest.fn()));
+
+        renderShare("/share?title=Ship%20it");
+
+        const projectSelect = screen.getByLabelText(
+            microcopy.share.projectLabel
+        );
+        const columnSelect = screen.getByLabelText(microcopy.share.columnLabel);
+        await waitFor(() => expect(columnSelect).toHaveTextContent("Backlog"));
+
+        await user.click(projectSelect);
+        await user.click(
+            await screen.findByRole("option", { name: "Bravo launch" })
+        );
+
+        await waitFor(() => expect(projectSelect).toHaveTextContent("Bravo"));
+        await waitFor(() => expect(columnSelect).toHaveTextContent("Ready"));
     });
 
     it("falls back to a slice of the shared text when no title is supplied", () => {

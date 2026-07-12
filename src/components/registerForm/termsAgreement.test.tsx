@@ -30,5 +30,8 @@ describe("AuthTermsAgreement", () => {
         renderInRouter(<AuthTermsAgreement variant="register" />);
         const link = screen.getByRole("link", { name: /terms of service/i });
         expect(link).toHaveAttribute("href", `/${AUTH_TERMS_PATH}`);
+        expect(link).toHaveClass("coarse:inline-flex");
+        expect(link).toHaveClass("coarse:min-h-[44px]");
+        expect(link).toHaveClass("coarse:items-center");
     });
 });

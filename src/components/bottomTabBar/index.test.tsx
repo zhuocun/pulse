@@ -174,6 +174,20 @@ describe("BottomTabBar", () => {
         expect(profile).toHaveAttribute("aria-current", "page");
     });
 
+    it("keeps the active indicator out of the five-tab flex layout", () => {
+        const { container } = renderBar("/inbox");
+        const nav = screen.getByTestId("bottom-tab-bar");
+        const indicator = container.querySelector(
+            "[data-active-indicator]"
+        ) as HTMLElement;
+
+        expect(indicator.className).toContain("absolute");
+        expect(nav.className).not.toContain("[&>*]:relative");
+        expect(nav.className).toContain("[&>a]:relative");
+        expect(nav.className).toContain("[&>button]:relative");
+        expect(allTabs()).toHaveLength(5);
+    });
+
     /*
      * Phase 6 Wave 7 — the Search action tab. It opens the existing
      * command palette via a `commandPalette:open` CustomEvent (the

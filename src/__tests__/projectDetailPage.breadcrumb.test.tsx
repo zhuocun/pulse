@@ -7,9 +7,13 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 import ProjectDetailPage from "../pages/projectDetail";
 
+let mockProjectName = "Atlas";
+
 jest.mock("../utils/hooks/useReactQuery", () => ({
     __esModule: true,
-    default: () => ({ data: { _id: "project-1", projectName: "Atlas" } })
+    default: () => ({
+        data: { _id: "project-1", projectName: mockProjectName }
+    })
 }));
 
 const LocationProbe = () => {
@@ -27,6 +31,8 @@ const renderAt = (route: string) =>
                 >
                     <Route index element={<Navigate to="board" replace />} />
                     <Route path="board" element={<div>Board outlet</div>} />
+                    <Route path="members" element={<div>Members outlet</div>} />
+                    <Route path="reports" element={<div>Reports outlet</div>} />
                 </Route>
                 <Route path="*" element={<LocationProbe />} />
             </Routes>
@@ -35,6 +41,10 @@ const renderAt = (route: string) =>
     );
 
 describe("ProjectDetailPage breadcrumb", () => {
+    beforeEach(() => {
+        mockProjectName = "Atlas";
+    });
+
     it("renders an interactive breadcrumb (Projects link + current project), tokenized shadow, and redirects /projects/:id to board", () => {
         const detailSource = fs.readFileSync(
             path.join(__dirname, "../pages/projectDetail.tsx"),
@@ -66,5 +76,25 @@ describe("ProjectDetailPage breadcrumb", () => {
         expect(screen.getByTestId("location")).toHaveTextContent(
             "/projects/project-1/board"
         );
+    });
+
+    it("lets only the long project crumb shrink while preserving the current leaf", () => {
+        mockProjectName =
+            "International enterprise platform reliability and compliance roadmap";
+        renderAt("/projects/project-1/members");
+
+        const breadcrumb = screen.getByTestId("project-breadcrumb");
+        expect(breadcrumb.className).toContain(
+            "[&_li[data-breadcrumb=middle]]:flex-[1_1_auto]"
+        );
+        expect(breadcrumb.className).toContain(
+            "[&_li[data-breadcrumb=current]]:flex-[0_0_auto]"
+        );
+
+        const middle = breadcrumb.querySelector('[data-breadcrumb="middle"]');
+        const current = breadcrumb.querySelector('[data-breadcrumb="current"]');
+        expect(middle).toHaveTextContent(mockProjectName);
+        expect(current).toHaveTextContent("Members");
+        expect(current).toHaveTextContent(/^\/Members$/);
     });
 });

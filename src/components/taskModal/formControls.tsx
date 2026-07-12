@@ -436,7 +436,7 @@ export const MultiSelectField: React.FC<MultiSelectFieldProps> = ({
                         aria-controls={listboxId}
                         aria-expanded={open}
                         aria-haspopup="listbox"
-                        className="flex flex-1 items-center justify-between gap-xs bg-transparent text-left text-sm text-muted-foreground outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-[36px]"
+                        className="flex flex-1 items-center justify-between gap-xs bg-transparent text-left text-sm text-muted-foreground outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-[44px] coarse:min-w-[44px]"
                         disabled={disabled}
                         id={id}
                         onBlur={onBlur}
@@ -456,7 +456,7 @@ export const MultiSelectField: React.FC<MultiSelectFieldProps> = ({
                 {selected.length > 0 ? (
                     <button
                         aria-label={microcopy.actions.clear}
-                        className="flex size-5 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+                        className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground coarse:size-11"
                         onClick={() => onChange?.([])}
                         type="button"
                     >

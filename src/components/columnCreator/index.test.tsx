@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
+import { useState, type ReactNode } from "react";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
@@ -37,7 +38,7 @@ const response = (body: unknown, ok = true) =>
         status: ok ? 200 : 400
     }) as unknown as Response;
 
-const renderCreator = () => {
+const renderCreator = (creator: ReactNode = <ColumnCreator />) => {
     const queryClient = new QueryClient({
         defaultOptions: {
             mutations: { retry: false },
@@ -52,7 +53,7 @@ const renderCreator = () => {
                     <Routes>
                         <Route
                             path="/projects/:projectId/board"
-                            element={<ColumnCreator />}
+                            element={creator}
                         />
                     </Routes>
                 </MemoryRouter>
@@ -122,6 +123,37 @@ describe("ColumnCreator", () => {
 
         const input = await expandIntoInput();
         expect(input).toBeInTheDocument();
+    });
+
+    it("supports controlled editing and focuses the creator input", async () => {
+        const ControlledCreator = () => {
+            const [editing, setEditing] = useState(false);
+            return (
+                <>
+                    <button onClick={() => setEditing(true)} type="button">
+                        Open controlled creator
+                    </button>
+                    <ColumnCreator
+                        editing={editing}
+                        onEditingChange={setEditing}
+                    />
+                </>
+            );
+        };
+        renderCreator(<ControlledCreator />);
+
+        fireEvent.click(
+            screen.getByRole("button", { name: "Open controlled creator" })
+        );
+        const input = await screen.findByLabelText("New column name");
+        expect(input).toHaveFocus();
+
+        fireEvent.keyDown(input, { key: "Escape" });
+        await waitFor(() =>
+            expect(
+                screen.getByRole("button", { name: "Add column" })
+            ).toBeInTheDocument()
+        );
     });
 
     it("creates a column for the current project and clears the input", async () => {

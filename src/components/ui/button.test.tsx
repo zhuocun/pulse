@@ -25,18 +25,31 @@ describe("Button", () => {
     });
 
     it("shows a spinner, marks aria-busy, and disables while loading", () => {
-        render(<Button loading>Save</Button>);
+        render(
+            <Button disabled={false} loading>
+                Save
+            </Button>
+        );
         const button = screen.getByRole("button", { name: /Save/ });
         expect(button).toBeDisabled();
         expect(button).toHaveAttribute("aria-busy", "true");
+        expect(button).toHaveClass("disabled:opacity-100");
+        expect(button).not.toHaveClass("disabled:opacity-50");
         expect(screen.getByTestId("button-spinner")).toBeInTheDocument();
     });
 
-    it("declares a touch-target height of at least 44px (WCAG 2.5.8)", () => {
+    it("keeps ordinary disabled controls dimmed", () => {
+        render(<Button disabled>Unavailable</Button>);
+        const button = screen.getByRole("button", { name: "Unavailable" });
+        expect(button).toHaveClass("disabled:opacity-50");
+        expect(button).not.toHaveAttribute("aria-busy");
+    });
+
+    it("declares a 44px coarse-pointer target in both dimensions", () => {
         render(<Button>Tap</Button>);
-        expect(
-            declaresTouchTarget(screen.getByRole("button", { name: "Tap" }))
-        ).toBe(true);
+        const button = screen.getByRole("button", { name: "Tap" });
+        expect(declaresTouchTarget(button)).toBe(true);
+        expect(button).toHaveClass("coarse:min-w-[44px]");
     });
 
     it("has no axe violations across variants", async () => {

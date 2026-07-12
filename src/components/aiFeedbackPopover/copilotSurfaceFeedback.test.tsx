@@ -100,6 +100,7 @@ describe("AiCopilotSurfaceFeedback", () => {
         expect(buttons.length).toBeGreaterThan(0);
         buttons.forEach((button) => {
             expect(declaresTouchTarget(button)).toBe(true);
+            expect(button).toHaveClass("coarse:min-w-[44px]");
         });
     });
 

@@ -1,5 +1,5 @@
 import { CircleAlert } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import {
     Link,
     NavLink,
@@ -91,10 +91,10 @@ const BREADCRUMB_CLASS = cn(
     // The middle (project-name) anchor is a clipped inline-flex box; the
     // ellipsis lives on its inner span since text-overflow can't ellipsize a
     // flex container's contents.
-    "[&_li[data-breadcrumb=middle]]:max-w-full [&_li[data-breadcrumb=middle]]:min-w-0 [&_li[data-breadcrumb=middle]]:overflow-hidden",
+    "[&_li[data-breadcrumb=middle]]:flex-[1_1_auto] [&_li[data-breadcrumb=middle]]:max-w-full [&_li[data-breadcrumb=middle]]:min-w-0 [&_li[data-breadcrumb=middle]]:overflow-hidden",
     "[&_li[data-breadcrumb=middle]_a]:inline-flex [&_li[data-breadcrumb=middle]_a]:items-center [&_li[data-breadcrumb=middle]_a]:max-w-full [&_li[data-breadcrumb=middle]_a]:min-w-0 [&_li[data-breadcrumb=middle]_a]:overflow-hidden [&_li[data-breadcrumb=middle]_a]:whitespace-nowrap",
     "[&_li[data-breadcrumb=middle]_a>span]:min-w-0 [&_li[data-breadcrumb=middle]_a>span]:overflow-hidden [&_li[data-breadcrumb=middle]_a>span]:text-ellipsis [&_li[data-breadcrumb=middle]_a>span]:whitespace-nowrap",
-    "[&_li:last-of-type]:min-w-0 [&_li:last-of-type]:overflow-hidden [&_li:last-of-type]:text-ellipsis [&_li:last-of-type]:whitespace-nowrap [&_li:last-of-type]:font-semibold [&_li:last-of-type]:[color:var(--pulse-text-base)]",
+    "[&_li[data-breadcrumb=current]]:flex-[0_0_auto] [&_li[data-breadcrumb=current]]:whitespace-nowrap [&_li[data-breadcrumb=current]]:font-semibold [&_li[data-breadcrumb=current]]:[color:var(--pulse-text-base)]",
     // 44 px coarse-pointer touch target on every crumb link.
     "coarse:[&_a]:inline-flex coarse:[&_a]:items-center coarse:[&_a]:min-h-[44px]"
 );
@@ -118,7 +118,7 @@ const CHILD_NAV_BASE_CLASS = "flex items-center gap-xs flex-[0_0_auto]";
  * suppressed so the row reads as a segmented control.
  */
 const CHILD_NAV_SCROLLABLE_CLASS = cn(
-    "flex-[1_1_100%] min-w-0 overflow-x-auto [-webkit-overflow-scrolling:touch]",
+    "flex-[1_1_100%] min-w-0 overflow-x-auto pe-xxs [-webkit-overflow-scrolling:touch]",
     "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
 );
 
@@ -150,6 +150,7 @@ const ProjectDetailPage = () => {
     const { pathname } = useLocation();
     const navigate = useNavigate();
     const isPhoneChrome = useIsPhoneChrome();
+    const activeChildLinkRef = useRef<HTMLAnchorElement | null>(null);
 
     const {
         data: project,
@@ -213,6 +214,27 @@ const ProjectDetailPage = () => {
         document.title = shellTitle;
     }, [shellOwnsTitle, shellTitle]);
 
+    useEffect(() => {
+        if (!isPhoneChrome) return;
+        const activeLink = activeChildLinkRef.current;
+        if (!activeLink) return;
+
+        activeLink.scrollIntoView({
+            block: "nearest",
+            inline: "nearest"
+        });
+        const nav = activeLink.parentElement;
+        if (!nav) return;
+
+        const activeBounds = activeLink.getBoundingClientRect();
+        const navBounds = nav.getBoundingClientRect();
+        if (activeBounds.right > navBounds.right) {
+            nav.scrollLeft += Math.ceil(activeBounds.right - navBounds.right);
+        } else if (activeBounds.left < navBounds.left) {
+            nav.scrollLeft -= Math.ceil(navBounds.left - activeBounds.left);
+        }
+    }, [activeChild, isPhoneChrome, project?._id]);
+
     const crumbs: ReactNode[] = [
         <Link key="projects" to="/projects" viewTransition>
             {microcopy.breadcrumb.projects}
@@ -263,7 +285,8 @@ const ProjectDetailPage = () => {
                                 const position =
                                     index === 0
                                         ? "root"
-                                        : index === crumbs.length - 1
+                                        : childCrumbTitle &&
+                                            index === crumbs.length - 1
                                           ? "current"
                                           : "middle";
                                 return (
@@ -304,6 +327,11 @@ const ProjectDetailPage = () => {
                             <NavLink
                                 className={CHILD_NAV_LINK_CLASS}
                                 end
+                                ref={
+                                    activeChild === "board"
+                                        ? activeChildLinkRef
+                                        : undefined
+                                }
                                 to={`/projects/${projectId}/board`}
                                 viewTransition
                             >
@@ -312,6 +340,11 @@ const ProjectDetailPage = () => {
                             <NavLink
                                 className={CHILD_NAV_LINK_CLASS}
                                 end
+                                ref={
+                                    activeChild === "members"
+                                        ? activeChildLinkRef
+                                        : undefined
+                                }
                                 to={`/projects/${projectId}/members`}
                                 viewTransition
                             >
@@ -320,6 +353,11 @@ const ProjectDetailPage = () => {
                             <NavLink
                                 className={CHILD_NAV_LINK_CLASS}
                                 end
+                                ref={
+                                    activeChild === "milestones"
+                                        ? activeChildLinkRef
+                                        : undefined
+                                }
                                 to={`/projects/${projectId}/milestones`}
                                 viewTransition
                             >
@@ -328,6 +366,11 @@ const ProjectDetailPage = () => {
                             <NavLink
                                 className={CHILD_NAV_LINK_CLASS}
                                 end
+                                ref={
+                                    activeChild === "labels"
+                                        ? activeChildLinkRef
+                                        : undefined
+                                }
                                 to={`/projects/${projectId}/labels`}
                                 viewTransition
                             >
@@ -336,6 +379,11 @@ const ProjectDetailPage = () => {
                             <NavLink
                                 className={CHILD_NAV_LINK_CLASS}
                                 end
+                                ref={
+                                    activeChild === "reports"
+                                        ? activeChildLinkRef
+                                        : undefined
+                                }
                                 to={`/projects/${projectId}/reports`}
                                 viewTransition
                             >

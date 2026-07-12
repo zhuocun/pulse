@@ -83,9 +83,9 @@ const SheetContent = React.forwardRef<
                     <SheetPrimitive.Close
                         aria-label={microcopy.actions.close}
                         className={cn(
-                            "absolute right-md top-md rounded-sm opacity-70 transition-opacity",
+                            "absolute right-md top-md inline-flex size-8 items-center justify-center rounded-sm opacity-70 transition-opacity",
                             "hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-                            "disabled:pointer-events-none"
+                            "disabled:pointer-events-none coarse:size-11"
                         )}
                     >
                         <X className="size-4" aria-hidden />

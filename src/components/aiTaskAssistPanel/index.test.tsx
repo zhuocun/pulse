@@ -222,6 +222,22 @@ describe("AiTaskAssistPanel", () => {
         );
     });
 
+    it("uses square coarse targets for Regenerate and readiness Close", async () => {
+        mountPanel({ values: { taskName: "Hi" } });
+        advanceBy(1000);
+
+        const regenerate = await screen.findByRole("button", {
+            name: /regenerate/i
+        });
+        const closeButtons = await screen.findAllByRole("button", {
+            name: /^close$/i
+        });
+        expect(regenerate).toHaveClass("coarse:min-w-[44px]");
+        closeButtons.forEach((close) => {
+            expect(close).toHaveClass("coarse:size-11");
+        });
+    });
+
     it("groups the similar tasks into a distinct labelled section", async () => {
         mountPanel({
             values: { taskName: "Investigate flaky login bug" }

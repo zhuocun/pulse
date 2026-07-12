@@ -180,19 +180,13 @@ const SharePage = () => {
     const { data: projects, isLoading: projectsLoading } =
         useReactQuery<IProject[]>("projects");
 
-    const [selectedProjectId, setSelectedProjectId] = useState<
-        string | undefined
-    >();
+    const [selectedProjectId, setSelectedProjectId] = useState("");
     useEffect(() => {
         // Default to the first project once the list resolves so the
         // user can submit without an extra interaction. They can still
         // pick a different one from the dropdown.
-        if (
-            selectedProjectId === undefined &&
-            projects &&
-            projects.length > 0
-        ) {
-            setSelectedProjectId(projects[0]?._id);
+        if (selectedProjectId === "" && projects && projects.length > 0) {
+            setSelectedProjectId(projects[0]?._id ?? "");
         }
     }, [projects, selectedProjectId]);
 
@@ -200,16 +194,14 @@ const SharePage = () => {
         IColumn[]
     >(
         "boards",
-        { projectId: selectedProjectId },
+        { projectId: selectedProjectId || undefined },
         undefined,
         undefined,
         undefined,
         Boolean(selectedProjectId)
     );
 
-    const [selectedColumnId, setSelectedColumnId] = useState<
-        string | undefined
-    >();
+    const [selectedColumnId, setSelectedColumnId] = useState("");
     useEffect(() => {
         // Default to the project's first column. Resetting the selection
         // whenever the project changes prevents a stale column from a
@@ -218,10 +210,10 @@ const SharePage = () => {
             setSelectedColumnId((current) =>
                 current && columns.some((c) => c._id === current)
                     ? current
-                    : columns[0]?._id
+                    : (columns[0]?._id ?? "")
             );
         } else if (!columnsLoading) {
-            setSelectedColumnId(undefined);
+            setSelectedColumnId("");
         }
     }, [columns, columnsLoading]);
 
@@ -431,7 +423,10 @@ const SharePage = () => {
                         {microcopy.share.projectLabel}
                     </label>
                     <Select
-                        onValueChange={(value) => setSelectedProjectId(value)}
+                        onValueChange={(value) => {
+                            setSelectedProjectId(value);
+                            setSelectedColumnId("");
+                        }}
                         value={selectedProjectId}
                     >
                         <SelectTrigger

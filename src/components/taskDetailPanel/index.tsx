@@ -32,6 +32,7 @@ import useMembersList from "../../utils/hooks/useMembersList";
 import useProjectMembers from "../../utils/hooks/useProjectMembers";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useReactQuery from "../../utils/hooks/useReactQuery";
+import useReducedMotion from "../../utils/hooks/useReducedMotion";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
 import useTaskPanelSiblings from "../../utils/hooks/useTaskPanelSiblings";
 import useUndoToast from "../../utils/hooks/useUndoToast";
@@ -245,6 +246,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     const navigate = useNavigate();
     const { enabled: aiEnabled } = useAiEnabled();
     const isPhone = useIsPhoneChrome();
+    const reducedMotion = useReducedMotion();
     const screens = useResponsiveScreens();
     /*
      * Three chassis modes — see the file header. Desktop docked rail
@@ -485,8 +487,10 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         // entry to pop back to — `navigate(-1)` would no-op or land
         // outside the app. Going to the board URL works both for
         // freshly-loaded sessions and within-app opens.
-        navigate(`/projects/${projectId}/board`, { viewTransition: true });
-    }, [form, navigate, projectId]);
+        navigate(`/projects/${projectId}/board`, {
+            viewTransition: !reducedMotion && !isPhone
+        });
+    }, [form, isPhone, navigate, projectId, reducedMotion]);
 
     /*
      * Dirty-state guard via React Router 7's `useBlocker`. Returns
@@ -711,12 +715,33 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
      */
     useEffect(() => {
         if (!isDesktopRail) return;
-        previousFocusRef.current = document.activeElement as HTMLElement | null;
+        const activeElement = document.activeElement;
+        previousFocusRef.current =
+            activeElement instanceof HTMLElement &&
+            activeElement !== document.body
+                ? activeElement
+                : null;
         asideRef.current?.focus();
         return () => {
-            previousFocusRef.current?.focus?.();
+            const previousFocus = previousFocusRef.current;
+            if (previousFocus?.isConnected) {
+                previousFocus.focus();
+            }
         };
     }, [isDesktopRail]);
+
+    useEffect(() => {
+        if (!isDesktopRail) return;
+        const panel = asideRef.current;
+        if (!panel) return;
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== "Escape" || event.defaultPrevented) return;
+            event.preventDefault();
+            requestClose();
+        };
+        panel.addEventListener("keydown", onKeyDown);
+        return () => panel.removeEventListener("keydown", onKeyDown);
+    }, [isDesktopRail, requestClose]);
 
     /*
      * Swipe-between-tasks handlers (Phase 3 A2 — Line 171 of the

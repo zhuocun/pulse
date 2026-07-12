@@ -79,6 +79,11 @@ describe("LoginPage", () => {
         expect(
             screen.getByRole("link", { name: /sign up for an account/i })
         ).toBeInTheDocument();
+        const registerLink = screen.getByRole("link", {
+            name: /sign up for an account/i
+        });
+        expect(registerLink).toHaveClass("coarse:inline-flex");
+        expect(registerLink).toHaveClass("coarse:min-h-[44px]");
     });
 
     it("navigates to register from the switch link", () => {
