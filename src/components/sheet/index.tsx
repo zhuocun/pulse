@@ -820,7 +820,11 @@ const Sheet: React.FC<SheetProps> = ({
             >
                 <UISheetContent
                     {...labelledByProps}
-                    className={cn("flex flex-col gap-0 p-0", rootClassName)}
+                    className={cn(
+                        "flex flex-col gap-0 p-0",
+                        rootClassName,
+                        side === "bottom" && "max-h-[92dvh]"
+                    )}
                     data-testid={dataTestid}
                     hideClose
                     onCloseAutoFocus={fallbackFocusRestore.handleCloseAutoFocus}
@@ -841,7 +845,10 @@ const Sheet: React.FC<SheetProps> = ({
                         </UISheetHeader>
                     ) : null}
                     <div
-                        className="flex-1 overflow-y-auto p-lg"
+                        className={cn(
+                            "flex-1 overflow-y-auto p-lg",
+                            side === "bottom" && "min-h-0"
+                        )}
                         style={styles?.body}
                     >
                         {children}

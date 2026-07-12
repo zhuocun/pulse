@@ -337,6 +337,13 @@ describe("Sheet — desktop drawer fallback", () => {
         ).toBeInTheDocument();
     });
 
+    it("does not apply the bottom-sheet height constraint on the right", () => {
+        render(<Harness />);
+        expect(
+            screen.getByRole("dialog", { name: "Sheet title" })
+        ).not.toHaveClass("max-h-[92dvh]");
+    });
+
     it("uses a caller-supplied close button label", () => {
         render(<Harness closeAriaLabel="Dismiss sheet" />);
         const close = screen.getByRole("button", { name: "Dismiss sheet" });
@@ -408,6 +415,15 @@ describe("Sheet — reduced-motion fallback", () => {
         expect(
             screen.getByRole("dialog", { name: "Sheet title" })
         ).toBeInTheDocument();
+    });
+
+    it("constrains the bottom fallback and keeps its body scrollable", () => {
+        render(<Harness />);
+        const surface = screen.getByRole("dialog", { name: "Sheet title" });
+        const body = surface.querySelector(".overflow-y-auto");
+
+        expect(surface).toHaveClass("flex", "flex-col", "max-h-[92dvh]");
+        expect(body).toHaveClass("flex-1", "min-h-0", "overflow-y-auto");
     });
 
     it("uses a caller-supplied close button label", () => {
