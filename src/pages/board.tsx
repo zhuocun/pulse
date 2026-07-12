@@ -176,6 +176,11 @@ const SWIPE_HINT_CLOSE_CLASS = cn(
     "coarse:h-[44px] coarse:w-[44px]"
 );
 
+const BOARD_FILTERED_EMPTY_CLASS = cn(
+    "mb-sm flex flex-wrap items-center justify-center gap-xs rounded-md border border-dashed border-border bg-muted/40",
+    "px-md py-sm text-center text-sm text-muted-foreground"
+);
+
 const BoardLoadingSkeleton = () => (
     <ColumnContainer aria-busy="true" aria-label={microcopy.a11y.loadingBoard}>
         {[0, 1, 2].map((i) => (
@@ -291,6 +296,7 @@ const boardTitle = (projectName?: string) =>
 
 const BoardPage = () => {
     const { projectId } = useParams<{ projectId: string }>();
+    const [firstColumnCreatorOpen, setFirstColumnCreatorOpen] = useState(false);
     const [param, setParam] = useUrl([
         "taskName",
         "coordinatorId",
@@ -406,17 +412,10 @@ const BoardPage = () => {
             taskName: undefined,
             coordinatorId: undefined,
             type: undefined,
-            semanticIds: undefined
+            semanticIds: undefined,
+            lens: undefined
         });
     }, [setParam]);
-    const emptyColumnCreatorRef = useRef<HTMLDivElement | null>(null);
-    const handleCreateFirstColumn = useCallback(() => {
-        const trigger = emptyColumnCreatorRef.current?.querySelector("button");
-        if (trigger instanceof HTMLButtonElement) {
-            trigger.click();
-            trigger.focus();
-        }
-    }, []);
     /**
      * Phase 4.6 — horizontal scroll ref for the board minimap. The
      * minimap reads `scrollLeft + clientWidth` from this ref to
@@ -609,6 +608,8 @@ const BoardPage = () => {
         param.semanticIds ||
         activeLens
     );
+    const hasBoardWideNoResults =
+        hasActiveFilters && visibleFilteredCount === 0;
     const filterStatusMessage = hasActiveFilters
         ? (visibleFilteredCount === 1
               ? microcopy.counts.tasksMatchingActiveFilters.one
@@ -1095,19 +1096,46 @@ const BoardPage = () => {
                                     }
                                     cta={
                                         <Button
-                                            onClick={handleCreateFirstColumn}
+                                            onClick={() =>
+                                                setFirstColumnCreatorOpen(true)
+                                            }
                                             variant="primary"
                                         >
                                             {microcopy.empty.board.cta}
                                         </Button>
                                     }
                                 />
-                                <div ref={emptyColumnCreatorRef}>
-                                    <ColumnCreator />
-                                </div>
+                                {firstColumnCreatorOpen ? (
+                                    <ColumnCreator
+                                        editing={firstColumnCreatorOpen}
+                                        onEditingChange={
+                                            setFirstColumnCreatorOpen
+                                        }
+                                    />
+                                ) : null}
                             </>
                         ) : (
                             <>
+                                {hasBoardWideNoResults ? (
+                                    <div
+                                        className={BOARD_FILTERED_EMPTY_CLASS}
+                                        data-testid="board-filtered-empty"
+                                    >
+                                        <span aria-live="polite" role="status">
+                                            {
+                                                microcopy.empty.filteredColumn
+                                                    .title
+                                            }
+                                        </span>
+                                        <Button
+                                            onClick={resetBoardFilters}
+                                            size="sm"
+                                            variant="ghost"
+                                        >
+                                            {microcopy.empty.filteredColumn.cta}
+                                        </Button>
+                                    </div>
+                                ) : null}
                                 {(board?.length ?? 0) > 1 &&
                                     !swipeHintDismissed && (
                                         <div
@@ -1188,6 +1216,9 @@ const BoardPage = () => {
                                                             param={param}
                                                             onResetFilters={
                                                                 resetBoardFilters
+                                                            }
+                                                            suppressFilteredEmptyHint={
+                                                                hasBoardWideNoResults
                                                             }
                                                             isDragDisabled={
                                                                 isTaskDragDisabled

@@ -4,6 +4,7 @@ import {
     fireEvent,
     render,
     screen,
+    within,
     waitFor
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -1082,6 +1083,133 @@ describe("TaskDetailPanel — desktop docked rail (Phase 3 A2)", () => {
         await waitFor(() => {
             expect(document.activeElement).toBe(panel);
         });
+        installAntdBrowserMocks();
+    });
+
+    it("closes a clean rail on Escape and restores its connected opener", async () => {
+        installDesktopLgMock();
+        const opener = document.createElement("button");
+        opener.textContent = "Open task";
+        document.body.append(opener);
+        opener.focus();
+        try {
+            const { router } = renderPanelAt(
+                "/projects/project-1/board/task/task-1"
+            );
+            const panel = await screen.findByTestId("task-detail-panel");
+
+            fireEvent.keyDown(panel, { key: "Escape", code: "Escape" });
+
+            await waitFor(() => {
+                expect(router.state.location.pathname).toBe(
+                    "/projects/project-1/board"
+                );
+                expect(opener).toHaveFocus();
+            });
+        } finally {
+            opener.remove();
+            installAntdBrowserMocks();
+        }
+    });
+
+    it("opens one discard confirmation when Escape is pressed on a dirty rail", async () => {
+        installDesktopLgMock();
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1"
+        );
+        const input = await screen.findByDisplayValue("Build task");
+        fireEvent.change(input, { target: { value: "Edited" } });
+
+        fireEvent.keyDown(screen.getByTestId("task-detail-panel"), {
+            key: "Escape",
+            code: "Escape"
+        });
+
+        expect(
+            await screen.findAllByRole("dialog", {
+                name: microcopy.taskDetailPanel.confirmDiscardTitle as string
+            })
+        ).toHaveLength(1);
+        expect(router.state.location.pathname).toBe(
+            "/projects/project-1/board/task/task-1"
+        );
+        installAntdBrowserMocks();
+    });
+
+    it("leaves the rail open when a nested interaction consumes Escape", async () => {
+        installDesktopLgMock();
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1"
+        );
+        const panel = await screen.findByTestId("task-detail-panel");
+        const event = new KeyboardEvent("keydown", {
+            bubbles: true,
+            cancelable: true,
+            code: "Escape",
+            key: "Escape"
+        });
+        event.preventDefault();
+
+        act(() => {
+            panel.dispatchEvent(event);
+        });
+
+        expect(router.state.location.pathname).toBe(
+            "/projects/project-1/board/task/task-1"
+        );
+        expect(panel).toBeInTheDocument();
+        installAntdBrowserMocks();
+    });
+
+    it("does not restore focus to a detached rail opener", async () => {
+        installDesktopLgMock();
+        const opener = document.createElement("button");
+        document.body.append(opener);
+        const focusSpy = jest.spyOn(opener, "focus");
+        opener.focus();
+        focusSpy.mockClear();
+        try {
+            const { router } = renderPanelAt(
+                "/projects/project-1/board/task/task-1"
+            );
+            const panel = await screen.findByTestId("task-detail-panel");
+            opener.remove();
+
+            fireEvent.keyDown(panel, { key: "Escape", code: "Escape" });
+
+            await waitFor(() =>
+                expect(router.state.location.pathname).toBe(
+                    "/projects/project-1/board"
+                )
+            );
+            expect(focusSpy).not.toHaveBeenCalled();
+        } finally {
+            focusSpy.mockRestore();
+            opener.remove();
+            installAntdBrowserMocks();
+        }
+    });
+
+    it("keeps the rail close button behavior aligned with Escape", async () => {
+        installDesktopLgMock();
+        const { router } = renderPanelAt(
+            "/projects/project-1/board/task/task-1"
+        );
+        const panel = await screen.findByTestId("task-detail-panel");
+        const closeButton = within(panel)
+            .getAllByRole("button", {
+                name: microcopy.actions.close as string
+            })
+            .find((button) => button.closest("header"));
+        expect(closeButton).toBeDefined();
+
+        fireEvent.click(closeButton!);
+
+        await waitFor(() =>
+            expect(router.state.location.pathname).toBe(
+                "/projects/project-1/board"
+            )
+        );
         installAntdBrowserMocks();
     });
 

@@ -711,12 +711,33 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
      */
     useEffect(() => {
         if (!isDesktopRail) return;
-        previousFocusRef.current = document.activeElement as HTMLElement | null;
+        const activeElement = document.activeElement;
+        previousFocusRef.current =
+            activeElement instanceof HTMLElement &&
+            activeElement !== document.body
+                ? activeElement
+                : null;
         asideRef.current?.focus();
         return () => {
-            previousFocusRef.current?.focus?.();
+            const previousFocus = previousFocusRef.current;
+            if (previousFocus?.isConnected) {
+                previousFocus.focus();
+            }
         };
     }, [isDesktopRail]);
+
+    useEffect(() => {
+        if (!isDesktopRail) return;
+        const panel = asideRef.current;
+        if (!panel) return;
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== "Escape" || event.defaultPrevented) return;
+            event.preventDefault();
+            requestClose();
+        };
+        panel.addEventListener("keydown", onKeyDown);
+        return () => panel.removeEventListener("keydown", onKeyDown);
+    }, [isDesktopRail, requestClose]);
 
     /*
      * Swipe-between-tasks handlers (Phase 3 A2 — Line 171 of the

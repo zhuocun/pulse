@@ -227,12 +227,12 @@ export const CopilotDockBody: React.FC<CopilotDockBodyProps> = ({
                          * `forceMount` keeps inactive tabs mounted so chat
                          * history + the brief cache survive a tab switch —
                          * both bodies own their own state and teardown via
-                         * their `dockOpen` prop. Radix stamps `hidden` on the
-                         * inactive panes; the active pane flips to a flex
-                         * column so the body fills the dock.
+                         * their `dockOpen` prop. The callsite hides inactive
+                         * panes while the active pane flips to a flex column
+                         * so the body fills the dock.
                          */
                         <TabsContent
-                            className="mt-sm min-h-0 flex-1 data-[state=active]:flex data-[state=active]:flex-col"
+                            className="mt-sm min-h-0 flex-1 data-[state=active]:flex data-[state=active]:flex-col data-[state=inactive]:hidden"
                             forceMount
                             key={item.key}
                             value={item.key}
