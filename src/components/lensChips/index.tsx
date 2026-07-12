@@ -1,14 +1,8 @@
-import styled from "@emotion/styled";
 import React, { useMemo } from "react";
 
+import { cn } from "@/lib/utils";
+
 import { microcopy } from "../../constants/microcopy";
-import {
-    fontSize,
-    fontWeight,
-    motion,
-    radius,
-    space
-} from "../../theme/tokens";
 
 /**
  * Phase 3 A7 — Lenses (chip-based filters).
@@ -81,85 +75,32 @@ export const parseLensId = (value: string | null | undefined): LensId | null =>
         ? (value as LensId)
         : null;
 
-const ChipRow = styled.div`
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xs}px;
-    margin-bottom: ${space.sm}px;
-`;
+const CHIP_BASE_CLASS = cn(
+    "inline-flex min-h-[32px] items-center gap-xxs rounded-full border px-sm py-xxs text-sm font-medium",
+    "transition-colors motion-reduce:transition-none",
+    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+    "coarse:min-h-[44px] coarse:px-md"
+);
 
-interface ChipButtonProps {
-    $active: boolean;
-    $disabled?: boolean;
-}
+const chipClass = (active: boolean, disabled: boolean): string =>
+    cn(
+        CHIP_BASE_CLASS,
+        active
+            ? "border-primary bg-primary text-primary-foreground"
+            : "border-border bg-background text-foreground",
+        disabled
+            ? "cursor-not-allowed opacity-55"
+            : cn(
+                  "cursor-pointer",
+                  active ? "hover:bg-primary/90" : "hover:bg-muted"
+              )
+    );
 
-const ChipButton = styled.button<ChipButtonProps>`
-    align-items: center;
-    background: ${({ $active }) =>
-        $active
-            ? "var(--ant-color-primary, #ea580c)"
-            : "var(--ant-color-bg-container, #fff)"};
-    border: 1px solid
-        ${({ $active }) =>
-            $active
-                ? "var(--ant-color-primary, #ea580c)"
-                : "var(--ant-color-border-secondary, rgba(15, 23, 42, 0.12))"};
-    border-radius: ${radius.pill}px;
-    color: ${({ $active }) =>
-        $active
-            ? "var(--ant-color-text-light-solid, #fff)"
-            : "var(--ant-color-text, rgba(15, 23, 42, 0.85))"};
-    cursor: ${({ $disabled }) => ($disabled ? "not-allowed" : "pointer")};
-    opacity: ${({ $disabled }) => ($disabled ? 0.55 : 1)};
-    display: inline-flex;
-    font-size: ${fontSize.sm}px;
-    font-weight: ${fontWeight.medium};
-    gap: ${space.xxs}px;
-    min-height: 32px;
-    padding: ${space.xxs}px ${space.sm}px;
-    transition:
-        background-color ${motion.short}ms ease-out,
-        border-color ${motion.short}ms ease-out,
-        color ${motion.short}ms ease-out;
-
-    &:hover {
-        background: ${({ $active, $disabled }) =>
-            $disabled
-                ? "var(--ant-color-bg-container, #fff)"
-                : $active
-                  ? "var(--ant-color-primary-hover, #f97316)"
-                  : "var(--ant-color-fill-quaternary, rgba(15, 23, 42, 0.04))"};
-    }
-
-    &:focus-visible {
-        outline: 2px solid var(--ant-color-primary, #ea580c);
-        outline-offset: 2px;
-    }
-
-    /* Touch targets ≥ 44 px on coarse pointers (WCAG 2.5.5). */
-    @media (pointer: coarse) {
-        min-height: 44px;
-        padding-inline: ${space.md}px;
-    }
-
-    /* Skip the transition for users who request reduced motion. */
-    @media (prefers-reduced-motion: reduce) {
-        transition: none;
-    }
-`;
-
-const ComingSoonBadge = styled.span<ChipButtonProps>`
-    background: ${({ $active }) =>
-        $active
-            ? "rgba(255, 255, 255, 0.22)"
-            : "var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.08))"};
-    border-radius: ${radius.pill}px;
-    color: inherit;
-    font-size: ${fontSize.xs}px;
-    font-weight: ${fontWeight.semibold};
-    line-height: 1;
-    padding: 2px ${space.xs}px;
-`;
+const comingSoonBadgeClass = (active: boolean): string =>
+    cn(
+        "rounded-full px-xs py-[2px] text-xs font-semibold leading-none",
+        active ? "bg-white/[0.22]" : "bg-muted"
+    );
 
 interface LensChipsProps {
     /** Current lens from the URL (or `null` for All). */
@@ -210,14 +151,17 @@ const LensChips: React.FC<LensChipsProps> = ({ active, onChange }) => {
     );
 
     return (
-        <ChipRow aria-label={microcopy.a11y.lensChips} role="group">
+        <div
+            aria-label={microcopy.a11y.lensChips}
+            className="mb-sm flex flex-wrap gap-xs"
+            role="group"
+        >
             {chips.map((chip) => {
                 const isComingSoon = COMING_SOON_LENSES.has(chip.id);
                 const isActive = !isComingSoon && active === chip.id;
                 return (
-                    <ChipButton
-                        $active={isActive}
-                        $disabled={isComingSoon}
+                    <button
+                        className={chipClass(isActive, isComingSoon)}
                         /*
                          * Coming-soon lenses have no working predicate, so
                          * they read as disabled (no toggle, no pressed
@@ -237,17 +181,17 @@ const LensChips: React.FC<LensChipsProps> = ({ active, onChange }) => {
                     >
                         <span>{chip.label}</span>
                         {isComingSoon ? (
-                            <ComingSoonBadge
-                                $active={isActive}
+                            <span
                                 aria-label={microcopy.a11y.lensComingSoon}
+                                className={comingSoonBadgeClass(isActive)}
                             >
                                 {microcopy.lenses.comingSoonBadge}
-                            </ComingSoonBadge>
+                            </span>
                         ) : null}
-                    </ChipButton>
+                    </button>
                 );
             })}
-        </ChipRow>
+        </div>
     );
 };
 

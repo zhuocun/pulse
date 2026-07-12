@@ -162,7 +162,9 @@ describe("AiSearchInput remote search transport", () => {
         );
         expect(failureAlert).toBeTruthy();
         fireEvent.click(
-            failureAlert!.querySelector(".ant-alert-close-icon") as HTMLElement
+            failureAlert!.querySelector(
+                'button[aria-label="Close"]'
+            ) as HTMLElement
         );
 
         await waitFor(() => {

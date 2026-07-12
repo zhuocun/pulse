@@ -1,7 +1,8 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Form, Input } from "antd";
-import type { FormInstance } from "antd";
+
+import { Form, type FormInstance } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 
 import AuthErrorSummary, { type AuthErrorFieldMeta } from "./index";
 
@@ -13,20 +14,15 @@ const fields: readonly AuthErrorFieldMeta[] = [
 type HarnessProps = {
     serverError?: Error | null;
     includeFieldErrors?: boolean;
-    fieldErrors?: Array<{ name: string; errors: string[] }>;
     formRef?: (form: FormInstance) => void;
 };
 
 const Harness = ({
     serverError = null,
     includeFieldErrors = true,
-    fieldErrors,
     formRef
 }: HarnessProps) => {
     const [form] = Form.useForm();
-    if (fieldErrors) {
-        form.setFields(fieldErrors);
-    }
     if (formRef) formRef(form);
     return (
         <Form form={form}>
@@ -194,8 +190,8 @@ describe("AuthErrorSummary", () => {
         expect(screen.getByRole("group")).toHaveTextContent(/boom/i);
     });
 
-    // The 1×1 clipped SrOnly announcer inside the summary sits absolute over
-    // the visible submit button on auth pages. Without `pointer-events: none`
+    // The 1×1 clipped announcer inside the summary sits absolute over the
+    // visible submit button on auth pages. Without `pointer-events: none`
     // the invisible box would intercept clicks targeted at the button below.
     // Mirrors the invariant the deleted srOnlyLiveRegions strict file held.
     it("the SR-only announcer inside the summary is non-interactive", () => {
@@ -203,6 +199,6 @@ describe("AuthErrorSummary", () => {
         const summary = screen.getByRole("group");
         const srOnly = summary.querySelector("#auth-error-summary-sr-only");
         expect(srOnly).not.toBeNull();
-        expect(srOnly).toHaveStyle({ pointerEvents: "none" });
+        expect(srOnly).toHaveClass("pointer-events-none");
     });
 });

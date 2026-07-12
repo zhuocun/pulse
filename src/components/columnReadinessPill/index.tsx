@@ -13,58 +13,17 @@
  * `message` for each one (e.g. "No coordinator assigned."), so the
  * board user can spot which task is dragging the column's score and
  * groom it without leaving the board.
- *
- * Design constraint: we intentionally render an AntD `Tag` directly
- * instead of importing the shared `<CopilotChip>` that Lane H is
- * shipping in parallel. The two lanes are wave-3 siblings; cross-lane
- * coupling here would force a serial dependency we don't need. If the
- * shared chip ships in the same release we'll migrate this surface in
- * a follow-up; in the meantime the visual is intentionally restrained
- * (Tag + sparkle + label) so a swap is a one-import refactor.
  */
 
-import styled from "@emotion/styled";
-import { Popover, Tag } from "antd";
 import React, { useState } from "react";
+
+import { cn } from "@/lib/utils";
 
 import { microcopy } from "../../constants/microcopy";
 import { aiTokens } from "../../theme/aiTokens";
-import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import type { ColumnReadinessReport } from "../../utils/hooks/useColumnReadiness";
 import AiSparkleIcon from "../aiSparkleIcon";
-
-/**
- * Touch hit-area expander (PR #308 review — Followup B). On `pointer:
- * coarse` viewports we bump the pill's hit area to the WCAG 2.1 SC 2.5.5
- * recommended 44×44 minimum *without* changing the visible chip size —
- * a `::before` pseudo-element pads out the click target using a
- * negative inset margin so the parent layout stays unchanged. The
- * visible pill still measures whatever the inline styles spec (so the
- * column header doesn't bloat for fine-pointer users), but a tap
- * anywhere inside the 44-square activates the popover. The rule is
- * gated on `(pointer: coarse)` so desktop precision pointing isn't
- * affected.
- */
-const PillRoot = styled.span`
-    position: relative;
-    @media (pointer: coarse) {
-        &::before {
-            content: "";
-            position: absolute;
-            inset: 50% auto auto 50%;
-            min-block-size: 44px;
-            min-inline-size: 44px;
-            transform: translate(-50%, -50%);
-            /*
-             * Negative z-index keeps the expander behind the visible
-             * pill so it doesn't sit on top of the sparkle / label.
-             * Pointer events still reach it because the parent is the
-             * Popover trigger.
-             */
-            z-index: -1;
-        }
-    }
-`;
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 const formatTemplate = (
     template: string,
@@ -83,63 +42,49 @@ const asMicrocopyString = (value: unknown): string =>
     typeof value === "string" ? value : String(value ?? "");
 
 /**
- * The pill body. Pulled out so we can `aria-label` the outer span
- * without duplicating the visible-text logic and so the test harness
- * has a single render path to assert against.
+ * The pill body doubles as the popover trigger. On `pointer: coarse`
+ * viewports a `::before` pseudo-element pads the click target out to the
+ * WCAG 2.5.5 44×44 minimum without inflating the visible chip (the
+ * `coarse:before:*` utilities); `data-touch-hit-area="44"` is the stable
+ * contract marker tests assert against.
  */
-const PillBody: React.FC<{
-    status: "ready" | "needs-grooming";
-    ariaLabel: string;
-    onKeyDown: (event: React.KeyboardEvent<HTMLSpanElement>) => void;
-}> = ({ status, ariaLabel, onKeyDown }) => {
+const PillBody = React.forwardRef<
+    HTMLSpanElement,
+    {
+        status: "ready" | "needs-grooming";
+        ariaLabel: string;
+        onKeyDown: (event: React.KeyboardEvent<HTMLSpanElement>) => void;
+    } & React.HTMLAttributes<HTMLSpanElement>
+>(({ status, ariaLabel, onKeyDown, ...props }, ref) => {
     const copy = microcopy.ai.columnReadiness;
     const label =
         status === "ready"
             ? asMicrocopyString(copy.readyLabel)
             : asMicrocopyString(copy.groomingLabel);
     return (
-        <PillRoot
+        <span
+            {...props}
+            ref={ref}
             aria-label={ariaLabel}
             data-status={status}
             data-testid="column-readiness-pill"
-            /*
-             * `data-touch-hit-area` is the stable contract marker for
-             * the WCAG 2.5.5 hit-area expander (PR #308 Followup B).
-             * Tests assert this attribute is present on the styled
-             * root so a future refactor that drops the PillRoot
-             * wrapper would trip the assertion — Emotion's generated
-             * class hash is intentionally NOT load-bearing (it can
-             * change with any styled-components bump). PR #309 review
-             * flagged the previous `match(/css-/)` test as brittle;
-             * this attribute is the explicit replacement.
-             */
             data-touch-hit-area="44"
             onKeyDown={onKeyDown}
             role="button"
-            style={{
-                alignItems: "center",
-                background: aiTokens.bgSubtle,
-                borderRadius: radius.sm,
-                color:
-                    status === "ready"
-                        ? "var(--ant-color-success-text, #15803D)"
-                        : "var(--ant-color-warning-text, #B45309)",
-                cursor: "pointer",
-                display: "inline-flex",
-                fontSize: fontSize.xs,
-                fontWeight: fontWeight.medium,
-                gap: space.xxs,
-                lineHeight: 1.2,
-                paddingBlock: 2,
-                paddingInline: space.xs
-            }}
             tabIndex={0}
+            style={{ background: aiTokens.bgSubtle }}
+            className={cn(
+                "relative inline-flex cursor-pointer items-center gap-xxs rounded-sm px-xs py-[2px] text-xs font-medium leading-[1.2]",
+                "coarse:before:absolute coarse:before:left-1/2 coarse:before:top-1/2 coarse:before:-z-[1] coarse:before:block coarse:before:min-h-[44px] coarse:before:min-w-[44px] coarse:before:-translate-x-1/2 coarse:before:-translate-y-1/2 coarse:before:content-['']",
+                status === "ready" ? "text-success" : "text-warning"
+            )}
         >
             <AiSparkleIcon aria-hidden size="sm" />
             <span>{label}</span>
-        </PillRoot>
+        </span>
     );
-};
+});
+PillBody.displayName = "PillBody";
 
 const ColumnReadinessPill: React.FC<ColumnReadinessPillProps> = ({
     report
@@ -149,11 +94,6 @@ const ColumnReadinessPill: React.FC<ColumnReadinessPillProps> = ({
         return null;
     }
     const copy = microcopy.ai.columnReadiness;
-    /*
-     * The aria-label lives outside the visible label (the visible label
-     * is the status microcopy; the screen-reader label is the
-     * machine-readable ratio "<n> of <m> tasks ready"). Per the spec.
-     */
     const ariaTemplate =
         report.status === "ready"
             ? asMicrocopyString(microcopy.a11y.columnReadinessReady)
@@ -170,53 +110,22 @@ const ColumnReadinessPill: React.FC<ColumnReadinessPillProps> = ({
         { ready: report.readyCount, total: report.totalCount }
     );
 
-    const popoverContent =
+    const popoverBody =
         report.blockerTasks.length === 0 ? (
-            <div
-                style={{
-                    color: "var(--ant-color-text-secondary, rgba(15, 23, 42, 0.55))",
-                    fontSize: fontSize.xs,
-                    maxWidth: 280
-                }}
-            >
+            <div className="max-w-[280px] text-xs text-muted-foreground">
                 {asMicrocopyString(copy.popoverEmptyReady)}
             </div>
         ) : (
             <ul
                 aria-label={asMicrocopyString(copy.popoverBlockerListLabel)}
-                style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: space.xs,
-                    listStyle: "none",
-                    margin: 0,
-                    maxWidth: 320,
-                    padding: 0
-                }}
+                className="m-0 flex max-w-[320px] list-none flex-col gap-xs p-0"
             >
                 {report.blockerTasks.map(({ task, reasons }) => (
-                    <li
-                        key={task._id}
-                        style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 2
-                        }}
-                    >
-                        <span
-                            style={{
-                                fontSize: fontSize.xs,
-                                fontWeight: fontWeight.medium
-                            }}
-                        >
+                    <li key={task._id} className="flex flex-col gap-[2px]">
+                        <span className="text-xs font-medium">
                             {task.taskName}
                         </span>
-                        <span
-                            style={{
-                                color: "var(--ant-color-text-secondary, rgba(15, 23, 42, 0.55))",
-                                fontSize: fontSize.xs
-                            }}
-                        >
+                        <span className="text-xs text-muted-foreground">
                             {reasons.join(" · ")}
                         </span>
                     </li>
@@ -225,7 +134,6 @@ const ColumnReadinessPill: React.FC<ColumnReadinessPillProps> = ({
         );
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLSpanElement>) => {
-        // Enter / Space activate the pill (matches role="button" axe rule).
         if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
             setOpen((prev) => !prev);
@@ -235,43 +143,24 @@ const ColumnReadinessPill: React.FC<ColumnReadinessPillProps> = ({
     };
 
     return (
-        <Popover
-            content={popoverContent}
-            onOpenChange={setOpen}
-            open={open}
-            overlayStyle={{ maxWidth: 360 }}
-            placement="bottomLeft"
-            title={popoverTitle}
-            trigger="click"
-        >
-            {/*
-             * AntD's Popover clones its child and attaches the click /
-             * keyboard handlers to the child's ROOT — the <Tag>, not
-             * the inner <span>. The aria-label has to live on the Tag
-             * so a screen-reader user navigating to the popover
-             * trigger by role hears the readiness ratio instead of an
-             * unlabelled "button". The inner PillBody keeps a copy of
-             * the label so screen readers reading the focused element
-             * (role=button, tabIndex=0) also announce the count — both
-             * paths surface the same accessible name, no double-
-             * announce because the inner span sits inside the Tag's
-             * accessibility subtree.
-             */}
-            <Tag
-                aria-label={ariaLabel}
-                style={{
-                    background: "transparent",
-                    border: "none",
-                    margin: 0,
-                    padding: 0
-                }}
-            >
+        <Popover onOpenChange={setOpen} open={open}>
+            <PopoverTrigger asChild>
                 <PillBody
                     ariaLabel={ariaLabel}
                     onKeyDown={handleKeyDown}
                     status={report.status}
                 />
-            </Tag>
+            </PopoverTrigger>
+            <PopoverContent
+                align="start"
+                aria-label={popoverTitle}
+                className="max-w-[360px]"
+            >
+                <div className="mb-xs text-sm font-semibold text-foreground">
+                    {popoverTitle}
+                </div>
+                {popoverBody}
+            </PopoverContent>
         </Popover>
     );
 };

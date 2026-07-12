@@ -1,5 +1,11 @@
-import { Tooltip } from "antd";
 import React from "react";
+
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger
+} from "@/components/ui/tooltip";
 
 import { microcopy } from "../../constants/microcopy";
 import CopilotChip, { type CopilotChipTone } from "../copilotChip";
@@ -86,7 +92,14 @@ const AiMatchStrengthBadge: React.FC<AiMatchStrengthBadgeProps> = ({
     // Compact mode only renders a colored dot; keep the band name
     // discoverable via tooltip so sighted users get parity with the
     // aria-label that screen-reader users hear.
-    return <Tooltip title={label}>{tag}</Tooltip>;
+    return (
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>{tag}</TooltipTrigger>
+                <TooltipContent>{label}</TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    );
 };
 
 export default AiMatchStrengthBadge;

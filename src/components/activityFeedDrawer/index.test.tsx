@@ -4,10 +4,6 @@ import { Provider } from "react-redux";
 import { store } from "../../store";
 import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
 import { aiLedgerActions } from "../../store/reducers/aiLedgerSlice";
-import {
-    coarseTouchTargetsFor,
-    styledClassFor
-} from "../../testUtils/styleRules";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import { __resetActivityFeedUndoCallbacksForTests } from "../../utils/hooks/useActivityFeed";
 import { __resetAiLedgerUndoCallbacksForTests } from "../../utils/hooks/useAiLedger";
@@ -362,10 +358,9 @@ describe("ActivityFeedBell", () => {
         const onClick = jest.fn();
         render(<ActivityFeedBell unreadCount={0} onClick={onClick} />);
         const button = screen.getByTestId("activity-feed-bell");
-        const styledClass = styledClassFor(button);
-        expect(styledClass).toBeTruthy();
-        const { heights, widths } = coarseTouchTargetsFor(styledClass ?? "");
-        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
-        expect(Math.max(...widths)).toBeGreaterThanOrEqual(44);
+        // Tailwind's compiled sheet is not loaded in jsdom, so the coarse
+        // 44 px floor is verified by the canonical utility classes.
+        expect(button.className).toContain("coarse:h-[44px]");
+        expect(button.className).toContain("coarse:w-[44px]");
     });
 });

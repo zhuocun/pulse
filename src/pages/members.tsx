@@ -1,11 +1,9 @@
-import styled from "@emotion/styled";
-import { Typography } from "antd";
 import { useParams } from "react-router-dom";
 
+import { Typography } from "@/components/ui/typography";
 import PageContainer from "../components/pageContainer";
 import ProjectMembersManager from "../components/projectMembersManager";
 import { microcopy } from "../constants/microcopy";
-import { fontSize, fontWeight, lineHeight, space } from "../theme/tokens";
 import useReactQuery from "../utils/hooks/useReactQuery";
 import useTitle from "../utils/hooks/useTitle";
 
@@ -26,15 +24,6 @@ import useTitle from "../utils/hooks/useTitle";
 
 const ProjectQuery = "projects" as const;
 
-const PageHeading = styled(Typography.Title)`
-    && {
-        font-size: ${fontSize.xxl}px;
-        font-weight: ${fontWeight.semibold};
-        line-height: ${lineHeight.tight};
-        margin-bottom: ${space.md}px;
-    }
-`;
-
 const MembersPage = () => {
     const { projectId } = useParams<{ projectId: string }>();
     const { data: project } = useReactQuery<IProject>(ProjectQuery, {
@@ -51,7 +40,12 @@ const MembersPage = () => {
 
     return (
         <PageContainer data-testid="members-page">
-            <PageHeading level={1}>{microcopy.members.heading}</PageHeading>
+            <Typography.Title
+                className="mb-md text-xxl font-semibold leading-tight"
+                level={1}
+            >
+                {microcopy.members.heading}
+            </Typography.Title>
             {projectId ? <ProjectMembersManager projectId={projectId} /> : null}
         </PageContainer>
     );

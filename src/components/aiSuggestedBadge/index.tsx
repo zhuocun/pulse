@@ -1,8 +1,14 @@
-import { Popover, Typography } from "antd";
 import React from "react";
 
+import { Button } from "@/components/ui/button";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger
+} from "@/components/ui/popover";
+import { Typography } from "@/components/ui/typography";
+
 import { microcopy } from "../../constants/microcopy";
-import { space } from "../../theme/tokens";
 import CopilotChip from "../copilotChip";
 
 /**
@@ -43,41 +49,41 @@ const AiSuggestedBadge: React.FC<AiSuggestedBadgeProps> = ({
     const label = compact
         ? microcopy.ai.appliedSuggestionShort
         : microcopy.ai.appliedSuggestion;
-    const popoverContent = (
-        <div style={{ maxWidth: "18rem" }}>
-            <Typography.Paragraph
-                style={{ marginBottom: space.xs }}
-                type="secondary"
-            >
-                {rationale ?? microcopy.ai.suggestionPopover}
-            </Typography.Paragraph>
-            {onRevert && (
-                <Typography.Link onClick={onRevert}>
-                    {microcopy.ai.revertToPrevious}
-                </Typography.Link>
-            )}
-        </div>
-    );
     /*
-     * Popover triggers — we deliberately omit `"focus"`. Form-fill
-     * surfaces tab through several badges in a row, and an
-     * auto-opening popover on focus narrates the rationale paragraph
-     * into the screen-reader stream mid-form-fill. `"hover"` keeps the
-     * tooltip-style preview for pointer users; `"click"` (and keyboard
-     * Enter/Space via `role="button"` + `tabIndex={0}`) is the explicit
-     * affordance that opens the Revert link.
+     * Popover trigger — the primitive opens on `click` (and keyboard
+     * Enter/Space, since the chip is an interactive `<button>`). We
+     * deliberately do not open on `focus`: form-fill surfaces tab
+     * through several badges in a row, and an auto-opening popover on
+     * focus narrates the rationale paragraph into the screen-reader
+     * stream mid-form-fill.
      */
     return (
-        <Popover content={popoverContent} trigger={["hover", "click"]}>
-            <CopilotChip
-                aria-label={microcopy.ai.appliedSuggestion}
-                compact={compact}
-                interactive
-                style={style}
-                variant="suggested"
-            >
-                {label}
-            </CopilotChip>
+        <Popover>
+            <PopoverTrigger asChild>
+                <CopilotChip
+                    aria-label={microcopy.ai.appliedSuggestion}
+                    compact={compact}
+                    interactive
+                    style={style}
+                    variant="suggested"
+                >
+                    {label}
+                </CopilotChip>
+            </PopoverTrigger>
+            <PopoverContent aria-label={microcopy.ai.appliedSuggestion}>
+                <Typography.Paragraph type="secondary">
+                    {rationale ?? microcopy.ai.suggestionPopover}
+                </Typography.Paragraph>
+                {onRevert && (
+                    <Button
+                        className="h-auto p-0"
+                        onClick={onRevert}
+                        variant="link"
+                    >
+                        {microcopy.ai.revertToPrevious}
+                    </Button>
+                )}
+            </PopoverContent>
         </Popover>
     );
 };

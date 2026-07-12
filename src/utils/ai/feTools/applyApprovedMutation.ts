@@ -1,6 +1,7 @@
-import { message } from "antd";
 import type { CSSProperties } from "react";
 import React from "react";
+
+import { message } from "@/components/ui/toast";
 
 import type { MutationDiff, TaskUpdate } from "../../../interfaces/agent";
 import { ANALYTICS_EVENTS, track } from "../../../constants/analytics";
@@ -130,7 +131,7 @@ export const applyApprovedMutationTool: FeTool<
             const undoBtnStyle: CSSProperties = {
                 background: "transparent",
                 border: 0,
-                color: "var(--ant-color-primary, #EA580C)",
+                color: "var(--pulse-brand-primary, #EA580C)",
                 cursor: "pointer",
                 font: "inherit",
                 fontWeight: 500,

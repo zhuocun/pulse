@@ -1,9 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type React from "react";
 
 import CopilotMenu from "./index";
 
-const installAntdBrowserMocks = () => {
+const installBrowserMocks = () => {
     Object.defineProperty(window, "matchMedia", {
         writable: true,
         value: (query: string) => ({
@@ -30,6 +31,12 @@ const installAntdBrowserMocks = () => {
         writable: true,
         value: ResizeObserverMock
     });
+
+    // Radix's dropdown menu relies on PointerEvent APIs jsdom doesn't
+    // ship — polyfill them so the menu can open under `userEvent`.
+    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+    Element.prototype.releasePointerCapture = jest.fn();
 };
 
 const setup = (
@@ -51,14 +58,14 @@ const setup = (
 };
 
 const openMenu = async () => {
-    fireEvent.click(
+    await userEvent.click(
         screen.getByRole("button", { name: /board copilot menu/i })
     );
 };
 
 describe("CopilotMenu", () => {
     beforeAll(() => {
-        installAntdBrowserMocks();
+        installBrowserMocks();
     });
 
     it("runs the Ask action when the primary Copilot button is clicked", () => {

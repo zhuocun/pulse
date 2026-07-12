@@ -80,7 +80,7 @@ In this repo:
 - `index.html` carries every meta tag above.
 - `public/manifest.webmanifest` describes the installable PWA shell. Real PNG icons (`purpose: "any"` + `purpose: "maskable"`, 192 px + 512 px) ship in `public/icons/`, with the SVG variants kept as fallbacks — see §5 for how they're generated.
 - `src/App.css:79–127` owns the document-level reset, the `body` font stack, and `-webkit-text-size-adjust`.
-- The 16 px input rule is scoped to `@media (pointer: coarse)` (`src/App.css:202–222`) so desktop keeps AntD's denser 14 px look while iOS does not auto-zoom on focus. This was the single highest-impact change in the audit.
+- The 16 px input rule is scoped to `@media (pointer: coarse)` (`src/App.css:288–293`) so desktop keeps the denser 14 px look while iOS does not auto-zoom on focus. This was the single highest-impact change in the audit.
 
 ---
 
@@ -121,7 +121,7 @@ In this repo:
 
 In this repo:
 
-- `src/theme/antdTheme.ts:77–79` lifts AntD's `controlHeight` / `controlHeightLG` / `controlHeightSM` to 44 px on `pointer: coarse`, so even `size="small"` buttons hit Apple HIG on touch.
+- `TOUCH_TARGET` (`src/components/ui/touchTarget.ts` — `coarse:min-h-[44px]`) is threaded into every interactive `ui/*` shadcn primitive, so even `size="sm"` controls hit the Apple HIG 44 px floor on touch; the `coarse:` variant maps to `@media (pointer: coarse)` in `tailwind.config.ts`.
 - `src/App.css:118–120` sets `-webkit-tap-highlight-color: transparent` and `text-size-adjust: 100%` at the body level.
 - View Transitions are wired on every user-initiated navigation via React Router 7's `viewTransition` prop / `navigate(..., { viewTransition: true })`. The sticky header opts out via `view-transition-name: pulse-header` so it stays anchored across route changes — see `src/components/header/index.tsx:30–47` and `src/App.css:230–248`.
 - The `motion` and `easing` token blocks at `src/theme/tokens.ts:147–158` standardize durations (60/120/200/320 ms) and curves so animations stay consistent.
@@ -134,7 +134,7 @@ In this repo:
 - **Font-size ≥ 16 px** on inputs (iOS auto-zooms otherwise). Never `user-scalable=no` (WCAG violation).
 - **Keyboard handling**: `interactive-widget=resizes-content` + `env(keyboard-inset-height)` for fixed footers above the keyboard. The VirtualKeyboard API (`navigator.virtualKeyboard.overlaysContent = true`) for chat composers.
 
-In this repo: login/registration already had `inputMode` + `enterKeyHint`. The first audit added them to `taskCreator`, `columnCreator`, and `projectSearchPanel`. The mobile-optimization follow-up extended the same attributes to `projectModal`, `taskModal` (name / epic / note), `commandPalette`, `aiSearchInput`, and the Copilot chat composer (`copilotDock/ChatTabBody`, `enterKeyHint="send"` so the iOS return key reads "send"). Search inputs that don't already render their own clear affordance use `type="search"`; the palette and AI search keep AntD's `allowClear` prefix instead of stacking two clear buttons.
+In this repo: login/registration already had `inputMode` + `enterKeyHint`. The first audit added them to `taskCreator`, `columnCreator`, and `projectSearchPanel`. The mobile-optimization follow-up extended the same attributes to `projectModal`, `taskModal` (name / epic / note), `commandPalette`, `aiSearchInput`, and the Copilot chat composer (`copilotDock/ChatTabBody`, `enterKeyHint="send"` so the iOS return key reads "send"). Search inputs use the shadcn `Input` (`src/components/ui/input.tsx`) with `type="search"`, so the browser's native clear affordance shows without stacking a second custom clear button — there is no antd `allowClear` anymore.
 
 ### E. Visual polish
 
@@ -146,9 +146,9 @@ In this repo: login/registration already had `inputMode` + `enterKeyHint`. The f
 
 In this repo:
 
-- Dark mode is fully wired via `useColorScheme`, AntD `ConfigProvider`, and matching `theme-color` meta tags. Reduced motion has both a global guard (`src/App.css:230–242`) and a `useReducedMotion` hook for component opt-in.
-- `buildAntdTheme` (`src/theme/antdTheme.ts`) lifts the AntD body type scale one step on `pointer: coarse` inside the same coarse branch that raises `controlHeight`: `fontSize` 14→16, `fontSizeSM` 13→14, `fontSizeLG` 16→18. Desktop keeps the dense 14 / 13 / 16 ladder; heading tokens (display/xxl/xl/lg) are unchanged because they already read large. The step reuses the existing `fontSize.*` tokens — no new literals.
-- Body/label copy that hard-codes `fontSize.sm` (13 px) — the auth switch rows, terms agreement, password-strength hint, and auth hero fine print — reads through `bodyCopyCoarseFontCss` (`src/theme/tokens.ts`) so it lifts to `fontSize.base` (14 px) on coarse pointers and never renders sub-14 px next to the bumped 16 px base. Intentional micro-captions (badges, pills, chips, timestamps, meta rows) stay at their `fontSize.xs` / `fontSize.sm` literal on purpose.
+- Dark mode is fully wired via `useColorScheme` (which flips the palette `--pulse-*` CSS vars from `src/theme/palettes/cssVars.ts`) and matching `theme-color` meta tags. Reduced motion has both a global guard (`src/App.css:230–242`) and a `useReducedMotion` hook for component opt-in.
+- Native form controls lift to 16 px on `pointer: coarse` via the `@media (pointer: coarse)` rule in `src/App.css:288–293`, so inputs read like native body copy on a phone without triggering iOS auto-zoom, while desktop keeps the dense 14 px ladder. Heading tokens (display/xxl/xl/lg) are unchanged because they already read large.
+- Body/label copy that hard-codes `fontSize.sm` (13 px) — the auth switch rows, terms agreement, password-strength hint, and auth hero fine print — reads through `bodyCopyCoarseFontCss` (`src/theme/tokens.ts`) so it lifts to `fontSize.base` (14 px) on coarse pointers and never renders sub-14 px next to the bumped 16 px base. Intentional micro-captions (badges, pills, chips, timestamps, meta rows) stay at their `fontSize.xs` / `fontSize.sm` literal on purpose. Both reuse the existing `fontSize.*` tokens — no new literals.
 
 ### F. Offline & resilience
 
@@ -230,7 +230,7 @@ Sub-100 ms INP feels truly native; 200-500 ms feels web-y. The 2025 Web Almanac 
 
 ### General "web-y" smells
 
-- `alert()`, `confirm()`, `prompt()` — jarring system dialogs. **In this repo:** AntD `Modal.confirm` is used everywhere instead.
+- `alert()`, `confirm()`, `prompt()` — jarring system dialogs. **In this repo:** a shadcn `Dialog` (Radix) confirmation is used instead.
 - Default tap-highlight gray flash without a custom `:active` state.
 - No haptic / micro-feedback on tap.
 - Jarring route transitions (no view transition).
@@ -249,8 +249,8 @@ Applied in the audit (PR #46), the View Transitions follow-up (PR #47), and the 
 - iOS auto-zoom prevented (`@media (pointer: coarse)` 16 px input rule).
 - Full PWA boilerplate in `index.html`; minimal `public/manifest.webmanifest`.
 - All popover / drawer height caps use `dvh` with `vh` fallback.
-- AntD `controlHeightSM` is 44 px on coarse pointers (Apple HIG).
-- AntD body type scale lifts one step on coarse pointers — `fontSize` 14→16, `fontSizeSM` 13→14, `fontSizeLG` 16→18 (`src/theme/antdTheme.ts`) — so mobile body copy reads ~16 px like native, while desktop keeps the dense ladder and headings stay put. Body/label copy that hard-coded `fontSize.sm` (auth switch rows, terms agreement, password-strength hint, hero fine print) now routes through `bodyCopyCoarseFontCss` so it clears the 14 px floor on touch.
+- Interactive `ui/*` controls hit a 44 px min-height on coarse pointers via `TOUCH_TARGET` (`src/components/ui/touchTarget.ts`, Apple HIG).
+- Native form controls lift to 16 px on coarse pointers (`src/App.css:288–293`) so mobile input copy reads ~16 px like native, while desktop keeps the dense ladder and headings stay put. Body/label copy that hard-coded `fontSize.sm` (auth switch rows, terms agreement, password-strength hint, hero fine print) routes through `bodyCopyCoarseFontCss` (`src/theme/tokens.ts`) so it clears the 14 px floor on touch.
 - Bottom-tab labels all read at `fontSize.xs` (12 px). The Search tab is a `<button>`, and its style block declares `font-family: inherit` rather than the `font` shorthand — the shorthand resets `font-size` back to the UA default, which oversized and truncated the "Search" label next to its 12 px `NavLink` siblings (`src/components/bottomTabBar/index.tsx`).
 - Card metadata contrast pass (WCAG 1.4.3): the project card's organization + date read at the secondary text colour rather than tertiary, and the high-priority board-card badge uses `--pulse-priority-high` — a mode-aware AA-safe amber (amber-700 on the white card, the brand seed on the dark card) instead of the `--ant-color-warning` seed that measured ~2.2 : 1 on white (`src/components/projectCard/index.tsx`, `src/components/column/index.tsx`, `src/theme/palettes/cssVars.ts`).
 - `inputMode` + `enterKeyHint` on every text input — auth, creators, search panels, modals (`projectModal`, `taskModal`), `commandPalette`, `aiSearchInput`, and the AI chat composer (`enterKeyHint="send"`).

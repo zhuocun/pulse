@@ -128,9 +128,14 @@ describe("ResponsiveFormSheet — phone branch", () => {
         expect(dialog).toBe(screen.getByTestId("form-sheet-surface"));
     });
 
-    it("does not render an AntD Modal on phone", () => {
+    it("renders only the Sheet surface (not the desktop Dialog) on phone", () => {
         render(<Harness />);
-        expect(document.querySelector(".ant-modal")).toBeNull();
+        // The phone branch renders exactly one dialog — the detent-aware
+        // Sheet surface; the desktop Dialog (which carries no `data-detent`)
+        // is never mounted.
+        const dialogs = screen.getAllByRole("dialog");
+        expect(dialogs).toHaveLength(1);
+        expect(dialogs[0]).toHaveAttribute("data-detent", "medium");
     });
 
     it("unmounts the surface when closed", () => {
@@ -162,11 +167,9 @@ describe("ResponsiveFormSheet — desktop branch", () => {
         mockedUseReducedMotion.mockReturnValue(false);
     });
 
-    it("renders an AntD Modal dialog with title, footer, and children", () => {
+    it("renders a Dialog with title, footer, and children", () => {
         render(<Harness />);
 
-        const modal = document.querySelector(".ant-modal");
-        expect(modal).toBeTruthy();
         const dialog = screen.getByRole("dialog", { name: "Edit project" });
         expect(dialog).toBeInTheDocument();
         expect(screen.getByTestId("form-sheet-save")).toBeInTheDocument();

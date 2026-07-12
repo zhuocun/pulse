@@ -1,16 +1,9 @@
-import styled from "@emotion/styled";
-import { Typography } from "antd";
 import React from "react";
 
-import {
-    accent,
-    breakpoints,
-    fontSize,
-    fontWeight,
-    lineHeight,
-    radius,
-    space
-} from "../../theme/tokens";
+import { cn } from "@/lib/utils";
+import { Typography } from "@/components/ui/typography";
+
+import { accent } from "../../theme/tokens";
 import EmptyIllustration from "../emptyIllustration";
 
 /**
@@ -22,9 +15,7 @@ import EmptyIllustration from "../emptyIllustration";
  *    use when something failed and the user needs to know now.
  *  - `notice` and `notFound` mount with no live-region role; the
  *    heading itself carries the message and the page change (or
- *    initial mount) is sufficient context. Avoids the gratuitous
- *    polite-live-region announcement on every 404 / AI-disabled
- *    landing.
+ *    initial mount) is sufficient context.
  */
 type EmptyStateTone = "empty" | "loading" | "notice" | "notFound" | "error";
 
@@ -56,57 +47,6 @@ interface EmptyStateProps {
 /* Tones that should fire a polite live-region announcement on mount. */
 const POLITE_TONES = new Set<EmptyStateTone>(["empty", "loading"]);
 
-const Container = styled.div`
-    align-items: center;
-    color: var(--ant-color-text, rgba(15, 23, 42, 0.85));
-    display: flex;
-    flex-direction: column;
-    gap: ${space.sm}px;
-    padding: ${space.xl}px ${space.md}px;
-    text-align: center;
-
-    @media (min-width: ${breakpoints.sm}px) {
-        padding: ${space.xxl}px ${space.lg}px;
-    }
-`;
-
-const IllustrationFrame = styled.div`
-    align-items: center;
-    background:
-        radial-gradient(circle at 30% 30%, ${accent.bgMedium}, transparent 65%),
-        radial-gradient(
-            circle at 70% 70%,
-            rgba(234, 88, 12, 0.16),
-            transparent 60%
-        ),
-        var(--ant-color-fill-quaternary, rgba(15, 23, 42, 0.04));
-    border: 1px solid var(--ant-color-border-secondary, rgba(15, 23, 42, 0.06));
-    border-radius: ${radius.pill}px;
-    color: var(--ant-color-primary, #ea580c);
-    display: inline-flex;
-    height: 88px;
-    justify-content: center;
-    margin-bottom: 0;
-    width: 88px;
-`;
-
-const Title = styled(Typography.Title)`
-    && {
-        font-size: ${fontSize.md}px;
-        font-weight: ${fontWeight.semibold};
-        line-height: ${lineHeight.snug};
-        margin: 0;
-    }
-`;
-
-const Description = styled(Typography.Text)`
-    && {
-        color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-        line-height: ${lineHeight.normal};
-        max-width: 36rem;
-    }
-`;
-
 /**
  * Reusable empty state used by project list, board, members popover, chat
  * drawer, brief drawer (Phase 3.6). Keeps the visual treatment, copy density,
@@ -123,8 +63,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({
     "data-testid": testId
 }) => {
     // Map tone → ARIA role. `empty`/`loading` keep the prior
-    // `role="status"` so existing callsites continue to announce
-    // politely; `error` escalates to assertive; `notice`/`notFound`
+    // `role="status"`; `error` escalates to assertive; `notice`/`notFound`
     // drop the live-region role entirely.
     const role =
         tone === "error"
@@ -133,16 +72,40 @@ const EmptyState: React.FC<EmptyStateProps> = ({
               ? "status"
               : undefined;
     return (
-        <Container data-testid={testId} role={role}>
-            {illustration ?? (
-                <IllustrationFrame>
-                    <EmptyIllustration size={44} variant={variant} />
-                </IllustrationFrame>
+        <div
+            className={cn(
+                "flex flex-col items-center gap-sm px-md py-xl text-center text-foreground",
+                "min-[480px]:px-lg min-[480px]:py-xxl"
             )}
-            <Title level={headingLevel}>{title}</Title>
-            {description ? <Description>{description}</Description> : null}
-            {cta ? <div style={{ marginTop: space.xs }}>{cta}</div> : null}
-        </Container>
+            data-testid={testId}
+            role={role}
+        >
+            {illustration ?? (
+                <span
+                    className="inline-flex size-[88px] items-center justify-center rounded-pill border border-border text-primary"
+                    style={{
+                        background: `radial-gradient(circle at 30% 30%, ${accent.bgMedium}, transparent 65%), radial-gradient(circle at 70% 70%, rgba(234, 88, 12, 0.16), transparent 60%), rgba(15, 23, 42, 0.04)`
+                    }}
+                >
+                    <EmptyIllustration size={44} variant={variant} />
+                </span>
+            )}
+            <Typography.Title
+                className="m-0 text-md font-semibold leading-snug"
+                level={headingLevel}
+            >
+                {title}
+            </Typography.Title>
+            {description ? (
+                <Typography.Text
+                    className="max-w-[36rem] leading-normal"
+                    type="secondary"
+                >
+                    {description}
+                </Typography.Text>
+            ) : null}
+            {cta ? <div className="mt-xs">{cta}</div> : null}
+        </div>
     );
 };
 

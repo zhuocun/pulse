@@ -1,28 +1,27 @@
-import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
-import {
-    Alert,
-    Button,
-    DatePicker,
-    Input,
-    Popconfirm,
-    Select,
-    Skeleton,
-    Space,
-    Tag,
-    Typography
-} from "antd";
 import dayjs, { type Dayjs } from "dayjs";
+import { AlertCircle, Pencil, Trash2 } from "lucide-react";
 import React, { useCallback, useMemo, useState } from "react";
 
-import { microcopy, microcopyString } from "../../constants/microcopy";
+import { Alert, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-    fontSize,
-    fontWeight,
-    space,
-    touchTargetCoarse
-} from "../../theme/tokens";
-import useAppMessage from "../../utils/hooks/useAppMessage";
+    Popover,
+    PopoverContent,
+    PopoverTrigger
+} from "@/components/ui/popover";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import useAppMessage from "@/components/ui/toast";
+import { Typography } from "@/components/ui/typography";
+
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import useAuth from "../../utils/hooks/useAuth";
 import useMilestoneMutations from "../../utils/hooks/useMilestoneMutations";
 import useMilestones from "../../utils/hooks/useMilestones";
@@ -61,6 +60,8 @@ const DEFAULT_NEW_STATE: MilestoneState = "open";
 
 const EDITOR_ROLES = new Set(["owner", "editor"]);
 
+const ICON_BUTTON_CLASS = "coarse:min-w-[44px]";
+
 const toDayjsOrUndefined = (value: unknown): Dayjs | undefined => {
     if (!value) return undefined;
     const parsed = dayjs(value as string);
@@ -72,152 +73,21 @@ const formatDate = (value: string | null | undefined): string => {
     return parsed ? parsed.format(ISO_DATE_FORMAT) : "";
 };
 
-const Wrapper = styled.section`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.md}px;
-`;
+// Native `<input type="date">` emits / consumes plain "YYYY-MM-DD" strings;
+// bridge them to the `Dayjs` the create/update payloads expect.
+const dateInputValue = (value: Dayjs | undefined): string =>
+    value ? value.format(ISO_DATE_FORMAT) : "";
 
-const List = styled.ul`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xs}px;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-`;
+const parseDateInput = (value: string): Dayjs | undefined =>
+    value ? toDayjsOrUndefined(value) : undefined;
 
-const Row = styled.li`
-    align-items: center;
-    border: 1px solid var(--ant-color-border-secondary, rgba(15, 23, 42, 0.08));
-    border-radius: ${space.xs}px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.sm}px;
-    margin: 0;
-    padding: ${space.sm}px;
-`;
-
-const Identity = styled.div`
-    display: flex;
-    flex: 1 1 12rem;
-    flex-direction: column;
-    gap: ${space.xxs}px;
-    min-width: 0;
-`;
-
-const MilestoneName = styled(Typography.Text)`
-    && {
-        font-size: ${fontSize.base}px;
-        font-weight: ${fontWeight.semibold};
-    }
-`;
-
-const MilestoneMeta = styled(Typography.Text)`
-    && {
-        color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45));
-        font-size: ${fontSize.xs}px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-`;
-
-const Controls = styled.div`
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xs}px;
-    margin-inline-start: auto;
-`;
-
-const StateSelect = styled(Select<MilestoneState>)`
-    min-width: 7rem;
-
-    @media (pointer: coarse) {
-        .ant-select-selector {
-            min-height: ${touchTargetCoarse}px;
+const onEnterKey =
+    (handler: () => void) => (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            handler();
         }
-    }
-`;
-
-const IconButton = styled(Button)`
-    @media (pointer: coarse) {
-        min-height: ${touchTargetCoarse}px;
-        min-width: ${touchTargetCoarse}px;
-    }
-`;
-
-const EditRow = styled.div`
-    display: flex;
-    flex: 1 1 100%;
-    flex-direction: column;
-    gap: ${space.xs}px;
-`;
-
-const FieldRow = styled.div`
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xs}px;
-`;
-
-const AddSection = styled.div`
-    border-top: 1px solid
-        var(--ant-color-border-secondary, rgba(15, 23, 42, 0.08));
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xs}px;
-    padding-block-start: ${space.md}px;
-`;
-
-const AddHeading = styled(Typography.Text)`
-    && {
-        font-size: ${fontSize.sm}px;
-        font-weight: ${fontWeight.semibold};
-    }
-`;
-
-const AddRow = styled.div`
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xs}px;
-`;
-
-const NameInput = styled(Input)`
-    flex: 1 1 12rem;
-    min-width: 10rem;
-
-    @media (pointer: coarse) {
-        min-height: ${touchTargetCoarse}px;
-    }
-`;
-
-const DescriptionInput = styled(Input)`
-    flex: 1 1 16rem;
-    min-width: 12rem;
-
-    @media (pointer: coarse) {
-        min-height: ${touchTargetCoarse}px;
-    }
-`;
-
-const AddStateSelect = styled(Select<MilestoneState>)`
-    min-width: 7rem;
-
-    @media (pointer: coarse) {
-        .ant-select-selector {
-            min-height: ${touchTargetCoarse}px;
-        }
-    }
-`;
-
-const AddButton = styled(Button)`
-    @media (pointer: coarse) {
-        min-height: ${touchTargetCoarse}px;
-    }
-`;
+    };
 
 interface MilestonesManagerProps {
     projectId: string;
@@ -230,6 +100,51 @@ interface EditDraft {
     dueDate?: Dayjs;
     state: MilestoneState;
 }
+
+interface ConfirmPopoverProps {
+    trigger: React.ReactNode;
+    title: string;
+    okText: string;
+    cancelText: string;
+    onConfirm: () => void;
+}
+
+const ConfirmPopover: React.FC<ConfirmPopoverProps> = ({
+    trigger,
+    title,
+    okText,
+    cancelText,
+    onConfirm
+}) => {
+    const [open, setOpen] = useState(false);
+    return (
+        <Popover onOpenChange={setOpen} open={open}>
+            <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+            <PopoverContent aria-label={title} className="w-64" role="dialog">
+                <p className="text-sm font-medium text-foreground">{title}</p>
+                <div className="mt-sm flex justify-end gap-xs">
+                    <Button
+                        onClick={() => setOpen(false)}
+                        size="sm"
+                        variant="default"
+                    >
+                        {cancelText}
+                    </Button>
+                    <Button
+                        onClick={() => {
+                            setOpen(false);
+                            onConfirm();
+                        }}
+                        size="sm"
+                        variant="destructive"
+                    >
+                        {okText}
+                    </Button>
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+};
 
 const MilestonesManager: React.FC<MilestonesManagerProps> = ({ projectId }) => {
     const message = useAppMessage();
@@ -417,38 +332,46 @@ const MilestonesManager: React.FC<MilestonesManagerProps> = ({ projectId }) => {
 
     if (isError) {
         return (
-            <Alert
-                data-testid="milestones-load-error"
-                message={microcopyString(microcopy.milestones.loadError)}
-                showIcon
-                type="error"
-            />
+            <Alert data-testid="milestones-load-error" variant="destructive">
+                <AlertCircle aria-hidden />
+                <AlertTitle>
+                    {microcopyString(microcopy.milestones.loadError)}
+                </AlertTitle>
+            </Alert>
         );
     }
 
     if (isLoading && milestones.length === 0) {
         return (
-            <div data-testid="milestones-loading">
-                <Skeleton active paragraph={{ rows: 3 }} />
+            <div
+                className="flex flex-col gap-xs"
+                data-testid="milestones-loading"
+            >
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
             </div>
         );
     }
 
     return (
-        <Wrapper data-testid="milestones-manager">
+        <section
+            className="flex flex-col gap-md"
+            data-testid="milestones-manager"
+        >
             {milestones.length === 0 ? (
                 <Typography.Text
                     data-testid="milestones-empty"
                     type="secondary"
-                    style={{ fontSize: fontSize.sm }}
                 >
                     {microcopyString(microcopy.milestones.empty)}
                 </Typography.Text>
             ) : (
-                <List
+                <ul
                     aria-label={microcopyString(
                         microcopy.milestones.listAriaLabel
                     )}
+                    className="m-0 flex list-none flex-col gap-xs p-0"
                 >
                     {milestones.map((milestone) => {
                         const isEditing = editingId === milestone._id;
@@ -462,68 +385,85 @@ const MilestonesManager: React.FC<MilestonesManagerProps> = ({ projectId }) => {
                                       .replace("{start}", startText || "—")
                                       .replace("{due}", dueText || "—")
                                 : "";
+                        const currentState =
+                            milestone.state === "closed" ? "closed" : "open";
                         return (
-                            <Row
-                                key={milestone._id}
-                                data-testid="milestone-row"
+                            <li
+                                className="m-0 flex flex-wrap items-center gap-sm rounded-md border border-border p-sm"
                                 data-milestone-id={milestone._id}
+                                data-testid="milestone-row"
+                                key={milestone._id}
                             >
-                                <Identity>
-                                    <MilestoneName>
+                                <div className="flex min-w-0 flex-[1_1_12rem] flex-col gap-xxs">
+                                    <Typography.Text strong>
                                         {milestone.name}
-                                    </MilestoneName>
+                                    </Typography.Text>
                                     {milestone.description ? (
-                                        <MilestoneMeta>
+                                        <span className="overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground">
                                             {milestone.description}
-                                        </MilestoneMeta>
+                                        </span>
                                     ) : null}
                                     {rangeText ? (
-                                        <MilestoneMeta data-testid="milestone-date-range">
+                                        <span
+                                            className="overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground"
+                                            data-testid="milestone-date-range"
+                                        >
                                             {rangeText}
-                                        </MilestoneMeta>
+                                        </span>
                                     ) : null}
-                                </Identity>
-                                <Controls>
+                                </div>
+                                <div className="ms-auto flex flex-wrap items-center gap-xs">
                                     {/* One state control per row: managers
                                      * get the Select (which already shows
                                      * the current state), read-only viewers
                                      * get the Tag. Rendering both would
                                      * duplicate the state callout. */}
                                     {canManage ? (
-                                        <StateSelect
-                                            aria-label={microcopyString(
-                                                microcopy.milestones
-                                                    .statePlaceholder
-                                            )}
-                                            data-testid="milestone-state-select"
-                                            onChange={(state) =>
+                                        <Select
+                                            onValueChange={(state) =>
                                                 handleStateChange(
                                                     milestone._id,
-                                                    state
+                                                    state as MilestoneState
                                                 )
                                             }
-                                            options={stateOptions}
-                                            value={
-                                                milestone.state === "closed"
-                                                    ? "closed"
-                                                    : "open"
-                                            }
-                                        />
+                                            value={currentState}
+                                        >
+                                            <SelectTrigger
+                                                aria-label={microcopyString(
+                                                    microcopy.milestones
+                                                        .statePlaceholder
+                                                )}
+                                                className="w-28"
+                                                data-testid="milestone-state-select"
+                                            >
+                                                {stateLabel(currentState)}
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {stateOptions.map((option) => (
+                                                    <SelectItem
+                                                        key={option.value}
+                                                        value={option.value}
+                                                    >
+                                                        {option.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                     ) : (
-                                        <Tag
-                                            color={
-                                                milestone.state === "closed"
-                                                    ? "default"
-                                                    : "green"
-                                            }
+                                        <Badge
                                             data-testid="milestone-state-tag"
+                                            variant={
+                                                currentState === "closed"
+                                                    ? "secondary"
+                                                    : "success"
+                                            }
                                         >
                                             {stateLabel(milestone.state)}
-                                        </Tag>
+                                        </Badge>
                                     )}
                                     {canManage ? (
                                         <>
-                                            <IconButton
+                                            <Button
                                                 aria-label={microcopyString(
                                                     microcopy.milestones
                                                         .editAriaLabel
@@ -531,19 +471,19 @@ const MilestonesManager: React.FC<MilestonesManagerProps> = ({ projectId }) => {
                                                     "{name}",
                                                     milestone.name
                                                 )}
+                                                className={ICON_BUTTON_CLASS}
                                                 data-testid="milestone-edit"
-                                                icon={
-                                                    <EditOutlined aria-hidden />
-                                                }
                                                 onClick={() =>
                                                     isEditing
                                                         ? cancelEdit()
                                                         : beginEdit(milestone)
                                                 }
-                                                size="small"
-                                                type="text"
-                                            />
-                                            <Popconfirm
+                                                size="sm"
+                                                variant="ghost"
+                                            >
+                                                <Pencil aria-hidden />
+                                            </Button>
+                                            <ConfirmPopover
                                                 cancelText={
                                                     microcopy.milestones.cancel
                                                 }
@@ -560,38 +500,45 @@ const MilestonesManager: React.FC<MilestonesManagerProps> = ({ projectId }) => {
                                                     "{name}",
                                                     milestone.name
                                                 )}
-                                            >
-                                                <IconButton
-                                                    aria-label={microcopyString(
-                                                        microcopy.milestones
-                                                            .deleteAriaLabel
-                                                    ).replace(
-                                                        "{name}",
-                                                        milestone.name
-                                                    )}
-                                                    danger
-                                                    data-testid="milestone-delete"
-                                                    icon={
-                                                        <DeleteOutlined
+                                                trigger={
+                                                    <Button
+                                                        aria-label={microcopyString(
+                                                            microcopy.milestones
+                                                                .deleteAriaLabel
+                                                        ).replace(
+                                                            "{name}",
+                                                            milestone.name
+                                                        )}
+                                                        className={
+                                                            ICON_BUTTON_CLASS
+                                                        }
+                                                        data-testid="milestone-delete"
+                                                        size="sm"
+                                                        variant="ghost"
+                                                    >
+                                                        <Trash2
                                                             aria-hidden
+                                                            className="text-destructive"
                                                         />
-                                                    }
-                                                    size="small"
-                                                    type="text"
-                                                />
-                                            </Popconfirm>
+                                                    </Button>
+                                                }
+                                            />
                                         </>
                                     ) : null}
-                                </Controls>
+                                </div>
                                 {canManage && isEditing && editDraft ? (
-                                    <EditRow data-testid="milestone-edit-form">
-                                        <FieldRow>
-                                            <NameInput
+                                    <div
+                                        className="flex flex-[1_1_100%] flex-col gap-xs"
+                                        data-testid="milestone-edit-form"
+                                    >
+                                        <div className="flex flex-wrap items-center gap-xs">
+                                            <Input
                                                 aria-label={microcopyString(
                                                     microcopy.milestones
                                                         .addNamePlaceholder
                                                 )}
                                                 autoComplete="off"
+                                                className="min-w-[10rem] flex-[1_1_12rem]"
                                                 data-testid="milestone-edit-name"
                                                 enterKeyHint="done"
                                                 inputMode="text"
@@ -613,12 +560,13 @@ const MilestonesManager: React.FC<MilestonesManagerProps> = ({ projectId }) => {
                                                 )}
                                                 value={editDraft.name}
                                             />
-                                            <DescriptionInput
+                                            <Input
                                                 aria-label={microcopyString(
                                                     microcopy.milestones
                                                         .addDescriptionPlaceholder
                                                 )}
                                                 autoComplete="off"
+                                                className="min-w-[12rem] flex-[1_1_16rem]"
                                                 data-testid="milestone-edit-description"
                                                 enterKeyHint="done"
                                                 inputMode="text"
@@ -641,59 +589,61 @@ const MilestonesManager: React.FC<MilestonesManagerProps> = ({ projectId }) => {
                                                 )}
                                                 value={editDraft.description}
                                             />
-                                        </FieldRow>
-                                        <FieldRow>
-                                            <DatePicker
-                                                allowClear
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-xs">
+                                            <Input
                                                 aria-label={microcopyString(
                                                     microcopy.milestones
                                                         .startDatePlaceholder
                                                 )}
-                                                format={ISO_DATE_FORMAT}
-                                                onChange={(value) =>
+                                                className="w-auto"
+                                                onChange={(event) =>
                                                     setEditDraft((draft) =>
                                                         draft
                                                             ? {
                                                                   ...draft,
                                                                   startDate:
-                                                                      value ??
-                                                                      undefined
+                                                                      parseDateInput(
+                                                                          event
+                                                                              .target
+                                                                              .value
+                                                                      )
                                                               }
                                                             : draft
                                                     )
                                                 }
-                                                placeholder={microcopyString(
-                                                    microcopy.milestones
-                                                        .startDatePlaceholder
+                                                type="date"
+                                                value={dateInputValue(
+                                                    editDraft.startDate
                                                 )}
-                                                value={editDraft.startDate}
                                             />
-                                            <DatePicker
-                                                allowClear
+                                            <Input
                                                 aria-label={microcopyString(
                                                     microcopy.milestones
                                                         .dueDatePlaceholder
                                                 )}
-                                                format={ISO_DATE_FORMAT}
-                                                onChange={(value) =>
+                                                className="w-auto"
+                                                onChange={(event) =>
                                                     setEditDraft((draft) =>
                                                         draft
                                                             ? {
                                                                   ...draft,
                                                                   dueDate:
-                                                                      value ??
-                                                                      undefined
+                                                                      parseDateInput(
+                                                                          event
+                                                                              .target
+                                                                              .value
+                                                                      )
                                                               }
                                                             : draft
                                                     )
                                                 }
-                                                placeholder={microcopyString(
-                                                    microcopy.milestones
-                                                        .dueDatePlaceholder
+                                                type="date"
+                                                value={dateInputValue(
+                                                    editDraft.dueDate
                                                 )}
-                                                value={editDraft.dueDate}
                                             />
-                                            <Space>
+                                            <div className="flex items-center gap-xs">
                                                 <Button
                                                     data-testid="milestone-edit-save"
                                                     disabled={
@@ -702,7 +652,7 @@ const MilestonesManager: React.FC<MilestonesManagerProps> = ({ projectId }) => {
                                                     }
                                                     loading={isUpdating}
                                                     onClick={saveEdit}
-                                                    type="primary"
+                                                    variant="primary"
                                                 >
                                                     {microcopyString(
                                                         microcopy.milestones
@@ -712,48 +662,51 @@ const MilestonesManager: React.FC<MilestonesManagerProps> = ({ projectId }) => {
                                                 <Button
                                                     data-testid="milestone-edit-cancel"
                                                     onClick={cancelEdit}
+                                                    variant="default"
                                                 >
                                                     {microcopyString(
                                                         microcopy.milestones
                                                             .cancel
                                                     )}
                                                 </Button>
-                                            </Space>
-                                        </FieldRow>
-                                    </EditRow>
+                                            </div>
+                                        </div>
+                                    </div>
                                 ) : null}
-                            </Row>
+                            </li>
                         );
                     })}
-                </List>
+                </ul>
             )}
 
             {canManage ? (
-                <AddSection>
-                    <AddHeading>
+                <div className="flex flex-col gap-xs border-t border-border pt-md">
+                    <Typography.Text strong>
                         {microcopyString(microcopy.milestones.addHeading)}
-                    </AddHeading>
-                    <AddRow>
-                        <NameInput
+                    </Typography.Text>
+                    <div className="flex flex-wrap items-center gap-xs">
+                        <Input
                             aria-label={microcopyString(
                                 microcopy.milestones.addNamePlaceholder
                             )}
                             autoComplete="off"
+                            className="min-w-[10rem] flex-[1_1_12rem]"
                             data-testid="milestone-add-name"
                             enterKeyHint="done"
                             inputMode="text"
                             onChange={(event) => setNewName(event.target.value)}
-                            onPressEnter={handleAdd}
+                            onKeyDown={onEnterKey(handleAdd)}
                             placeholder={microcopyString(
                                 microcopy.milestones.addNamePlaceholder
                             )}
                             value={newName}
                         />
-                        <DescriptionInput
+                        <Input
                             aria-label={microcopyString(
                                 microcopy.milestones.addDescriptionPlaceholder
                             )}
                             autoComplete="off"
+                            className="min-w-[12rem] flex-[1_1_16rem]"
                             data-testid="milestone-add-description"
                             enterKeyHint="done"
                             inputMode="text"
@@ -765,67 +718,79 @@ const MilestonesManager: React.FC<MilestonesManagerProps> = ({ projectId }) => {
                             )}
                             value={newDescription}
                         />
-                    </AddRow>
-                    <AddRow>
-                        <DatePicker
-                            allowClear
+                    </div>
+                    <div className="flex flex-wrap items-center gap-xs">
+                        <Input
                             aria-label={microcopyString(
                                 microcopy.milestones.startDatePlaceholder
                             )}
+                            className="w-auto"
                             data-testid="milestone-add-start"
-                            format={ISO_DATE_FORMAT}
-                            onChange={(value) =>
-                                setNewStartDate(value ?? undefined)
+                            onChange={(event) =>
+                                setNewStartDate(
+                                    parseDateInput(event.target.value)
+                                )
                             }
-                            placeholder={microcopyString(
-                                microcopy.milestones.startDatePlaceholder
-                            )}
-                            value={newStartDate}
+                            type="date"
+                            value={dateInputValue(newStartDate)}
                         />
-                        <DatePicker
-                            allowClear
+                        <Input
                             aria-label={microcopyString(
                                 microcopy.milestones.dueDatePlaceholder
                             )}
+                            className="w-auto"
                             data-testid="milestone-add-due"
-                            format={ISO_DATE_FORMAT}
-                            onChange={(value) =>
-                                setNewDueDate(value ?? undefined)
+                            onChange={(event) =>
+                                setNewDueDate(
+                                    parseDateInput(event.target.value)
+                                )
                             }
-                            placeholder={microcopyString(
-                                microcopy.milestones.dueDatePlaceholder
-                            )}
-                            value={newDueDate}
+                            type="date"
+                            value={dateInputValue(newDueDate)}
                         />
-                        <AddStateSelect
-                            aria-label={microcopyString(
-                                microcopy.milestones.statePlaceholder
-                            )}
-                            data-testid="milestone-add-state"
-                            onChange={(value) => setNewState(value)}
-                            options={stateOptions}
-                            placeholder={microcopyString(
-                                microcopy.milestones.statePlaceholder
-                            )}
+                        <Select
+                            onValueChange={(value) =>
+                                setNewState(value as MilestoneState)
+                            }
                             value={newState}
-                        />
-                        <AddButton
+                        >
+                            <SelectTrigger
+                                aria-label={microcopyString(
+                                    microcopy.milestones.statePlaceholder
+                                )}
+                                className="w-28"
+                                data-testid="milestone-add-state"
+                            >
+                                {stateLabel(newState)}
+                            </SelectTrigger>
+                            <SelectContent>
+                                {stateOptions.map((option) => (
+                                    <SelectItem
+                                        key={option.value}
+                                        value={option.value}
+                                    >
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Button
                             data-testid="milestone-add-submit"
                             disabled={!newName.trim() || isCreating}
                             loading={isCreating}
                             onClick={handleAdd}
-                            type="primary"
+                            variant="primary"
                         >
                             {isCreating
                                 ? microcopyString(microcopy.milestones.adding)
                                 : microcopyString(
                                       microcopy.milestones.addButton
                                   )}
-                        </AddButton>
-                    </AddRow>
-                </AddSection>
+                        </Button>
+                    </div>
+                </div>
             ) : null}
-        </Wrapper>
+        </section>
     );
 };
 

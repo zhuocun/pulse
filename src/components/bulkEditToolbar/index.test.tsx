@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { App as AntdApp } from "antd";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import {
@@ -77,31 +77,38 @@ const makeClient = () => {
 const renderToolbar = (queryClient: QueryClient) =>
     render(
         <QueryClientProvider client={queryClient}>
-            <AntdApp>
-                <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={
-                                <BulkSelectionProvider>
-                                    <SelectTwo />
-                                    <BulkEditToolbar members={members} />
-                                </BulkSelectionProvider>
-                            }
-                        />
-                    </Routes>
-                </MemoryRouter>
-            </AntdApp>
+            <MemoryRouter initialEntries={["/projects/p1/board"]}>
+                <Routes>
+                    <Route
+                        path="/projects/:projectId/board"
+                        element={
+                            <BulkSelectionProvider>
+                                <SelectTwo />
+                                <BulkEditToolbar members={members} />
+                            </BulkSelectionProvider>
+                        }
+                    />
+                </Routes>
+            </MemoryRouter>
         </QueryClientProvider>
     );
 
 const pickPriorityHigh = async () => {
-    fireEvent.mouseDown(screen.getByRole("combobox", { name: "Set priority" }));
-    fireEvent.click(await screen.findByText("High"));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("combobox", { name: "Set priority" }));
+    await user.click(await screen.findByRole("option", { name: "High" }));
 };
 
 describe("BulkEditToolbar", () => {
     const fetchMock = jest.spyOn(global, "fetch");
+
+    // Radix Select drives its listbox with pointer-capture + scroll APIs
+    // jsdom doesn't ship; polyfill them so the priority picker can open.
+    beforeAll(() => {
+        Element.prototype.scrollIntoView = jest.fn();
+        Element.prototype.hasPointerCapture = jest.fn(() => false);
+        Element.prototype.releasePointerCapture = jest.fn();
+    });
 
     beforeEach(() => {
         fetchMock.mockReset();

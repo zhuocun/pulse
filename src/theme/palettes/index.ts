@@ -3,12 +3,12 @@
  *
  * The app ships three contrast-verified palettes. ONE of them (orange) is the
  * module-load default exported as `palette` — the synchronous CSS-var
- * injection in `index.tsx`, the literal fallbacks in `tokens.ts` /
- * `aiTokens.ts`, and the default `buildAntdTheme` argument all read it so the
- * very first paint is correct before React (and the runtime resolver hook)
- * mount. The user's stored `colorTheme` preference re-colors the live app at
- * runtime via `usePaletteTheme`, which re-renders `paletteToCss(selected)`
- * into the `#pulse-theme-vars` style element and rebuilds the AntD theme.
+ * injection in `index.tsx` and the literal fallbacks in `tokens.ts` /
+ * `aiTokens.ts` all read it so the very first paint is correct before React
+ * (and the runtime resolver hook) mount. The user's stored `colorTheme`
+ * preference re-colors the live app at runtime via `usePaletteTheme`, which
+ * re-renders `paletteToCss(selected)` into the `#pulse-theme-vars` style
+ * element.
  *
  * Adding a palette:
  *   1. Add `palettes/<name>.ts` modeled on `orange.ts`.
@@ -41,7 +41,7 @@ export const defaultPaletteName = "orange" as const;
 /**
  * The registry — insertion order IS the display order in the settings picker
  * (orange, blue, emerald). The key is the persisted `colorTheme` value; the
- * value is the palette object the runtime resolver and AntD builder consume.
+ * value is the palette object the runtime resolver consumes.
  */
 export const paletteRegistry = {
     orange: orangePalette,

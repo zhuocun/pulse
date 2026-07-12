@@ -1,6 +1,3 @@
-import { Input } from "antd";
-import type { TextAreaRef } from "antd/lib/input/TextArea";
-import type { TextAreaProps } from "antd/lib/input/TextArea";
 import type { ChangeEvent, CompositionEvent, KeyboardEvent } from "react";
 import React, {
     cloneElement,
@@ -27,11 +24,12 @@ import useReducedMotion from "../../utils/hooks/useReducedMotion";
  * (docs/design/_review-2026-05/04-ai-copilot.md §Ambition 2).
  *
  *     <AiGhostText route="task-note" context={{ projectName, columnName, taskName, currentValue }}>
- *         <Input.TextArea ... />
+ *         <Textarea ... />
  *     </AiGhostText>
  *
  * Behaviour:
- *  - Wraps any AntD `Input.TextArea`, preserving the child's props.
+ *  - Wraps a textarea (ui `Textarea` or AntD `Input.TextArea`), preserving
+ *    the child's props.
  *  - Debounces the user's input by 600 ms then asks the local engine
  *    (`utils/ai/engine#noteCompletion`) for a continuation.
  *  - Renders the completion as a faded overlay anchored to the textarea
@@ -68,14 +66,36 @@ interface AiGhostTextProps {
     /** Engine-side grounding plus the live partial value from the textarea. */
     context: NoteCompletionContext;
     /**
-     * The wrapped textarea. Must be an AntD `Input.TextArea`; props are
-     * preserved and the wrapper hooks `onChange` / `onKeyDown` /
+     * The wrapped textarea (ui `Textarea` or AntD `Input.TextArea`); props
+     * are preserved and the wrapper hooks `onChange` / `onKeyDown` /
      * `onCompositionStart` / `onCompositionEnd` on top of the originals.
      */
     children: React.ReactElement;
     /** Debounce in ms. Defaults to 600 — see Ambition 2 spec. */
     debounceMs?: number;
 }
+
+/**
+ * The wrapped textarea may be a plain DOM `<textarea>` (ui `Textarea`) or an
+ * AntD `Input.TextArea` whose ref exposes the DOM node under
+ * `resizableTextArea.textArea`. `resolveTextArea` normalizes both shapes to
+ * the underlying `HTMLTextAreaElement` so the mirror/scroll/accept logic
+ * stays agnostic to which control the caller passed.
+ */
+type TextAreaLike =
+    | HTMLTextAreaElement
+    | {
+          resizableTextArea?: { textArea?: HTMLTextAreaElement | null } | null;
+      };
+
+const resolveTextArea = (
+    ref: React.MutableRefObject<TextAreaLike | null>
+): HTMLTextAreaElement | null => {
+    const current = ref.current;
+    if (!current) return null;
+    if (current instanceof HTMLTextAreaElement) return current;
+    return current.resizableTextArea?.textArea ?? null;
+};
 
 const STORAGE_KEY_PREFIX = "boardCopilot:privacyShown:";
 /**
@@ -177,7 +197,7 @@ const AiGhostText: React.FC<AiGhostTextProps> = ({
     const flagOn = environment.aiGhostTextEnabled;
     const consent = usePrivacyConsent(route);
     const reducedMotion = useReducedMotion();
-    const textAreaRef = useRef<TextAreaRef | null>(null);
+    const textAreaRef = useRef<TextAreaLike | null>(null);
     const mirrorRef = useRef<HTMLDivElement | null>(null);
     const composingRef = useRef<boolean>(false);
     const [suggestion, setSuggestion] = useState<string>("");
@@ -199,7 +219,11 @@ const AiGhostText: React.FC<AiGhostTextProps> = ({
     // throw with a clearer message if the contract is ever violated.
     // Dropping the guard keeps every hook unconditional, which is the
     // safe shape per the React rules-of-hooks.
-    const childProps = (children as React.ReactElement<TextAreaProps>).props;
+    const childProps = (
+        children as React.ReactElement<
+            React.TextareaHTMLAttributes<HTMLTextAreaElement>
+        >
+    ).props;
 
     // ---- Debounce ---------------------------------------------------
     useEffect(() => {
@@ -261,7 +285,7 @@ const AiGhostText: React.FC<AiGhostTextProps> = ({
     //      listener to the textarea so the mirror tracks the live
     //      scroll position on every frame.
     useLayoutEffect(() => {
-        const ta = textAreaRef.current?.resizableTextArea?.textArea;
+        const ta = resolveTextArea(textAreaRef);
         const mirror = mirrorRef.current;
         if (!ta || !mirror) return;
         const syncScroll = () => {
@@ -289,7 +313,7 @@ const AiGhostText: React.FC<AiGhostTextProps> = ({
         // mutable `value`; setting it then dispatching a native `input`
         // event is the canonical "react-controlled" handoff used across
         // the codebase (see useChatComposerHistoryRecall).
-        const ta = textAreaRef.current?.resizableTextArea?.textArea;
+        const ta = resolveTextArea(textAreaRef);
         if (ta) {
             const setter = Object.getOwnPropertyDescriptor(
                 window.HTMLTextAreaElement.prototype,
@@ -373,15 +397,14 @@ const AiGhostText: React.FC<AiGhostTextProps> = ({
     // untouched. This is the privacy gate the Ambition 2 spec calls
     // out: no overlay, no engine call, no debounce, no listeners.
     const fallthroughChild = useMemo(() => {
-        if (children.type === Input.TextArea) {
-            // ``ref`` is not declared on ``TextAreaProps`` — AntD wires it
-            // via ``React.forwardRef``, so cast the override to ``unknown``
-            // first to bypass the strict TextArea prop type.
-            return cloneElement(children, {
-                ref: textAreaRef
-            } as unknown as Record<string, unknown>);
-        }
-        return children;
+        // ``ref`` is not declared on the textarea prop type when the child
+        // is an AntD ``Input.TextArea`` (it wires ref via
+        // ``React.forwardRef``), so cast the override to ``unknown`` first
+        // to bypass the strict prop type. Attaching the ref keeps the host
+        // modal able to focus the textarea even while the surface is gated.
+        return cloneElement(children, {
+            ref: textAreaRef
+        } as unknown as Record<string, unknown>);
     }, [children]);
 
     if (!enabled) {

@@ -1,14 +1,16 @@
-import { Modal } from "antd";
-import {
-    cloneElement,
-    isValidElement,
-    useCallback,
-    useId,
-    useState
-} from "react";
+import { useCallback, useState } from "react";
 
-import { microcopy, microcopyString } from "../../constants/microcopy";
-import { breakpoints } from "../../theme/tokens";
+import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog";
+
+import { microcopy } from "../../constants/microcopy";
 
 /**
  * Reusable unsaved-changes guard for modal/sheet close + cancel paths
@@ -23,8 +25,8 @@ import { breakpoints } from "../../theme/tokens";
  * `onConfirmDiscard` if the user confirms. Cancelling the confirm ("Keep
  * editing") keeps the surface open and editable.
  *
- * The confirm surface is a CONTROLLED `<Modal>` (not the imperative
- * `Modal.confirm`) so it:
+ * The confirm surface is a CONTROLLED `<Dialog>` (not an imperative modal
+ * API) so it:
  *   - mounts and unmounts with the host component (no cross-test leakage
  *     into `document.body`, which the imperative API caused), and
  *   - composes with the theme provider exactly like the other dialogs.
@@ -60,7 +62,7 @@ export interface UnsavedChangesGuard {
     /** Whether the discard-confirm dialog is currently shown. */
     isPrompting: boolean;
     /**
-     * The confirm `<Modal>`. Render it once inside the host modal's tree;
+     * The confirm `<Dialog>`. Render it once inside the host modal's tree;
      * it is hidden chrome until `requestClose` is called on a dirty form.
      */
     confirmNode: React.ReactNode;
@@ -71,7 +73,6 @@ const useUnsavedChangesGuard = ({
     onConfirmDiscard
 }: UnsavedChangesGuardOptions): UnsavedChangesGuard => {
     const [isPrompting, setIsPrompting] = useState(false);
-    const bodyId = useId();
 
     const requestClose = useCallback(() => {
         if (!isDirty()) {
@@ -91,41 +92,32 @@ const useUnsavedChangesGuard = ({
     }, [onConfirmDiscard]);
 
     const confirmNode = (
-        <Modal
-            cancelText={microcopyString(
-                microcopy.confirm.discardChanges.cancelLabel
-            )}
-            centered
-            okButtonProps={{ danger: true }}
-            okText={microcopyString(
-                microcopy.confirm.discardChanges.confirmLabel
-            )}
-            onCancel={keepEditing}
-            onOk={confirmDiscard}
+        <Dialog
+            onOpenChange={(next) => {
+                // Any dismissal (Esc, scrim, close button) is "Keep editing".
+                if (!next) keepEditing();
+            }}
             open={isPrompting}
-            title={microcopyString(microcopy.confirm.discardChanges.title)}
-            width={Math.min(420, breakpoints.sm)}
-            /*
-             * Link the body to the dialog via aria-describedby so screen
-             * reader users hear the description right after the title.
-             * rc-dialog hardcodes only aria-labelledby; modalRender wraps
-             * the inner container so we can inject the attribute there.
-             */
-            modalRender={(node) =>
-                isValidElement(node)
-                    ? cloneElement(
-                          node as React.ReactElement<{
-                              "aria-describedby"?: string;
-                          }>,
-                          { "aria-describedby": bodyId }
-                      )
-                    : node
-            }
         >
-            <div id={bodyId}>
-                {microcopyString(microcopy.confirm.discardChanges.description)}
-            </div>
-        </Modal>
+            <DialogContent className="max-w-[420px]">
+                <DialogHeader>
+                    <DialogTitle>
+                        {microcopy.confirm.discardChanges.title}
+                    </DialogTitle>
+                    <DialogDescription>
+                        {microcopy.confirm.discardChanges.description}
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <Button onClick={keepEditing}>
+                        {microcopy.confirm.discardChanges.cancelLabel}
+                    </Button>
+                    <Button onClick={confirmDiscard} variant="destructive">
+                        {microcopy.confirm.discardChanges.confirmLabel}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 
     return { requestClose, isPrompting, confirmNode };

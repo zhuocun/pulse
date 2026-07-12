@@ -1,7 +1,6 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { App as AntdApp } from "antd";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
@@ -11,10 +10,6 @@ import {
     USER_PREFERENCES_STORAGE_KEY,
     userPreferencesSlice
 } from "../../store/reducers/userPreferencesSlice";
-import {
-    coarseTouchTargetsFor,
-    styledClassFor
-} from "../../testUtils/styleRules";
 import useAuth from "../../utils/hooks/useAuth";
 
 import TaskSearchPanel, { TaskSearchParam } from ".";
@@ -65,42 +60,22 @@ const defaultParam: TaskSearchParam = {
     type: ""
 };
 
-const installAntdBrowserMocks = () => {
-    Object.defineProperty(window, "matchMedia", {
-        writable: true,
-        value: (query: string) => ({
-            addEventListener: jest.fn(),
-            addListener: jest.fn(),
-            dispatchEvent: jest.fn(),
-            matches: false,
-            media: query,
-            onchange: null,
-            removeEventListener: jest.fn(),
-            removeListener: jest.fn()
-        })
-    });
-
-    class ResizeObserverMock {
-        observe = jest.fn();
-
-        unobserve = jest.fn();
-
-        disconnect = jest.fn();
-    }
-
-    Object.defineProperty(window, "ResizeObserver", {
-        writable: true,
-        value: ResizeObserverMock
-    });
+const installBrowserMocks = () => {
+    // Radix Select/DropdownMenu/Popover drive their surfaces with
+    // pointer-capture and scroll APIs jsdom doesn't ship; polyfill them so
+    // the coordinator/type pickers, preset loader, and save popover open.
+    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+    Element.prototype.releasePointerCapture = jest.fn();
 };
 
 /**
  * Phase 4.2 — preset + density UI surfaces require a Redux store and a
  * react-router context (presets are scoped by `projectId`). We build a
  * throwaway store per render so saved presets / density toggles from
- * one test never leak into another. `AntdApp` is required so the
- * `message.warning/info/success` calls inside the panel resolve to a
- * real notification instance (rather than the silent fallback).
+ * one test never leak into another. The toast API no-ops without a
+ * mounted `<Toaster>`, so the panel's `message.*` acks stay silent in
+ * tests without any provider.
  */
 const makePanelStore = (preset?: SavedFilterPresetState[]) =>
     configureStore({
@@ -144,22 +119,20 @@ const renderPanel = ({
     render(
         <Provider store={store}>
             <MemoryRouter initialEntries={["/projects/project-1/board"]}>
-                <AntdApp>
-                    <Routes>
-                        <Route
-                            path="/projects/:projectId/board"
-                            element={
-                                <TaskSearchPanel
-                                    loading={loading}
-                                    members={panelMembers}
-                                    param={param}
-                                    setParam={setParam}
-                                    tasks={panelTasks}
-                                />
-                            }
-                        />
-                    </Routes>
-                </AntdApp>
+                <Routes>
+                    <Route
+                        path="/projects/:projectId/board"
+                        element={
+                            <TaskSearchPanel
+                                loading={loading}
+                                members={panelMembers}
+                                param={param}
+                                setParam={setParam}
+                                tasks={panelTasks}
+                            />
+                        }
+                    />
+                </Routes>
             </MemoryRouter>
         </Provider>
     );
@@ -167,8 +140,8 @@ const renderPanel = ({
     return { setParam, store };
 };
 
-const openSelect = (index: number) => {
-    fireEvent.mouseDown(screen.getAllByRole("combobox")[index]);
+const openSelect = async (index: number) => {
+    await userEvent.setup().click(screen.getAllByRole("combobox")[index]);
 };
 
 const expandFilters = async () => {
@@ -178,14 +151,20 @@ const expandFilters = async () => {
     }
 };
 
+const openPresetLoader = async () => {
+    await userEvent
+        .setup()
+        .click(screen.getByTestId("task-search-panel-presets-select"));
+};
+
 const getRenderedOptionLabels = () =>
-    Array.from(
-        document.body.querySelectorAll(".ant-select-item-option-content")
-    ).map((option) => option.textContent);
+    Array.from(document.body.querySelectorAll('[role="option"]')).map(
+        (option) => option.textContent
+    );
 
 describe("TaskSearchPanel", () => {
     beforeAll(() => {
-        installAntdBrowserMocks();
+        installBrowserMocks();
     });
 
     beforeEach(() => {
@@ -219,7 +198,7 @@ describe("TaskSearchPanel", () => {
 
         await expandFilters();
 
-        openSelect(0);
+        await openSelect(0);
         fireEvent.click(await screen.findByText("Alice"));
 
         expect(setParam).toHaveBeenCalledWith({
@@ -228,7 +207,7 @@ describe("TaskSearchPanel", () => {
             type: ""
         });
 
-        openSelect(1);
+        await openSelect(1);
         fireEvent.click(await screen.findByText("Bug"));
 
         expect(setParam).toHaveBeenCalledWith({
@@ -258,7 +237,7 @@ describe("TaskSearchPanel", () => {
 
         await expandFilters();
 
-        openSelect(0);
+        await openSelect(0);
 
         await waitFor(() => {
             expect(getRenderedOptionLabels()).toEqual(
@@ -284,7 +263,7 @@ describe("TaskSearchPanel", () => {
 
         await expandFilters();
 
-        openSelect(1);
+        await openSelect(1);
 
         await waitFor(() => {
             expect(getRenderedOptionLabels()).toEqual(
@@ -317,13 +296,17 @@ describe("TaskSearchPanel", () => {
 
         await expandFilters();
 
-        openSelect(0);
+        await openSelect(0);
 
         await waitFor(() => {
             expect(getRenderedOptionLabels()).toContain("Current User");
         });
 
-        openSelect(1);
+        // Radix closes the first Select before the second opens.
+        fireEvent.keyDown(document.activeElement ?? document.body, {
+            key: "Escape"
+        });
+        await openSelect(1);
 
         await waitFor(() => {
             expect(getRenderedOptionLabels()).toEqual(
@@ -346,7 +329,7 @@ describe("TaskSearchPanel", () => {
 
         await expandFilters();
 
-        openSelect(0);
+        await openSelect(0);
 
         await waitFor(() => {
             expect(getRenderedOptionLabels()).toEqual(["Coordinators"]);
@@ -381,36 +364,15 @@ describe("TaskSearchPanel", () => {
     });
 
     it("shows loading state for both selects", async () => {
-        const { container } = render(
-            <Provider store={makePanelStore()}>
-                <MemoryRouter initialEntries={["/projects/p1/board"]}>
-                    <AntdApp>
-                        <Routes>
-                            <Route
-                                path="/projects/:projectId/board"
-                                element={
-                                    <TaskSearchPanel
-                                        loading
-                                        members={members}
-                                        param={defaultParam}
-                                        setParam={jest.fn()}
-                                        tasks={[task()]}
-                                    />
-                                }
-                            />
-                        </Routes>
-                    </AntdApp>
-                </MemoryRouter>
-            </Provider>
-        );
+        renderPanel({ loading: true, panelTasks: [task()] });
 
         await expandFilters();
 
-        // Two filter selects (coordinator + type) plus the preset Select
-        // both render the loading sentinel; we still assert there are at
-        // least two so the existing loading-shaped contract holds.
-        const loadingNodes = container.querySelectorAll(".ant-select-loading");
-        expect(loadingNodes.length).toBeGreaterThanOrEqual(2);
+        // The coordinator + type selects each render the loading spinner
+        // in their trigger while managers resolve.
+        expect(
+            screen.getAllByTestId("task-select-loading").length
+        ).toBeGreaterThanOrEqual(2);
     });
 
     /*
@@ -479,19 +441,8 @@ describe("TaskSearchPanel", () => {
                 createdAt: 1
             };
             renderPanel({ setParam, initialPresets: [preset] });
-            // Open the preset Select and pick the only option.
-            // AntD's Select traps the selector behind nested divs; the
-            // outer `.ant-select-selector` is the element that listens
-            // for the open mousedown event in the codebase's existing
-            // tests (see the helper at the top of this file).
-            const presetSelect = screen.getByLabelText(
-                microcopy.board.presets.loadAriaLabel as string
-            ) as HTMLElement;
-            const selector =
-                presetSelect
-                    .closest(".ant-select")
-                    ?.querySelector(".ant-select-selector") ?? presetSelect;
-            fireEvent.mouseDown(selector as HTMLElement);
+            await expandFilters();
+            await openPresetLoader();
             await rtlUser.click(await screen.findByText("Open checkout"));
             expect(setParam).toHaveBeenCalledWith({
                 coordinatorId: "u1",
@@ -518,14 +469,8 @@ describe("TaskSearchPanel", () => {
                 createdAt: 1
             };
             renderPanel({ setParam, initialPresets: [preset] });
-            const presetSelect = screen.getByLabelText(
-                microcopy.board.presets.loadAriaLabel as string
-            ) as HTMLElement;
-            const selector =
-                presetSelect
-                    .closest(".ant-select")
-                    ?.querySelector(".ant-select-selector") ?? presetSelect;
-            fireEvent.mouseDown(selector as HTMLElement);
+            await expandFilters();
+            await openPresetLoader();
             await rtlUser.click(await screen.findByText("Open mine"));
             expect(setParam).toHaveBeenCalledWith(
                 expect.objectContaining({ lens: "mine" })
@@ -548,14 +493,8 @@ describe("TaskSearchPanel", () => {
                 createdAt: 1
             };
             renderPanel({ setParam, initialPresets: [preset] });
-            const presetSelect = screen.getByLabelText(
-                microcopy.board.presets.loadAriaLabel as string
-            ) as HTMLElement;
-            const selector =
-                presetSelect
-                    .closest(".ant-select")
-                    ?.querySelector(".ant-select-selector") ?? presetSelect;
-            fireEvent.mouseDown(selector as HTMLElement);
+            await expandFilters();
+            await openPresetLoader();
             await rtlUser.click(await screen.findByText("Retired lens"));
             expect(setParam).toHaveBeenCalledWith(
                 expect.objectContaining({ lens: undefined })
@@ -578,18 +517,8 @@ describe("TaskSearchPanel", () => {
                 createdAt: 1
             };
             renderPanel({ setParam, initialPresets: [preset] });
-            // AntD's Select traps the selector behind nested divs; the
-            // outer `.ant-select-selector` is the element that listens
-            // for the open mousedown event in the codebase's existing
-            // tests (see the helper at the top of this file).
-            const presetSelect = screen.getByLabelText(
-                microcopy.board.presets.loadAriaLabel as string
-            ) as HTMLElement;
-            const selector =
-                presetSelect
-                    .closest(".ant-select")
-                    ?.querySelector(".ant-select-selector") ?? presetSelect;
-            fireEvent.mouseDown(selector as HTMLElement);
+            await expandFilters();
+            await openPresetLoader();
             await rtlUser.click(await screen.findByText("Stale preset"));
             // taskName is always safe; coordinator + type drop because
             // neither value is in the live members / observed types
@@ -618,18 +547,8 @@ describe("TaskSearchPanel", () => {
                 createdAt: 1
             };
             const { store } = renderPanel({ initialPresets: [preset] });
-            // AntD's Select traps the selector behind nested divs; the
-            // outer `.ant-select-selector` is the element that listens
-            // for the open mousedown event in the codebase's existing
-            // tests (see the helper at the top of this file).
-            const presetSelect = screen.getByLabelText(
-                microcopy.board.presets.loadAriaLabel as string
-            ) as HTMLElement;
-            const selector =
-                presetSelect
-                    .closest(".ant-select")
-                    ?.querySelector(".ant-select-selector") ?? presetSelect;
-            fireEvent.mouseDown(selector as HTMLElement);
+            await expandFilters();
+            await openPresetLoader();
             const deleteButton = await screen.findByLabelText(
                 /Delete preset Preset D/i
             );
@@ -655,28 +574,20 @@ describe("TaskSearchPanel", () => {
                 createdAt: 1
             };
             renderPanel({ initialPresets: [preset] });
-            const presetSelect = screen.getByLabelText(
-                microcopy.board.presets.loadAriaLabel as string
-            ) as HTMLElement;
-            const selector =
-                presetSelect
-                    .closest(".ant-select")
-                    ?.querySelector(".ant-select-selector") ?? presetSelect;
-            fireEvent.mouseDown(selector as HTMLElement);
+            await expandFilters();
+            await openPresetLoader();
             const deleteButton = await screen.findByLabelText(
                 /Delete preset Touch preset/i
             );
-            const styledClass = styledClassFor(deleteButton);
-            expect(styledClass).toBeTruthy();
-            const { heights, widths } = coarseTouchTargetsFor(
-                styledClass ?? ""
-            );
-            expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
-            expect(Math.max(...widths)).toBeGreaterThanOrEqual(44);
+            // The delete glyph declares a 44×44 coarse-pointer hit area via
+            // the `coarse:` Tailwind variant (WCAG 2.5.8); JSDOM doesn't
+            // evaluate the media query, so the class list is the contract.
+            expect(deleteButton).toHaveClass("coarse:size-[44px]");
+            expect(deleteButton).toHaveClass("coarse:min-h-[44px]");
+            expect(deleteButton).toHaveClass("coarse:min-w-[44px]");
         });
 
         it("scopes presets to the current board (project) plus globals", async () => {
-            const rtlUser = userEvent.setup();
             const presets: SavedFilterPresetState[] = [
                 {
                     id: "other-board",
@@ -716,23 +627,10 @@ describe("TaskSearchPanel", () => {
                 }
             ];
             renderPanel({ initialPresets: presets });
-            // AntD's Select traps the selector behind nested divs; the
-            // outer `.ant-select-selector` is the element that listens
-            // for the open mousedown event in the codebase's existing
-            // tests (see the helper at the top of this file).
-            const presetSelect = screen.getByLabelText(
-                microcopy.board.presets.loadAriaLabel as string
-            ) as HTMLElement;
-            const selector =
-                presetSelect
-                    .closest(".ant-select")
-                    ?.querySelector(".ant-select-selector") ?? presetSelect;
-            fireEvent.mouseDown(selector as HTMLElement);
-            await rtlUser.hover(
-                screen.getByTestId("task-search-panel-presets-select")
-            );
+            await expandFilters();
+            await openPresetLoader();
+            expect(await screen.findByText("This board")).toBeInTheDocument();
             expect(screen.queryByText("Other board")).toBeNull();
-            expect(screen.getByText("This board")).toBeInTheDocument();
             expect(screen.getByText("Global")).toBeInTheDocument();
         });
     });

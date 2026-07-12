@@ -81,16 +81,16 @@ describe("ReportsPage", () => {
     });
 
     it("renders the breadcrumb crumb 'Projects > Project Name > Reports'", () => {
-        const { container } = renderReportsRoute();
+        renderReportsRoute();
 
         // The breadcrumb lives in the project detail shell — assert
         // all three crumbs are present and the Reports crumb carries
         // `aria-current="page"`. The middle (project) crumb becomes
         // a link back to the project root once a child route is
         // active so users can navigate up via the breadcrumb.
-        const crumb = container.querySelector(".ant-breadcrumb");
+        const crumb = screen.getByTestId("project-breadcrumb");
         expect(crumb).toBeTruthy();
-        const region = within(crumb as HTMLElement);
+        const region = within(crumb);
         expect(
             region.getByRole("link", { name: microcopy.breadcrumb.projects })
         ).toHaveAttribute("href", "/projects");

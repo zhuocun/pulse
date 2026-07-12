@@ -1,11 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { axe, toHaveNoViolations } from "jest-axe";
 
-import {
-    coarseTouchTargetsFor,
-    styledClassFor
-} from "../../testUtils/styleRules";
-
 import GlassActionCluster from ".";
 
 expect.extend(toHaveNoViolations);
@@ -214,14 +209,17 @@ describe("GlassActionCluster", () => {
     });
 
     it("declares coarse-pointer hit areas for slots and buttons", () => {
-        renderCluster();
+        const { container } = renderCluster();
+        const slot = container.querySelector(
+            ".pulse-cluster-slot"
+        ) as HTMLElement;
+        // Tailwind's compiled stylesheet is not loaded in jsdom, so the
+        // 44px coarse-pointer floor is verified by the presence of the
+        // canonical utility classes rather than a computed height.
+        expect(slot.className).toContain("coarse:min-h-[44px]");
+        expect(slot.className).toContain("coarse:min-w-[44px]");
         const cluster = screen.getByTestId("cluster");
-        const styledClass = styledClassFor(cluster);
-        expect(styledClass).toBeTruthy();
-
-        const { heights, widths } = coarseTouchTargetsFor(styledClass ?? "");
-        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
-        expect(Math.max(...widths)).toBeGreaterThanOrEqual(44);
+        expect(cluster.className).toContain("coarse:[&_button]:min-h-[44px]");
     });
 
     it("has no axe violations", async () => {

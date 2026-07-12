@@ -253,8 +253,15 @@ describe("AiTaskDraftModal — remote agent path", () => {
                 screen.getByDisplayValue("Agent-drafted task")
             ).toBeInTheDocument()
         );
-        expect(screen.getByText("Todo")).toBeInTheDocument();
-        expect(screen.getByText("Alice")).toBeInTheDocument();
+        // Radix Select renders the chosen value in the trigger; assert the
+        // clamped fallbacks landed there (avoids matching the hidden native
+        // <option> the Radix form bubble also emits with the same text).
+        expect(
+            screen.getByRole("combobox", { name: "Column" })
+        ).toHaveTextContent("Todo");
+        expect(
+            screen.getByRole("combobox", { name: "Coordinator" })
+        ).toHaveTextContent("Alice");
     });
 
     it("populates form fields after surface:draft single suggestion", async () => {

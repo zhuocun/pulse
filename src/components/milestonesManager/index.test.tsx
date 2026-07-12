@@ -5,6 +5,7 @@ import {
     waitFor,
     within
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { axe, toHaveNoViolations } from "jest-axe";
 
 import { microcopy } from "../../constants/microcopy";
@@ -40,20 +41,13 @@ const mockedUseReactQuery = useReactQuery as jest.MockedFunction<
     typeof useReactQuery
 >;
 
-const installAntdBrowserMocks = () => {
-    Object.defineProperty(window, "matchMedia", {
-        writable: true,
-        value: (query: string) => ({
-            addEventListener: jest.fn(),
-            addListener: jest.fn(),
-            dispatchEvent: jest.fn(),
-            matches: false,
-            media: query,
-            onchange: null,
-            removeEventListener: jest.fn(),
-            removeListener: jest.fn()
-        })
-    });
+const installBrowserMocks = () => {
+    // Radix Select/Popover drive their surfaces with pointer-capture and
+    // scroll APIs jsdom doesn't ship; polyfill them so the state picker and
+    // delete-confirm popover can open.
+    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+    Element.prototype.releasePointerCapture = jest.fn();
 };
 
 const createMilestone = jest.fn();
@@ -142,7 +136,7 @@ const rowFor = (milestoneId: string): HTMLElement => {
 };
 
 describe("MilestonesManager", () => {
-    beforeAll(installAntdBrowserMocks);
+    beforeAll(installBrowserMocks);
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -244,13 +238,13 @@ describe("MilestonesManager", () => {
         updateMilestone.mockResolvedValue("Milestone updated");
         renderManager();
 
-        const select = within(rowFor("ms-1")).getByTestId(
-            "milestone-state-select"
+        const menuUser = userEvent.setup();
+        await menuUser.click(
+            within(rowFor("ms-1")).getByTestId("milestone-state-select")
         );
-        fireEvent.mouseDown(within(select).getByRole("combobox"));
-        fireEvent.click(
-            await screen.findByText(microcopy.milestones.states.closed, {
-                selector: ".ant-select-item-option-content"
+        await menuUser.click(
+            await screen.findByRole("option", {
+                name: microcopy.milestones.states.closed
             })
         );
 

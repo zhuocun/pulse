@@ -5,7 +5,6 @@ import { BrowserRouter } from "react-router-dom";
 
 import { microcopy } from "../constants/microcopy";
 import { store } from "../store";
-import { ruleTextsFor, styledClassFor } from "../testUtils/styleRules";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useAuth from "../utils/hooks/useAuth";
 import useColorScheme from "../utils/hooks/useColorScheme";
@@ -112,12 +111,10 @@ describe("SettingsPage", () => {
         renderPage();
         const list = screen.getByTestId("settings-row-theme").parentElement;
         expect(list).not.toBeNull();
-        const styledClass = styledClassFor(list as Element);
-        expect(styledClass).toBeTruthy();
-
-        const ruleText = ruleTextsFor(styledClass ?? "").join("\n");
-        expect(ruleText).toContain("max-width: 48rem");
-        expect(ruleText).toContain("margin-inline: auto");
+        // The list caps its scan width and centres on desktop via Tailwind
+        // utilities (max-width: 48rem + margin-inline: auto).
+        expect(list).toHaveClass("mx-auto");
+        expect(list).toHaveClass("max-w-[48rem]");
     });
 
     it("renders the three-palette color-theme picker", () => {

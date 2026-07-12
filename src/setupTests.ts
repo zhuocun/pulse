@@ -5,6 +5,9 @@
 import "@testing-library/jest-dom";
 import { TextDecoder, TextEncoder } from "util";
 
+// jsdom ships no `matchMedia`; the responsive/motion/color-scheme hooks
+// (`useReducedMotion`, `useColorScheme`, `useIsPhoneChrome`, `useGlassIntensity`)
+// read it, so stub a query that always reports `matches: false`.
 if (typeof window !== "undefined") {
     Object.defineProperty(window, "matchMedia", {
         writable: true,

@@ -1,20 +1,7 @@
-import styled from "@emotion/styled";
 import { Link } from "react-router";
 
 import { AUTH_TERMS_PATH } from "../../constants/authPaths";
 import { microcopy } from "../../constants/microcopy";
-import { bodyCopyCoarseFontCss, space } from "../../theme/tokens";
-
-const Wrapper = styled.p`
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-    ${bodyCopyCoarseFontCss}
-    margin: 0 0 ${space.md}px;
-    line-height: 1.5;
-`;
-
-const TermsLink = styled(Link)`
-    font-size: inherit;
-`;
 
 export const AuthTermsAgreement = ({
     variant
@@ -31,12 +18,15 @@ export const AuthTermsAgreement = ({
             : microcopy.auth.termsRegisterSuffix;
 
     return (
-        <Wrapper>
+        <p className="mb-md text-sm leading-normal text-muted-foreground coarse:text-base">
             {prefix}{" "}
-            <TermsLink to={`/${AUTH_TERMS_PATH}`}>
+            <Link
+                to={`/${AUTH_TERMS_PATH}`}
+                className="text-primary underline-offset-4 hover:underline"
+            >
                 {microcopy.auth.termsLink}
-            </TermsLink>
+            </Link>
             {suffix}
-        </Wrapper>
+        </p>
     );
 };

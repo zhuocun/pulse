@@ -1,15 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { TextAreaRef } from "antd/es/input/TextArea";
 import { createRef } from "react";
 
 import { microcopy } from "../../constants/microcopy";
-import {
-    coarseTouchTargetsFor,
-    mediaRuleTextsFor,
-    ruleTextsFor,
-    styledClassFor
-} from "../../testUtils/styleRules";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
+import { declaresTouchTarget } from "../ui/testHelpers";
 
 import { AiChatComposer } from "./AiChatComposer";
 
@@ -25,7 +19,7 @@ const renderComposer = (
     const onSend = jest.fn();
     const onAbort = jest.fn();
     const setInput = jest.fn();
-    const inputRef = createRef<TextAreaRef>();
+    const inputRef = createRef<HTMLTextAreaElement>();
     const props: React.ComponentProps<typeof AiChatComposer> = {
         input: "hello",
         setInput,
@@ -181,26 +175,24 @@ describe("AiChatComposer", () => {
     it("renders a flex composer row with coarse-pointer touch targets", () => {
         renderComposer();
         const row = screen.getByTestId("ai-chat-composer-row");
-        const styledClass = styledClassFor(row);
-        expect(styledClass).toBeTruthy();
-        const ruleText = ruleTextsFor(styledClass ?? "").join("\n");
-        expect(ruleText).toContain("display: flex");
-        expect(ruleText).toContain("min-width: 0");
-        const { heights, widths } = coarseTouchTargetsFor(styledClass ?? "");
-        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
-        expect(Math.max(...widths)).toBeGreaterThanOrEqual(44);
+        expect(row.className).toContain("flex");
+        expect(row.className).toContain("min-w-0");
+        // The Send button primitive carries the ≥44px coarse touch floor.
+        expect(
+            declaresTouchTarget(
+                screen.getByLabelText(microcopy.a11y.sendMessage)
+            )
+        ).toBe(true);
     });
 
     it("keeps mobile composer controls compact below the small breakpoint", () => {
         renderComposer();
         const row = screen.getByTestId("ai-chat-composer-row");
-        const styledClass = styledClassFor(row);
-        expect(styledClass).toBeTruthy();
-
-        const mobileRules = mediaRuleTextsFor(styledClass ?? "", "480px").join(
-            "\n"
+        // Below `sm`, buttons collapse to a 44px square and the button label
+        // text is hidden (icon-only), driven by descendant Tailwind variants.
+        expect(row.className).toContain("max-sm:[&_button]:w-[44px]");
+        expect(row.className).toContain(
+            "max-sm:[&_.ai-chat-composer-button-text]:hidden"
         );
-        expect(mobileRules).toContain("width: 44px");
-        expect(mobileRules).toContain("display: none");
     });
 });

@@ -1,6 +1,4 @@
-import styled from "@emotion/styled";
 import { useIsFetching } from "@tanstack/react-query";
-import { Button, Drawer, Grid, Input, Modal, Tag, Typography } from "antd";
 import {
     useCallback,
     useEffect,
@@ -11,24 +9,34 @@ import {
 } from "react";
 import { useNavigate } from "react-router";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle
+} from "@/components/ui/sheet";
+import { Typography } from "@/components/ui/typography";
+import { cn } from "@/lib/utils";
+
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
-import {
-    easing,
-    fontSize,
-    fontWeight,
-    motion,
-    radius,
-    space
-} from "../../theme/tokens";
+import { breakpoints } from "../../theme/tokens";
 import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import useCachedQueryData, {
     useGatheredCachedList
 } from "../../utils/hooks/useCachedQueryData";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useKeyboardOpen from "../../utils/hooks/useKeyboardOpen";
-import useReducedMotion from "../../utils/hooks/useReducedMotion";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
 import { isMacLike } from "../../utils/platform";
@@ -39,6 +47,42 @@ interface CommandPaletteProps {
     open: boolean;
     onClose: () => void;
 }
+
+/**
+ * Viewport-width predicate replacing antd `Grid.useBreakpoint().md`. The
+ * palette flips to the bottom-sheet layout below the `md` (768px) token
+ * breakpoint. Defaults to wide (desktop) when `matchMedia` is unavailable
+ * (SSR / older jsdom), matching the legacy Grid default.
+ */
+const useIsWideViewport = (): boolean => {
+    const query = `(min-width: ${breakpoints.md}px)`;
+    const [wide, setWide] = useState<boolean>(() => {
+        if (
+            typeof window === "undefined" ||
+            typeof window.matchMedia !== "function"
+        ) {
+            return true;
+        }
+        return window.matchMedia(query).matches;
+    });
+    useEffect(() => {
+        if (
+            typeof window === "undefined" ||
+            typeof window.matchMedia !== "function"
+        ) {
+            return;
+        }
+        const media = window.matchMedia(query);
+        const handler = (event: MediaQueryListEvent) => setWide(event.matches);
+        if (typeof media.addEventListener === "function") {
+            media.addEventListener("change", handler);
+            return () => media.removeEventListener("change", handler);
+        }
+        media.addListener(handler);
+        return () => media.removeListener(handler);
+    }, [query]);
+    return wide;
+};
 
 interface PaletteEntry {
     id: string;
@@ -58,191 +102,80 @@ interface PaletteEntry {
     rankBoost?: number;
 }
 
-const ListContainer = styled.ul`
-    list-style: none;
-    margin: 0;
-    /* Dynamic viewport unit keeps the list from jumping when the iOS Safari
-     * URL bar collapses. The vh declaration stays as a fallback. */
-    max-height: 50vh;
-    max-height: 50dvh;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 0;
-`;
-
-const KindGroup = styled.li`
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-    font-size: ${fontSize.xs}px;
-    font-weight: ${fontWeight.semibold};
-    margin: ${space.xs}px 0 ${space.xxs}px;
-    padding: 0 ${space.sm}px;
-`;
-
-const Row = styled.li<{ active: boolean }>`
-    align-items: center;
-    background: ${(props) =>
-        props.active
-            ? "var(--ant-color-primary-bg, rgba(234, 88, 12, 0.10))"
-            : "transparent"};
-    border-radius: ${radius.md}px;
-    cursor: pointer;
-    display: flex;
-    gap: ${space.sm}px;
-    min-width: 0;
-    padding: ${space.xs}px ${space.sm}px;
-`;
-
-const KindTag = styled(Tag)`
-    && {
-        flex: 0 0 auto;
-        font-size: ${fontSize.xs}px;
-        margin-inline-end: 0;
-    }
-`;
-
-const EntryText = styled.span`
-    display: flex;
-    flex: 1 1 auto;
-    flex-wrap: wrap;
-    gap: ${space.xxs}px ${space.xs}px;
-    min-width: 0;
-    overflow: hidden;
-`;
-
-const EntryLabel = styled.span`
-    font-weight: ${fontWeight.medium};
-    min-width: 0;
-    overflow-wrap: anywhere;
-`;
-
-const EntrySublabel = styled(Typography.Text)`
-    && {
-        min-width: 0;
-        overflow-wrap: anywhere;
-    }
-`;
-
-const ModeBanner = styled.div`
-    align-items: center;
-    background: var(--color-copilot-bg-subtle);
-    border: 1px solid var(--color-copilot-bg-medium);
-    border-radius: ${radius.md}px;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-    display: flex;
-    font-size: ${fontSize.xs}px;
-    gap: ${space.xs}px;
-    margin-top: ${space.sm}px;
-    padding: ${space.xs}px ${space.sm}px;
-`;
-
-const HiddenLabel = styled.span`
-    border: 0;
-    clip: rect(0 0 0 0);
-    height: 1px;
-    margin: -1px;
-    overflow: hidden;
-    padding: 0;
-    pointer-events: none;
-    position: absolute;
-    width: 1px;
-`;
-
-const SamplePromptRow = styled.button`
-    background: transparent;
-    border: 0;
-    border-radius: ${radius.md}px;
-    cursor: pointer;
-    display: block;
-    padding: ${space.xs}px ${space.sm}px;
-    text-align: left;
-    width: 100%;
-
-    &:hover,
-    &:focus-visible {
-        background: var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.04));
-    }
-`;
+/* -- Surface class recipes --------------------------------------------- */
 
 /**
- * Phone-only chassis (iOS 26 bottom-anchored search): a flex column that
- * fills the Drawer body. Results occupy the scroll area on top; the search
- * capsule pins to the bottom near the thumb. `min-height: 0` lets the
- * scroll child shrink inside the flex parent instead of overflowing the
- * sheet.
+ * Results list. `50dvh` cap keeps the list from jumping when the iOS
+ * Safari URL bar collapses.
  */
-const PhoneShell = styled.div`
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: 0;
-`;
+const LIST_CONTAINER_CLASS =
+    "m-0 max-h-[50dvh] list-none overflow-y-auto overscroll-contain p-0";
+
+const KIND_GROUP_CLASS = cn(
+    "mb-xxs mt-xs px-sm text-xs font-semibold",
+    "[color:var(--pulse-text-secondary,rgba(15,23,42,0.65))]"
+);
+
+const rowClass = (active: boolean): string =>
+    cn(
+        "flex min-w-0 cursor-pointer items-center gap-sm rounded-md px-sm py-xs",
+        active
+            ? "[background:var(--pulse-brand-primary-bg,rgba(234,88,12,0.10))]"
+            : "bg-transparent"
+    );
+
+const ENTRY_TEXT_CLASS =
+    "flex min-w-0 flex-[1_1_auto] flex-wrap gap-x-xs gap-y-xxs overflow-hidden";
+
+const ENTRY_LABEL_CLASS = "min-w-0 font-medium [overflow-wrap:anywhere]";
+
+const ENTRY_SUBLABEL_CLASS = "min-w-0 [overflow-wrap:anywhere]";
+
+const MODE_BANNER_CLASS = cn(
+    "mt-sm flex items-center gap-xs rounded-md border px-sm py-xs text-xs",
+    "[background:var(--color-copilot-bg-subtle)]",
+    "border-[color:var(--color-copilot-bg-medium)]",
+    "[color:var(--pulse-text-secondary,rgba(15,23,42,0.65))]"
+);
+
+const SAMPLE_PROMPT_ROW_CLASS = cn(
+    "block w-full cursor-pointer rounded-md border-0 bg-transparent px-sm py-xs text-left",
+    "hover:[background:var(--pulse-fill-tertiary,rgba(15,23,42,0.04))]",
+    "focus-visible:[background:var(--pulse-fill-tertiary,rgba(15,23,42,0.04))]"
+);
 
 /**
- * Scrollable results region. Grows upward from the bottom-pinned input —
- * `justify-content: flex-end` keeps short result sets anchored just above
- * the search field (the iOS Mail/Messages idiom) rather than floating at
- * the top of a tall sheet. `flex: 1` + `min-height: 0` makes it the
- * scroll surface; the inner `dvh` cap on `ListContainer` still applies.
+ * Bottom-pinned search dock. Sits above the safe-area inset and lifts
+ * above the soft keyboard via `env(keyboard-inset-height)`. When the
+ * keyboard owns the safe area the resting inset is dropped so the field
+ * doesn't float over it.
  */
-const PhoneResults = styled.div`
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    justify-content: flex-end;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-`;
+const PHONE_DOCK_CLASS = cn(
+    "flex-shrink-0 pt-sm",
+    "[transition:padding-bottom_var(--pulse-duration-medium)_var(--pulse-ease-standard)]",
+    "motion-reduce:[transition:none]"
+);
+
+const phoneDockPaddingClass = (keyboardOpen: boolean): string =>
+    keyboardOpen
+        ? "[padding-bottom:max(theme(spacing.sm),env(keyboard-inset-height,0px))]"
+        : "[padding-bottom:max(theme(spacing.sm),env(keyboard-inset-height,0px),env(safe-area-inset-bottom))]";
 
 /**
- * Bottom-pinned search row. Sits above the safe-area inset and lifts above
- * the soft keyboard via `env(keyboard-inset-height)` (with the
- * safe-area inset as the resting floor). `flex-shrink: 0` keeps the
- * capsule a fixed height while the results above absorb the remaining
- * space. The `$keyboardOpen` flag tightens the bottom gap once the
- * keyboard owns the safe area so the field doesn't float over it.
+ * Sparkle AI-mode toggle that sits inside the search field. Coarse-safe
+ * 44px hit area; the active state tints with the copilot medium wash.
  */
-const PhoneSearchDock = styled.div<{
-    $keyboardOpen: boolean;
-    $reducedMotion: boolean;
-}>`
-    flex-shrink: 0;
-    padding-top: ${space.sm}px;
-    padding-bottom: ${(p) =>
-        p.$keyboardOpen
-            ? `max(${space.sm}px, env(keyboard-inset-height, 0px))`
-            : `max(${space.sm}px, env(keyboard-inset-height, 0px), env(safe-area-inset-bottom))`};
-    transition: ${(p) =>
-        p.$reducedMotion
-            ? "none"
-            : `padding-bottom ${motion.medium}ms ${easing.standard}`};
-`;
+const sparkleToggleClass = (aiMode: boolean): string =>
+    cn(
+        "inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-full border-0 p-[4px] leading-none",
+        aiMode
+            ? "[background:var(--color-copilot-bg-medium)]"
+            : "bg-transparent"
+    );
 
-/**
- * Liquid Glass capsule wrapping the search input on phone. Renders as a
- * `<GlassPanel intensity="regular">` so the frosted surface, hairline
- * border, and `prefers-reduced-transparency` / `forced-colors` opaque
- * fallbacks come from the shared recipe. The pill radius (radius.pill →
- * border-radius = half the ~50px height) and the inner AntD `<Input>`
- * stripped of its own chrome give the iOS 26 capsule field.
- */
-const GlassSearchCapsule = styled(GlassPanel)`
-    align-items: center;
-    border-radius: ${radius.pill}px;
-    display: flex;
-    min-height: 50px;
-    padding-inline: ${space.xs}px;
-
-    .ant-input-affix-wrapper,
-    .ant-input-affix-wrapper:focus,
-    .ant-input-affix-wrapper-focused,
-    .ant-input {
-        background: transparent;
-        border: 0;
-        box-shadow: none;
-        width: 100%;
-    }
-`;
+/** Strip the Input's own chrome when it nests inside the glass capsule. */
+const CHROMELESS_INPUT_CLASS =
+    "border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0";
 
 /*
  * Per-project section routes indexed alongside the project itself. On
@@ -429,9 +362,8 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
     const [activeIndex, setActiveIndex] = useState(0);
     const listboxId = useId();
     const announcerId = useId();
-    const screens = Grid.useBreakpoint();
+    const isWide = useIsWideViewport();
     const keyboardOpen = useKeyboardOpen();
-    const reducedMotion = useReducedMotion();
     const isPhoneChrome = useIsPhoneChrome();
 
     const projects = useGatheredCachedList<IProject>(["projects"]);
@@ -636,7 +568,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
     );
 
     const shortcutText = isMacLike() ? "Cmd+K" : "Ctrl+K";
-    const isMobile = !screens.md;
+    const isMobile = !isWide;
     /*
      * The full nav placeholder enumerates every entry kind and clips
      * inside the phone search capsule, so narrow viewports get a short
@@ -649,7 +581,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
           : microcopy.placeholders.commandPaletteNav;
     const resultCount = visible.length;
 
-    const renderSearchField = () => (
+    const renderSearchField = (chromeless: boolean) => (
         <div
             aria-controls={listboxId}
             aria-expanded={!aiMode && resultCount > 0}
@@ -657,22 +589,8 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
             aria-owns={listboxId}
             role="combobox"
         >
-            <Input
-                aria-activedescendant={
-                    renderedItems[activeIndex]?.type === "row"
-                        ? `entry-${(renderedItems[activeIndex] as RenderedRow).entry.id}`
-                        : undefined
-                }
-                aria-autocomplete="list"
-                aria-controls={listboxId}
-                aria-label={placeholder}
-                autoComplete="off"
-                enterKeyHint="search"
-                inputMode="search"
-                onChange={(event) => handleQueryChange(event.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={placeholder}
-                prefix={
+            <div className="relative flex w-full items-center">
+                <span className="absolute left-xs top-1/2 z-[1] -translate-y-1/2">
                     <button
                         aria-label={
                             aiMode
@@ -680,30 +598,36 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
                                 : microcopy.a11y.switchToBoardCopilot
                         }
                         aria-pressed={aiMode}
+                        className={sparkleToggleClass(aiMode)}
                         onClick={() => toggleAiMode()}
-                        style={{
-                            background: aiMode
-                                ? "var(--color-copilot-bg-medium)"
-                                : "transparent",
-                            border: 0,
-                            borderRadius: 999,
-                            cursor: "pointer",
-                            lineHeight: 0,
-                            minHeight: 44,
-                            minWidth: 44,
-                            padding: 4
-                        }}
                         type="button"
                     >
                         <AiSparkleIcon aria-hidden />
                     </button>
-                }
-                ref={(node) => {
-                    inputRef.current = node?.input ?? null;
-                }}
-                size="large"
-                value={query}
-            />
+                </span>
+                <Input
+                    aria-activedescendant={
+                        renderedItems[activeIndex]?.type === "row"
+                            ? `entry-${(renderedItems[activeIndex] as RenderedRow).entry.id}`
+                            : undefined
+                    }
+                    aria-autocomplete="list"
+                    aria-controls={listboxId}
+                    aria-label={placeholder}
+                    autoComplete="off"
+                    className={cn(
+                        "pl-[52px]",
+                        chromeless && CHROMELESS_INPUT_CLASS
+                    )}
+                    enterKeyHint="search"
+                    inputMode="search"
+                    onChange={(event) => handleQueryChange(event.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={placeholder}
+                    ref={inputRef}
+                    value={query}
+                />
+            </div>
         </div>
     );
 
@@ -720,16 +644,17 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
                       : ""}
             </SrOnlyLive>
             {aiMode ? (
-                <ModeBanner role="status">
+                <div className={MODE_BANNER_CLASS} role="status">
                     <AiSparkleIcon aria-hidden />
                     <span>
                         {microcopy.ai.askCopilot}.{" "}
                         {microcopy.commandPalette.copilotPromptHint}
                     </span>
-                </ModeBanner>
+                </div>
             ) : (
-                <ListContainer
+                <ul
                     aria-labelledby={`${listboxId}-label`}
+                    className={LIST_CONTAINER_CLASS}
                     id={listboxId}
                     role="listbox"
                 >
@@ -746,21 +671,15 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
                             </Typography.Paragraph>
                             {/* P3-A: No-results → "Ask Board Copilot" CTA */}
                             {!isColdCache && query.trim().length >= 3 && (
-                                <div
-                                    style={{
-                                        borderTop:
-                                            "1px solid var(--ant-color-border-secondary)",
-                                        padding: `${space.xs}px ${space.sm}px`
-                                    }}
-                                >
+                                <div className="border-t border-[color:var(--pulse-border-secondary)] px-sm py-xs">
                                     <Button
-                                        icon={<AiSparkleIcon aria-hidden />}
                                         onClick={() => {
                                             dispatchAiPrompt(query.trim());
                                         }}
-                                        size="small"
-                                        type="link"
+                                        size="sm"
+                                        variant="link"
                                     >
+                                        <AiSparkleIcon aria-hidden />
                                         {
                                             microcopy.commandPalette
                                                 .noResultsCopilotCta
@@ -773,73 +692,88 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
                         renderedItems.map((item, index) => {
                             if (item.type === "header") {
                                 return (
-                                    <KindGroup
+                                    <li
+                                        className={KIND_GROUP_CLASS}
                                         key={`header-${item.label}`}
                                         role="presentation"
                                     >
                                         {item.label}
-                                    </KindGroup>
+                                    </li>
                                 );
                             }
                             const entry = item.entry;
                             return (
-                                <Row
-                                    active={index === activeIndex}
+                                // APG combobox pattern: keyboard interaction
+                                // lives on the combobox <input> above (Arrow
+                                // keys move `activeIndex`, Enter selects via
+                                // `handleKeyDown`). This option row only needs
+                                // the pointer affordances — a per-row key
+                                // handler would be a second, conflicting
+                                // keyboard surface.
+                                // eslint-disable-next-line jsx-a11y/click-events-have-key-events
+                                <li
                                     aria-selected={index === activeIndex}
+                                    className={rowClass(index === activeIndex)}
                                     id={`entry-${entry.id}`}
                                     key={entry.id}
                                     onClick={() => handleEntrySelect(entry)}
                                     onMouseEnter={() => setActiveIndex(index)}
                                     role="option"
                                 >
-                                    <KindTag color="default">
+                                    <Badge
+                                        className="flex-none"
+                                        variant="secondary"
+                                    >
                                         {
                                             microcopy.commandPalette.kindTags[
                                                 entry.kind
                                             ]
                                         }
-                                    </KindTag>
-                                    <EntryText>
-                                        <EntryLabel>{entry.label}</EntryLabel>
+                                    </Badge>
+                                    <span className={ENTRY_TEXT_CLASS}>
+                                        <span className={ENTRY_LABEL_CLASS}>
+                                            {entry.label}
+                                        </span>
                                         {entry.sublabel ? (
-                                            <EntrySublabel type="secondary">
+                                            <Typography.Text
+                                                className={ENTRY_SUBLABEL_CLASS}
+                                                type="secondary"
+                                            >
                                                 {entry.sublabel}
-                                            </EntrySublabel>
+                                            </Typography.Text>
                                         ) : null}
-                                    </EntryText>
-                                </Row>
+                                    </span>
+                                </li>
                             );
                         })
                     )}
-                </ListContainer>
+                </ul>
             )}
             {aiMode && (
-                <ListContainer aria-label={microcopy.a11y.samplePrompts}>
+                <ul
+                    aria-label={microcopy.a11y.samplePrompts}
+                    className={LIST_CONTAINER_CLASS}
+                >
                     {microcopy.commandPalette.sampleAi.map((prompt) => (
                         <li key={prompt}>
-                            <SamplePromptRow
+                            <button
+                                className={SAMPLE_PROMPT_ROW_CLASS}
                                 onClick={() => dispatchAiPrompt(prompt)}
                                 type="button"
                             >
                                 <Typography.Text>{prompt}</Typography.Text>
-                            </SamplePromptRow>
+                            </button>
                         </li>
                     ))}
-                </ListContainer>
+                </ul>
             )}
         </>
     );
 
     const titleNode = (
-        <span
-            style={{
-                alignItems: "center",
-                display: "inline-flex",
-                gap: space.xs
-            }}
-        >
+        <span className="inline-flex items-center gap-xs">
             <AiSparkleIcon aria-hidden />
-            <span style={{ fontWeight: fontWeight.semibold }}>
+            <span className="font-semibold">
                 {microcopy.commandPalette.title}
             </span>
             {/* Coarse-pointer chrome has no hardware keyboard — the
@@ -853,71 +787,74 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
     );
 
     const hiddenLabel = (
-        <HiddenLabel id={`${listboxId}-label`}>
+        <span className="sr-only" id={`${listboxId}-label`}>
             {microcopy.commandPalette.navigateInstructions}
-        </HiddenLabel>
+        </span>
     );
 
     if (isMobile) {
         return (
-            <Drawer
-                destroyOnClose
-                onClose={onClose}
+            <Sheet
                 open={open}
-                placement="bottom"
-                styles={{
-                    // The flex column owns the safe-area / keyboard inset
-                    // via PhoneSearchDock, so the body itself keeps a
-                    // square bottom and a flush fill.
-                    body: {
-                        display: "flex",
-                        flexDirection: "column",
-                        paddingBottom: 0
-                    },
-                    // AntD v6 deprecated the top-level `height` prop on
-                    // Drawer (its replacement `size` only exposes
-                    // `default` / `large` presets at 320 px / 736 px,
-                    // which don't map to a viewport-relative bottom
-                    // sheet). Driving the wrapper height via
-                    // `styles.wrapper.height` lets a custom value through
-                    // without tripping the deprecation lint. A tall
-                    // `dvh` sheet gives the results room to grow above
-                    // the bottom-pinned search; `dvh` (not `vh`) rides
-                    // out the iOS Safari URL-bar collapse so the sheet
-                    // doesn't jump.
-                    wrapper: { height: "88dvh" }
+                onOpenChange={(next) => {
+                    if (!next) onClose();
                 }}
-                title={titleNode}
             >
-                <PhoneShell>
-                    {hiddenLabel}
-                    <PhoneResults>{renderResults()}</PhoneResults>
-                    <PhoneSearchDock
-                        $keyboardOpen={keyboardOpen}
-                        $reducedMotion={reducedMotion}
-                    >
-                        <GlassSearchCapsule intensity="regular">
-                            {renderSearchField()}
-                        </GlassSearchCapsule>
-                    </PhoneSearchDock>
-                </PhoneShell>
-            </Drawer>
+                <SheetContent
+                    aria-describedby={`${listboxId}-label`}
+                    className="flex h-[88dvh] max-h-[88dvh] flex-col gap-0 p-0"
+                    side="bottom"
+                >
+                    <SheetHeader className="border-b border-border px-lg py-md">
+                        <SheetTitle>{titleNode}</SheetTitle>
+                    </SheetHeader>
+                    {/*
+                     * Phone chassis (iOS 26 bottom-anchored search): results
+                     * grow upward from the thumb-anchored search dock.
+                     */}
+                    <div className="flex min-h-0 flex-1 flex-col px-lg">
+                        {hiddenLabel}
+                        <div className="flex min-h-0 flex-[1_1_auto] flex-col justify-end overflow-y-auto overscroll-contain">
+                            {renderResults()}
+                        </div>
+                        <div
+                            className={cn(
+                                PHONE_DOCK_CLASS,
+                                phoneDockPaddingClass(keyboardOpen)
+                            )}
+                        >
+                            <GlassPanel
+                                className="flex min-h-[50px] items-center rounded-pill px-xs"
+                                intensity="regular"
+                            >
+                                {renderSearchField(true)}
+                            </GlassPanel>
+                        </div>
+                    </div>
+                </SheetContent>
+            </Sheet>
         );
     }
 
     return (
-        <Modal
-            destroyOnHidden
-            footer={null}
-            onCancel={onClose}
+        <Dialog
             open={open}
-            title={titleNode}
-            width={560}
+            onOpenChange={(next) => {
+                if (!next) onClose();
+            }}
         >
-            {hiddenLabel}
-            {renderSearchField()}
-            {renderResults()}
-        </Modal>
+            <DialogContent
+                aria-describedby={`${listboxId}-label`}
+                className="max-w-[560px]"
+            >
+                <DialogHeader>
+                    <DialogTitle>{titleNode}</DialogTitle>
+                </DialogHeader>
+                {hiddenLabel}
+                {renderSearchField(false)}
+                {renderResults()}
+            </DialogContent>
+        </Dialog>
     );
 };
 

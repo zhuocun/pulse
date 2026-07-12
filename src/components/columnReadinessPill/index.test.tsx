@@ -214,7 +214,7 @@ describe("ColumnReadinessPill", () => {
         expect(pill).toHaveAttribute("data-touch-hit-area", "44");
     });
 
-    it("places the readiness aria-label on the outer Popover trigger root, not only the inner pill", () => {
+    it("places the readiness aria-label on the Popover trigger root", () => {
         render(
             <ColumnReadinessPill
                 report={buildReport({
@@ -224,13 +224,12 @@ describe("ColumnReadinessPill", () => {
                 })}
             />
         );
-        const innerPill = screen.getByTestId("column-readiness-pill");
-        // The outer trigger is the parent .ant-tag element; AntD's
-        // Popover wires its click/keyboard handlers to that node, so
-        // its aria-label must surface the readiness count.
-        const outerTrigger = innerPill.closest(".ant-tag");
-        expect(outerTrigger).not.toBeNull();
-        expect(outerTrigger).toHaveAttribute(
+        // Radix's Popover wires its click/keyboard handlers onto the
+        // trigger — which `asChild` collapses into the pill itself — so
+        // the pill's aria-label must surface the readiness count.
+        const pill = screen.getByTestId("column-readiness-pill");
+        expect(pill).toHaveAttribute("data-state");
+        expect(pill).toHaveAttribute(
             "aria-label",
             expect.stringMatching(/8 of 10 tasks ready/i)
         );

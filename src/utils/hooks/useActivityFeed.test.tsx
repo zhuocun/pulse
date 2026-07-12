@@ -1,5 +1,5 @@
 import { act, render } from "@testing-library/react";
-import { message } from "antd";
+import { message } from "@/components/ui/toast";
 import { Provider } from "react-redux";
 
 import { store } from "../../store";

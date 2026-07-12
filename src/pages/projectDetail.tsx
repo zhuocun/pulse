@@ -1,6 +1,5 @@
-import styled from "@emotion/styled";
-import { Alert, Breadcrumb, Button, Skeleton } from "antd";
-import { useEffect } from "react";
+import { CircleAlert } from "lucide-react";
+import { useEffect, type ReactNode } from "react";
 import {
     Link,
     NavLink,
@@ -10,386 +9,141 @@ import {
     useParams
 } from "react-router-dom";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import EmptyState from "../components/emptyState";
 import { microcopy } from "../constants/microcopy";
-import {
-    breakpoints,
-    fontSize,
-    fontWeight,
-    radius,
-    shadow,
-    space
-} from "../theme/tokens";
+import { shadow, space } from "../theme/tokens";
 import useReactQuery from "../utils/hooks/useReactQuery";
 import useIsPhoneChrome from "../utils/hooks/useIsPhoneChrome";
 
-const Container = styled.div`
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    min-height: 0;
-    width: 100%;
-`;
-
-const TopBar = styled.div`
-    align-items: center;
-    /*
-     * Frosted-glass secondary chrome. Mirrors the main header's
-     * pattern: a translucent --glass-surface-subtle (~50 % opaque)
-     * backed by backdrop-filter blur, so the breadcrumb + tabs row
-     * stays legible when content is scrolled under it but the page
-     * gradient and the page content still read clearly through the
-     * bar at rest. The 1 px hairline border-bottom gives the chrome
-     * a faint edge at rest. Pinned just below the main header at
-     * top: var(--header-height), which the main header publishes via
-     * a ResizeObserver.
-     *
-     * z-index 10 matches the main header; the bar is later in DOM
-     * order so it stacks above the main header's bottom edge.
-     *
-     * Vertical padding tracks the main header's compact rhythm so the
-     * two chrome layers feel cut from the same cloth.
-     */
-    background: var(--glass-surface-subtle);
-    /* Wave 2 T4 — consume the global intensity lever so the
-     * user-facing toggle (Clear / Regular / Solid) re-tunes the
-     * secondary topbar along with the rest of the chrome. Pixel-
-     * identical to the prior blur(20px) saturate(180%) recipe at
-     * the default "regular" intensity. */
-    backdrop-filter: var(--ant-backdrop-filter-glass);
-    -webkit-backdrop-filter: var(--ant-backdrop-filter-glass);
-    border-bottom: 1px solid var(--glass-border);
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xxs}px;
-    justify-content: space-between;
-    min-width: 0;
-    padding: ${space.xs}px ${space.sm}px;
-    padding-inline-start: max(${space.sm}px, env(safe-area-inset-left));
-    padding-inline-end: max(${space.sm}px, env(safe-area-inset-right));
-    position: sticky;
-    top: var(--header-height, 44px);
-    z-index: 10;
-
-    /*
-     * Phase 5 "Liquid Glass" Wave 2 — top-leading specular rim.
-     * Mirrors the main header recipe so the two chrome layers
-     * (header + project breadcrumb) read as cut from the same cloth.
-     */
-    &::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        background: var(--glass-specular-top);
-        pointer-events: none;
-        z-index: 0;
-    }
-
-    /*
-     * Bottom-trailing companion. ::after paints the soft trough on
-     * the opposite corner from the rim highlight. The scroll-edge
-     * dissolve is on the chrome element itself (below) — masking
-     * ::after would only fade the rim shadow, not the actual chrome
-     * surface that needs to taper.
-     */
-    &::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        background: var(--glass-specular-bottom);
-        pointer-events: none;
-        z-index: 0;
-    }
-
-    /*
-     * Scroll-edge dissolve: mask the bottom 12 px of the chrome
-     * (including backdrop-filter + tinted background) so content
-     * scrolling under the sticky bar fades up through the edge. The
-     * 12 px lives in padding-bottom so the breadcrumb / tabs row
-     * (the > * descendants) sit above the masked region and don't
-     * get clipped. Same recipe as the page header.
-     */
-    padding-bottom: 12px;
-    mask-image: linear-gradient(
-        to bottom,
-        black calc(100% - 12px),
-        transparent 100%
-    );
-    -webkit-mask-image: linear-gradient(
-        to bottom,
-        black calc(100% - 12px),
-        transparent 100%
-    );
-
-    /* Children sit above the rim pseudo-elements. */
-    > * {
-        position: relative;
-        z-index: 1;
-    }
-
-    @media (min-width: ${breakpoints.sm}px) {
-        gap: ${space.xs}px;
-        padding: ${space.xs}px ${space.md}px;
-        padding-inline-start: max(${space.md}px, env(safe-area-inset-left));
-        padding-inline-end: max(${space.md}px, env(safe-area-inset-right));
-    }
-
-    @media (min-width: ${breakpoints.md}px) {
-        gap: ${space.md}px;
-        padding: ${space.xs}px ${space.lg}px;
-        padding-inline-start: max(${space.lg}px, env(safe-area-inset-left));
-        padding-inline-end: max(${space.lg}px, env(safe-area-inset-right));
-    }
-
-    /*
-     * Honor the user's reduced-transparency preference: collapse the
-     * glass surface to the solid page background and drop the blur.
-     * Same recipe App.css uses on the body and on AntD modals/drawers.
-     * Drop the rim + dissolve too so the opaque body doesn't compete
-     * with achromatic gradients painted on top.
-     */
-    @media (prefers-reduced-transparency: reduce) {
-        background: var(--page-background);
-        background-attachment: fixed;
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-        padding-bottom: 0;
-        mask-image: none;
-        -webkit-mask-image: none;
-
-        &::before,
-        &::after {
-            background: none;
-        }
-    }
-
-    /*
-     * Forced-colors mode (Windows high-contrast) replaces every author
-     * colour with system tokens. Drop the rim layers so Canvas /
-     * CanvasText win.
-     */
-    @media (forced-colors: active) {
-        padding-bottom: 0;
-        mask-image: none;
-        -webkit-mask-image: none;
-
-        &::before,
-        &::after {
-            background: none;
-        }
-    }
-
-    box-shadow: ${shadow.sm};
-`;
+const CONTAINER_CLASS = "flex flex-1 flex-col min-h-0 w-full";
 
 /*
- * flex-basis: auto reads as the breadcrumb's max-content width, which for a
- * 200-char project name is wider than the row, pushing the Board tab onto
- * its own line below. Pin the basis to 0 so the wrapper starts empty and
- * grows into whatever space the tabs leave behind; the inner ellipsis takes
- * care of the visual truncation.
+ * Frosted-glass secondary chrome. Mirrors the main header's pattern: a
+ * translucent `--glass-surface-subtle` backed by `backdrop-filter` blur, so
+ * the breadcrumb + tabs row stays legible when content is scrolled under it
+ * but the page gradient still reads through at rest. Pinned just below the
+ * main header at `top: var(--header-height)`, which the header publishes via
+ * a ResizeObserver.
  *
- * AntD Breadcrumb's inner <ol> is a flex container with flex-wrap: wrap, so
- * once the wrapper stops growing past max-content the long item wraps onto
- * a second row instead of getting truncated. Force nowrap on the ol and
- * pin the last item with min-width: 0 + overflow: hidden so it can shrink
- * and ellipsize in place.
+ * The specular ::before / ::after rim layers, the scroll-edge mask, and the
+ * reduced-transparency / forced-colors fallbacks mirror the header glass
+ * recipe. `box-shadow` (`shadow.sm`) is applied inline so the token stays the
+ * single source of truth. Padding tracks the header's compact rhythm.
  */
-const BreadcrumbWrapper = styled.div`
-    flex: 1 1 0;
-    min-width: 0;
-
-    && .ant-breadcrumb {
-        font-size: ${fontSize.sm}px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    && .ant-breadcrumb ol {
-        flex-wrap: nowrap;
-        min-width: 0;
-    }
-    && .ant-breadcrumb li,
-    && .ant-breadcrumb-link {
-        min-width: 0;
-    }
-    && .ant-breadcrumb li:first-child,
-    && .ant-breadcrumb li:first-child .ant-breadcrumb-link,
-    && .ant-breadcrumb li:first-child a {
-        flex-shrink: 0;
-        max-width: none;
-        overflow: visible;
-        text-overflow: clip;
-        white-space: nowrap;
-    }
-    && .ant-breadcrumb li:not(:first-child):not(:last-child),
-    &&
-        .ant-breadcrumb
-        li:not(:first-child):not(:last-child)
-        .ant-breadcrumb-link {
-        max-width: 100%;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    /*
-     * The project-name anchor is inline-flex (it carries the 44 px
-     * coarse-pointer touch target below), and text-overflow does not
-     * ellipsize the contents of a flex container — the glyphs hard-clip
-     * at the box edge instead. Keep the anchor as the sized/clipped
-     * flex box and move the ellipsis onto the inner span, which as a
-     * min-width: 0 flex item truncates correctly.
-     */
-    && .ant-breadcrumb li:not(:first-child):not(:last-child) a {
-        align-items: center;
-        display: inline-flex;
-        max-width: 100%;
-        min-width: 0;
-        overflow: hidden;
-        white-space: nowrap;
-    }
-    && .ant-breadcrumb li:not(:first-child):not(:last-child) a > span {
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    && .ant-breadcrumb li:last-child {
-        color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
-        font-weight: ${fontWeight.semibold};
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    @media (pointer: coarse) {
-        && .ant-breadcrumb a {
-            align-items: center;
-            display: inline-flex;
-            min-height: 44px;
-        }
-    }
-`;
-
-const Body = styled.div`
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    min-height: 0;
-    overflow: auto;
-`;
+const TOP_BAR_CLASS = cn(
+    "sticky z-10 flex flex-wrap items-center justify-between gap-xxs min-w-0",
+    "[top:var(--header-height,44px)]",
+    "[background:var(--glass-surface-subtle)] [border-bottom:1px_solid_var(--glass-border)]",
+    "[backdrop-filter:var(--pulse-backdrop-filter-glass)] [-webkit-backdrop-filter:var(--pulse-backdrop-filter-glass)]",
+    "py-xs px-sm",
+    "[padding-inline-start:max(var(--pulse-space-sm),env(safe-area-inset-left))]",
+    "[padding-inline-end:max(var(--pulse-space-sm),env(safe-area-inset-right))]",
+    "pb-[12px]",
+    "[mask-image:linear-gradient(to_bottom,black_calc(100%-12px),transparent_100%)]",
+    "[-webkit-mask-image:linear-gradient(to_bottom,black_calc(100%-12px),transparent_100%)]",
+    "before:content-[''] before:pointer-events-none before:absolute before:inset-0 before:z-0 before:rounded-[inherit] before:bg-[image:var(--glass-specular-top)]",
+    "after:content-[''] after:pointer-events-none after:absolute after:inset-0 after:z-0 after:rounded-[inherit] after:bg-[image:var(--glass-specular-bottom)]",
+    "[&>*]:relative [&>*]:z-[1]",
+    "[@media(prefers-reduced-transparency:reduce)]:[background:var(--page-background)]",
+    "[@media(prefers-reduced-transparency:reduce)]:[background-attachment:fixed]",
+    "[@media(prefers-reduced-transparency:reduce)]:[backdrop-filter:none]",
+    "[@media(prefers-reduced-transparency:reduce)]:[-webkit-backdrop-filter:none]",
+    "[@media(prefers-reduced-transparency:reduce)]:pb-0",
+    "[@media(prefers-reduced-transparency:reduce)]:[mask-image:none]",
+    "[@media(prefers-reduced-transparency:reduce)]:[-webkit-mask-image:none]",
+    "[@media(prefers-reduced-transparency:reduce)]:before:bg-none",
+    "[@media(prefers-reduced-transparency:reduce)]:after:bg-none",
+    "forced-colors:pb-0 forced-colors:[mask-image:none] forced-colors:[-webkit-mask-image:none]",
+    "forced-colors:before:bg-none forced-colors:after:bg-none",
+    "min-[480px]:gap-xs min-[480px]:px-md",
+    "min-[480px]:[padding-inline-start:max(var(--pulse-space-md),env(safe-area-inset-left))]",
+    "min-[480px]:[padding-inline-end:max(var(--pulse-space-md),env(safe-area-inset-right))]",
+    "md:gap-md md:px-lg",
+    "md:[padding-inline-start:max(var(--pulse-space-lg),env(safe-area-inset-left))]",
+    "md:[padding-inline-end:max(var(--pulse-space-lg),env(safe-area-inset-right))]"
+);
 
 /*
- * Phase 4.7: re-introduce a small in-page nav alongside the
- * breadcrumb now that the project detail has more than one child
- * route (Board + Reports). Renders as a row of `<NavLink>`s with a
- * stable `aria-current="page"` attribute on the active link so
- * keyboard / SR users can tell where they are. We deliberately ship
- * a plain link row (not AntD Tabs) so a future third entry doesn't
- * have to re-introduce the Tabs/ink-bar machinery QW-11 deleted.
- *
- * Keep the row inside the same TopBar so the chrome stays a single
- * sticky band; `flex-wrap: wrap` lets the breadcrumb and the nav
- * row sit side by side on wide viewports and stack on phones.
- *
- * On phone chrome ($scrollable) the row takes the full chrome width
- * under the breadcrumb and pans horizontally instead of wrapping, so
- * all five sections stay reachable on narrow viewports without the
- * chrome growing several rows tall. The scrollbar is suppressed so
- * the row reads as a segmented control; the links themselves are the
- * scroll affordance.
+ * Composed breadcrumb (replaces AntD `Breadcrumb`). A semantic
+ * `<nav><ol><li>` trail with a separator glyph between crumbs. The <ol> is a
+ * nowrap flex row so a long project name truncates in place: the root crumb
+ * never shrinks, the middle (project-name link) ellipsizes on its inner span,
+ * and the current (last) crumb clips with an ellipsis. `flex-[1_1_0]` pins
+ * the wrapper basis to 0 so a 200-char name can't push the tabs to a second
+ * row. Colours thread the app-owned `--pulse-*` tokens (formerly AntD's
+ * `--ant-color-*`).
  */
-const ChildNav = styled.nav<{ $scrollable: boolean }>`
-    align-items: center;
-    display: flex;
-    flex: 0 0 auto;
-    gap: ${space.xs}px;
+const BREADCRUMB_CLASS = cn(
+    "flex-[1_1_0] min-w-0",
+    "[&_ol]:flex [&_ol]:flex-nowrap [&_ol]:items-center [&_ol]:gap-xxs [&_ol]:m-0 [&_ol]:min-w-0 [&_ol]:list-none [&_ol]:p-0 [&_ol]:text-sm",
+    "[&_li]:inline-flex [&_li]:items-center [&_li]:min-w-0",
+    "[&_a]:no-underline [&_a]:[color:var(--pulse-text-secondary)]",
+    "[&_a:hover]:underline [&_a:hover]:[color:var(--pulse-text-base)]",
+    "[&_a:focus-visible]:underline [&_a:focus-visible]:[color:var(--pulse-text-base)]",
+    "[&_[data-breadcrumb-separator]]:flex-[0_0_auto] [&_[data-breadcrumb-separator]]:mx-xxs [&_[data-breadcrumb-separator]]:[color:var(--pulse-text-tertiary)]",
+    // Root crumb ("Projects") never shrinks or ellipsizes.
+    "[&_li:first-of-type]:flex-shrink-0",
+    "[&_li:first-of-type_a]:flex-shrink-0 [&_li:first-of-type_a]:max-w-none [&_li:first-of-type_a]:overflow-visible [&_li:first-of-type_a]:[text-overflow:clip] [&_li:first-of-type_a]:whitespace-nowrap",
+    // The middle (project-name) anchor is a clipped inline-flex box; the
+    // ellipsis lives on its inner span since text-overflow can't ellipsize a
+    // flex container's contents.
+    "[&_li[data-breadcrumb=middle]]:max-w-full [&_li[data-breadcrumb=middle]]:min-w-0 [&_li[data-breadcrumb=middle]]:overflow-hidden",
+    "[&_li[data-breadcrumb=middle]_a]:inline-flex [&_li[data-breadcrumb=middle]_a]:items-center [&_li[data-breadcrumb=middle]_a]:max-w-full [&_li[data-breadcrumb=middle]_a]:min-w-0 [&_li[data-breadcrumb=middle]_a]:overflow-hidden [&_li[data-breadcrumb=middle]_a]:whitespace-nowrap",
+    "[&_li[data-breadcrumb=middle]_a>span]:min-w-0 [&_li[data-breadcrumb=middle]_a>span]:overflow-hidden [&_li[data-breadcrumb=middle]_a>span]:text-ellipsis [&_li[data-breadcrumb=middle]_a>span]:whitespace-nowrap",
+    "[&_li:last-of-type]:min-w-0 [&_li:last-of-type]:overflow-hidden [&_li:last-of-type]:text-ellipsis [&_li:last-of-type]:whitespace-nowrap [&_li:last-of-type]:font-semibold [&_li:last-of-type]:[color:var(--pulse-text-base)]",
+    // 44 px coarse-pointer touch target on every crumb link.
+    "coarse:[&_a]:inline-flex coarse:[&_a]:items-center coarse:[&_a]:min-h-[44px]"
+);
 
-    ${(props) =>
-        props.$scrollable
-            ? `
-    flex: 1 1 100%;
-    min-width: 0;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    &::-webkit-scrollbar {
-        display: none;
-    }
-    `
-            : ""}
-`;
+const BODY_CLASS = "flex flex-1 flex-col min-h-0 overflow-auto";
 
-const ChildNavLink = styled(NavLink)`
-    border-radius: ${radius.sm}px;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-    /* Fixed-size segments inside the (possibly scrollable) nav row —
-     * a link must never shrink or wrap mid-label, otherwise the
-     * horizontal pan on phone chrome clips labels instead of panning. */
-    flex: 0 0 auto;
-    font-size: ${fontSize.sm}px;
-    font-weight: ${fontWeight.medium};
-    line-height: 1.2;
-    padding: ${space.xs}px ${space.sm}px;
-    text-decoration: none;
-    white-space: nowrap;
-    /*
-     * Phase 5 "Liquid Glass" Wave 2 — gel-flex on breadcrumb tabs.
-     * Mirrors the header / bottom-tab gel-flex so every interactive
-     * chrome surface in the app yields under press with the same
-     * cadence. transform-only; the tap target stays intact.
-     */
-    transition: transform var(--motion-gel-flex, 220ms)
-        var(--easing-spring-snap, ease-out);
-    will-change: transform;
-    /*
-     * 44 px minimum tap target on the link row. WCAG 2.5.5 — the
-     * link row is one of the first interactive surfaces a touch
-     * user reaches when entering a project, so the floor is on
-     * everywhere rather than gated on coarse pointers.
-     */
-    min-height: 36px;
+/*
+ * Phase 4.7: a small in-page nav alongside the breadcrumb (Board / Members /
+ * Milestones / Labels / Reports). A plain `<NavLink>` row (not AntD Tabs)
+ * whose active link carries `aria-current="page"`. Kept inside the same
+ * TopBar so the chrome stays a single sticky band; `flex-wrap: wrap` on the
+ * TopBar lets the breadcrumb and this row sit side by side on wide viewports
+ * and stack on phones.
+ */
+const CHILD_NAV_BASE_CLASS = "flex items-center gap-xs flex-[0_0_auto]";
 
-    @media (pointer: coarse) {
-        min-height: 44px;
-    }
+/*
+ * On phone chrome the row takes the full chrome width under the breadcrumb
+ * and pans horizontally instead of wrapping, so all five sections stay
+ * reachable without the chrome growing several rows tall. The scrollbar is
+ * suppressed so the row reads as a segmented control.
+ */
+const CHILD_NAV_SCROLLABLE_CLASS = cn(
+    "flex-[1_1_100%] min-w-0 overflow-x-auto [-webkit-overflow-scrolling:touch]",
+    "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+);
 
-    &:hover,
-    &:focus-visible {
-        background: var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.06));
-        color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
-    }
-
-    &:focus-visible {
-        outline: 2px solid var(--ant-color-primary, #ea580c);
-        outline-offset: 1px;
-    }
-
-    &:active {
-        transform: scale(0.97);
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        transition: none;
-
-        &:active {
-            transform: none;
-        }
-    }
-
-    /* React Router's NavLink toggles an aria-current attribute when
-     * the link is the active route — paint the active state on that
-     * attribute so the visible style and the AT contract stay in
-     * lockstep. */
-    &[aria-current="page"] {
-        background: var(--ant-color-fill-secondary, rgba(15, 23, 42, 0.06));
-        color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
-        font-weight: ${fontWeight.semibold};
-    }
-`;
+/*
+ * A single breadcrumb tab. Fixed-size segments (`flex-[0_0_auto]`,
+ * `whitespace-nowrap`) so a link never shrinks or wraps mid-label, otherwise
+ * the horizontal pan on phone chrome would clip labels. The gel-flex press
+ * mirrors the header / bottom-tab recipe (transform-only; the tap target
+ * stays intact). The active `aria-current="page"` state paints on the
+ * attribute so the visible style and the AT contract stay in lockstep.
+ * Colours thread the app-owned `--pulse-*` tokens.
+ */
+const CHILD_NAV_LINK_CLASS = cn(
+    "flex-[0_0_auto] rounded-sm px-sm py-xs text-sm font-medium no-underline whitespace-nowrap",
+    "[line-height:1.2] will-change-transform min-h-[36px]",
+    "[transition:transform_var(--motion-gel-flex,220ms)_var(--easing-spring-snap,ease-out)]",
+    "[color:var(--pulse-text-secondary)]",
+    "hover:[background:var(--pulse-fill-tertiary)] hover:[color:var(--pulse-text-base)]",
+    "focus-visible:[background:var(--pulse-fill-tertiary)] focus-visible:[color:var(--pulse-text-base)]",
+    "focus-visible:[outline:2px_solid_var(--pulse-brand-primary)] focus-visible:[outline-offset:1px]",
+    "active:scale-[0.97]",
+    "motion-reduce:[transition:none] motion-reduce:active:scale-100",
+    "coarse:min-h-[44px]",
+    "aria-[current=page]:[background:var(--pulse-fill-secondary)] aria-[current=page]:[color:var(--pulse-text-base)] aria-[current=page]:font-semibold"
+);
 
 const ProjectDetailPage = () => {
     const { projectId } = useParams<{ projectId: string }>();
@@ -459,61 +213,75 @@ const ProjectDetailPage = () => {
         document.title = shellTitle;
     }, [shellOwnsTitle, shellTitle]);
 
-    const breadcrumbItems = [
-        {
-            title: (
-                <Link to="/projects" viewTransition>
-                    {microcopy.breadcrumb.projects}
-                </Link>
-            )
-        },
-        {
-            title:
-                pLoading && !project ? (
-                    <Skeleton.Input
-                        active
-                        size="small"
-                        style={{ width: 160 }}
-                    />
-                ) : childCrumbTitle ? (
-                    /*
-                     * When a child route is active, the project name
-                     * becomes a link back to the project root (which
-                     * declaratively redirects to /board) so the user
-                     * can navigate up from Reports back to the board
-                     * via the breadcrumb. The leaf crumb carries
-                     * `aria-current="page"`.
-                     */
-                    <Link to={`/projects/${projectId}`} viewTransition>
-                        <span>
-                            {project?.projectName ?? microcopy.labels.project}
-                        </span>
-                    </Link>
-                ) : (
-                    <span aria-current="page">
-                        {project?.projectName ?? microcopy.labels.project}
-                    </span>
-                )
-        },
+    const crumbs: ReactNode[] = [
+        <Link key="projects" to="/projects" viewTransition>
+            {microcopy.breadcrumb.projects}
+        </Link>,
+        pLoading && !project ? (
+            <Skeleton key="project" style={{ height: 16, width: 160 }} />
+        ) : childCrumbTitle ? (
+            /*
+             * When a child route is active, the project name becomes a
+             * link back to the project root (which declaratively
+             * redirects to /board) so the user can navigate up from
+             * Reports back to the board via the breadcrumb. The leaf
+             * crumb carries `aria-current="page"`.
+             */
+            <Link key="project" to={`/projects/${projectId}`} viewTransition>
+                <span>{project?.projectName ?? microcopy.labels.project}</span>
+            </Link>
+        ) : (
+            <span key="project" aria-current="page">
+                {project?.projectName ?? microcopy.labels.project}
+            </span>
+        ),
         ...(childCrumbTitle
             ? [
-                  {
-                      title: <span aria-current="page">{childCrumbTitle}</span>
-                  }
+                  <span key="child" aria-current="page">
+                      {childCrumbTitle}
+                  </span>
               ]
             : [])
     ];
 
     return (
-        <Container>
+        <div className={CONTAINER_CLASS}>
             {!(isPhoneChrome && activeChild === "board") ? (
-                <TopBar
+                <div
+                    className={TOP_BAR_CLASS}
+                    style={{ boxShadow: shadow.sm }}
                     data-glass-context="true"
                     data-testid="project-detail-chrome"
                 >
-                    <BreadcrumbWrapper>
-                        <Breadcrumb items={breadcrumbItems} />
-                    </BreadcrumbWrapper>
+                    <nav
+                        className={BREADCRUMB_CLASS}
+                        aria-label={microcopy.breadcrumb.ariaLabel}
+                        data-testid="project-breadcrumb"
+                    >
+                        <ol>
+                            {crumbs.map((crumb, index) => {
+                                const position =
+                                    index === 0
+                                        ? "root"
+                                        : index === crumbs.length - 1
+                                          ? "current"
+                                          : "middle";
+                                return (
+                                    <li key={index} data-breadcrumb={position}>
+                                        {index > 0 ? (
+                                            <span
+                                                aria-hidden
+                                                data-breadcrumb-separator
+                                            >
+                                                /
+                                            </span>
+                                        ) : null}
+                                        {crumb}
+                                    </li>
+                                );
+                            })}
+                        </ol>
+                    </nav>
                     {/*
                      * In-project navigation (Phase 4.7). Hidden while the
                      * project query is in-flight to avoid a layout
@@ -525,68 +293,76 @@ const ProjectDetailPage = () => {
                      * Labels / Reports unreachable by touch.
                      */}
                     {project && projectId ? (
-                        <ChildNav
-                            $scrollable={isPhoneChrome}
+                        <nav
+                            className={cn(
+                                CHILD_NAV_BASE_CLASS,
+                                isPhoneChrome && CHILD_NAV_SCROLLABLE_CLASS
+                            )}
                             aria-label={microcopy.labels.projectSections}
                             data-testid="project-detail-child-nav"
                         >
-                            <ChildNavLink
+                            <NavLink
+                                className={CHILD_NAV_LINK_CLASS}
                                 end
                                 to={`/projects/${projectId}/board`}
                                 viewTransition
                             >
                                 {microcopy.labels.board}
-                            </ChildNavLink>
-                            <ChildNavLink
+                            </NavLink>
+                            <NavLink
+                                className={CHILD_NAV_LINK_CLASS}
                                 end
                                 to={`/projects/${projectId}/members`}
                                 viewTransition
                             >
                                 {microcopy.labels.members}
-                            </ChildNavLink>
-                            <ChildNavLink
+                            </NavLink>
+                            <NavLink
+                                className={CHILD_NAV_LINK_CLASS}
                                 end
                                 to={`/projects/${projectId}/milestones`}
                                 viewTransition
                             >
                                 {microcopy.labels.milestones}
-                            </ChildNavLink>
-                            <ChildNavLink
+                            </NavLink>
+                            <NavLink
+                                className={CHILD_NAV_LINK_CLASS}
                                 end
                                 to={`/projects/${projectId}/labels`}
                                 viewTransition
                             >
                                 {microcopy.labels.labels}
-                            </ChildNavLink>
-                            <ChildNavLink
+                            </NavLink>
+                            <NavLink
+                                className={CHILD_NAV_LINK_CLASS}
                                 end
                                 to={`/projects/${projectId}/reports`}
                                 viewTransition
                             >
                                 {microcopy.labels.reports}
-                            </ChildNavLink>
-                        </ChildNav>
+                            </NavLink>
+                        </nav>
                     ) : null}
-                </TopBar>
+                </div>
             ) : null}
-            <Body>
+            <div className={BODY_CLASS}>
                 {pError ? (
-                    <Alert
-                        action={
+                    <Alert variant="destructive" style={{ margin: space.md }}>
+                        <CircleAlert aria-hidden />
+                        <AlertTitle>{microcopy.feedback.loadFailed}</AlertTitle>
+                        <AlertDescription>
+                            {microcopy.feedback.retryHint}
+                        </AlertDescription>
+                        <div style={{ marginTop: space.sm }}>
                             <Button
                                 onClick={() => refetchProject()}
-                                size="small"
-                                type="primary"
+                                size="sm"
+                                variant="primary"
                             >
                                 {microcopy.actions.retry}
                             </Button>
-                        }
-                        description={microcopy.feedback.retryHint}
-                        message={microcopy.feedback.loadFailed}
-                        showIcon
-                        style={{ margin: space.md }}
-                        type="error"
-                    />
+                        </div>
+                    </Alert>
                 ) : isNotFound ? (
                     <EmptyState
                         title={microcopy.empty.notFound.title}
@@ -598,7 +374,7 @@ const ProjectDetailPage = () => {
                                         viewTransition: true
                                     })
                                 }
-                                type="primary"
+                                variant="primary"
                             >
                                 {microcopy.empty.notFound.cta}
                             </Button>
@@ -607,8 +383,8 @@ const ProjectDetailPage = () => {
                 ) : (
                     <Outlet />
                 )}
-            </Body>
-        </Container>
+            </div>
+        </div>
     );
 };
 

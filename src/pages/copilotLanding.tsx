@@ -1,21 +1,14 @@
-import { RightOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
-import { Button, Input, Typography } from "antd";
+import { ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Typography } from "@/components/ui/typography";
 import AiSparkleIcon from "../components/aiSparkleIcon";
 import EmptyState from "../components/emptyState";
 import PageContainer from "../components/pageContainer";
 import { microcopy } from "../constants/microcopy";
-import {
-    accent,
-    fontSize,
-    fontWeight,
-    lineHeight,
-    radius,
-    space
-} from "../theme/tokens";
 import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
@@ -37,59 +30,8 @@ import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
  * would leak across routes.
  */
 
-const PageHeading = styled(Typography.Title)`
-    && {
-        align-items: center;
-        display: inline-flex;
-        font-size: ${fontSize.xxl}px;
-        font-weight: ${fontWeight.semibold};
-        gap: ${space.xs}px;
-        line-height: ${lineHeight.tight};
-        margin-bottom: ${space.xs}px;
-    }
-`;
-
-const PageSubtitle = styled(Typography.Paragraph)`
-    && {
-        color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-        font-size: ${fontSize.md}px;
-        margin-bottom: ${space.lg}px;
-    }
-`;
-
-const ComposerShell = styled.div`
-    background: var(--ant-color-bg-container, #fff);
-    border: 1px solid var(--ant-color-border-secondary, rgba(15, 23, 42, 0.06));
-    border-radius: ${radius.lg}px;
-    display: flex;
-    flex-direction: column;
-    gap: ${space.sm}px;
-    padding: ${space.md}px;
-`;
-
-const ComposerRow = styled.div`
-    align-items: stretch;
-    display: flex;
-    flex-direction: column;
-    gap: ${space.sm}px;
-
-    @media (min-width: 640px) {
-        align-items: center;
-        flex-direction: row;
-    }
-`;
-
-const BriefSecondary = styled(Button)`
-    && {
-        align-self: flex-start;
-        color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-        padding-inline: 0;
-    }
-
-    &&:hover {
-        color: ${accent.border};
-    }
-`;
+const PAGE_HEADING =
+    "mb-xs inline-flex items-center gap-xs text-xxl font-semibold leading-tight";
 
 const CopilotLandingPage = () => {
     useTitle(composeBrandedTitle(microcopy.pageTitle.copilot), false);
@@ -101,9 +43,9 @@ const CopilotLandingPage = () => {
     if (!aiEnabled) {
         return (
             <PageContainer>
-                <PageHeading level={1}>
+                <Typography.Title className={PAGE_HEADING} level={1}>
                     {microcopy.copilotLanding.heading}
-                </PageHeading>
+                </Typography.Title>
                 <EmptyState
                     data-testid="copilot-landing-ai-disabled"
                     description={microcopy.copilotLanding.aiDisabledDescription}
@@ -126,52 +68,62 @@ const CopilotLandingPage = () => {
 
     return (
         <PageContainer>
-            <PageHeading level={1}>
+            <Typography.Title className={PAGE_HEADING} level={1}>
                 <AiSparkleIcon aria-hidden size="lg" />
                 <span>{microcopy.copilotLanding.heading}</span>
-            </PageHeading>
-            <PageSubtitle>{microcopy.copilotLanding.subtitle}</PageSubtitle>
-            <ComposerShell data-testid="copilot-landing-ask">
-                <ComposerRow>
-                    <Input
-                        aria-label={microcopy.copilotLanding.askTitle}
-                        autoComplete="off"
-                        enterKeyHint="send"
-                        inputMode="text"
-                        onChange={(event) => setDraft(event.target.value)}
-                        onPressEnter={() => goToAsk(draft)}
-                        placeholder={
-                            microcopy.copilotLanding.composerPlaceholder
-                        }
-                        prefix={
-                            <AiSparkleIcon
-                                aria-hidden
-                                style={{
-                                    color: "var(--ant-color-primary, #EA580C)"
-                                }}
-                            />
-                        }
-                        size="large"
-                        value={draft}
-                    />
+            </Typography.Title>
+            <Typography.Paragraph className="mb-lg text-md text-[color:var(--pulse-text-secondary)]">
+                {microcopy.copilotLanding.subtitle}
+            </Typography.Paragraph>
+            <div
+                className="flex flex-col gap-sm rounded-lg border border-[var(--pulse-border-secondary)] bg-[var(--pulse-bg-container)] p-md"
+                data-testid="copilot-landing-ask"
+            >
+                <div className="flex flex-col items-stretch gap-sm sm:flex-row sm:items-center">
+                    {/*
+                     * Prefix adornment slot. The primitive `Input` has no
+                     * antd-style `prefix`, so the sparkle glyph is a sibling
+                     * positioned inside the field and the input carries left
+                     * padding to clear it.
+                     */}
+                    <div className="relative min-w-0 flex-auto">
+                        <span className="pointer-events-none absolute start-sm top-1/2 inline-flex -translate-y-1/2 items-center text-brand">
+                            <AiSparkleIcon aria-hidden />
+                        </span>
+                        <Input
+                            aria-label={microcopy.copilotLanding.askTitle}
+                            autoComplete="off"
+                            className="pl-xl"
+                            enterKeyHint="send"
+                            inputMode="text"
+                            onChange={(event) => setDraft(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") goToAsk(draft);
+                            }}
+                            placeholder={
+                                microcopy.copilotLanding.composerPlaceholder
+                            }
+                            value={draft}
+                        />
+                    </div>
                     <Button
                         onClick={() => goToAsk(draft)}
-                        size="large"
-                        type="primary"
+                        size="lg"
+                        variant="primary"
                     >
                         {microcopy.copilotLanding.askTitle}
                     </Button>
-                </ComposerRow>
-                <BriefSecondary
+                </div>
+                <Button
+                    className="h-auto self-start px-0 text-[color:var(--pulse-text-secondary)] hover:text-[color:var(--pulse-accent-border)]"
                     data-testid="copilot-landing-brief"
-                    icon={<RightOutlined aria-hidden />}
-                    iconPlacement="end"
                     onClick={goToBrief}
-                    type="link"
+                    variant="link"
                 >
                     {microcopy.copilotLanding.briefSecondaryAction}
-                </BriefSecondary>
-            </ComposerShell>
+                    <ChevronRight aria-hidden />
+                </Button>
+            </div>
         </PageContainer>
     );
 };

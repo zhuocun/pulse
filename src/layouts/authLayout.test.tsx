@@ -3,223 +3,127 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import AuthLayout, { AuthButton } from "./authLayout";
 
+const renderLayout = () =>
+    render(
+        <MemoryRouter initialEntries={["/login"]}>
+            <Routes>
+                <Route element={<AuthLayout />}>
+                    <Route
+                        path="/login"
+                        element={<div>Login outlet content</div>}
+                    />
+                </Route>
+            </Routes>
+        </MemoryRouter>
+    );
+
 describe("AuthLayout", () => {
     it("renders the auth shell with outlet content", () => {
-        const { container } = render(
-            <MemoryRouter initialEntries={["/login"]}>
-                <Routes>
-                    <Route element={<AuthLayout />}>
-                        <Route
-                            path="/login"
-                            element={<div>Login outlet content</div>}
-                        />
-                    </Route>
-                </Routes>
-            </MemoryRouter>
-        );
+        const { container } = renderLayout();
 
         expect(screen.getByText("Login outlet content")).toBeInTheDocument();
         expect(container.querySelector("header")).toBeInTheDocument();
-        expect(container.querySelector(".ant-card")).toBeInTheDocument();
+        expect(container.querySelector("main")).toBeInTheDocument();
+        expect(
+            container.querySelector('[data-glass-context="true"]')
+        ).toBeInTheDocument();
     });
 
-    it("uses a fluid width capped at 40rem for the form card", () => {
-        const { container } = render(
-            <MemoryRouter initialEntries={["/login"]}>
-                <Routes>
-                    <Route element={<AuthLayout />}>
-                        <Route
-                            path="/login"
-                            element={<div>Login outlet content</div>}
-                        />
-                    </Route>
-                </Routes>
-            </MemoryRouter>
-        );
+    // Tailwind's compiled stylesheet isn't loaded in jsdom, so the recipe is
+    // verified by the utilities threaded onto the rendered elements rather than
+    // by resolving computed styles (which would return empty here).
+    it("caps the form card at a fluid 40rem width", () => {
+        const { container } = renderLayout();
 
-        const card = container.querySelector(".ant-card") as HTMLElement;
+        const card = container.querySelector(
+            '[data-glass-context="true"]'
+        ) as HTMLElement;
         expect(card).toBeTruthy();
-        const width = window.getComputedStyle(card).width;
-        expect(width).toContain("min(");
-        expect(width).toContain("40rem");
+        expect(card.className).toContain("max-w-[40rem]");
+        expect(card.className).toContain("w-[min(40rem,100%-2rem)]");
     });
 
     it("exports a full-width auth button", () => {
         render(<AuthButton>Continue</AuthButton>);
 
-        expect(screen.getByRole("button", { name: /continue/i })).toHaveStyle({
-            width: "100%"
-        });
+        const button = screen.getByRole("button", { name: /continue/i });
+        expect(button.className).toContain("w-full");
     });
 
-    // WCAG 2.5.8 (Target Size, Minimum) requires interactive targets be at
-    // least 24×24 CSS px, and the AAA recommendation is 44×44 — the dominant
-    // mobile CTA on the auth pages must stay generous. The deleted
-    // `uiTouchTargets.strict.test.tsx` suite policed this across surfaces
-    // via runtime style inspection. styled-components injects rules into
-    // <style> tags that jsdom does not actually resolve, so we read the
-    // declarations directly from the rendered stylesheet — same regression
-    // signal, just sourced at the rule level instead of the computed-style
-    // level.
+    // WCAG 2.5.8 (Target Size). The dominant mobile CTA must stay generous:
+    // the primitive `Button` threads the `coarse:min-h-[44px]` floor and the
+    // AuthButton pins an explicit 44px (`h-11`) height on every pointer.
     it("declares a touch-target height of at least 44 px (WCAG 2.5.8)", () => {
         render(<AuthButton>Continue</AuthButton>);
         const button = screen.getByRole("button", { name: /continue/i });
-        // styled-components hashes the rule into a class like `css-mcde2a`
-        // (without the `dev-only` / `var-root` cssinjs naming). Pick that
-        // out so the search below is anchored to the exact emitted rule.
-        const styledCls = button.className
-            .split(/\s+/)
-            .find(
-                (tok) =>
-                    /^css-[a-z0-9]{4,}$/i.test(tok) &&
-                    !tok.startsWith("css-var-") &&
-                    !tok.startsWith("css-dev-only-")
-            );
-        expect(styledCls).toBeTruthy();
 
-        // Walk every stylesheet's rules and find any `height: <N>px`
-        // declaration on a rule that mentions the styled class. The
-        // AuthButton's `&& { height: 44px; }` rule must be present.
-        const heights: number[] = [];
-        Array.from(document.styleSheets).forEach((sheet) => {
-            let rules: CSSRuleList;
-            try {
-                rules = sheet.cssRules;
-            } catch {
-                // cross-origin / unreadable stylesheets surface here.
-                return;
-            }
-            for (const rule of Array.from(rules)) {
-                if (!(rule instanceof CSSStyleRule)) continue;
-                if (!styledCls || !rule.selectorText.includes(styledCls))
-                    continue;
-                const re = /height:\s*(\d+(?:\.\d+)?)px/gi;
-                let m: RegExpExecArray | null = re.exec(rule.cssText);
-                while (m !== null) {
-                    heights.push(parseFloat(m[1] ?? "0"));
-                    m = re.exec(rule.cssText);
-                }
-            }
-        });
-
-        // The styled component's `height: 44px` rule must be one of them.
-        // A regression to a smaller value or a removed rule fails loudly.
-        expect(heights).toContain(44);
+        expect(button.className).toContain("h-11");
+        expect(button.className).toContain("coarse:min-h-[44px]");
     });
 
     /*
-     * Phase 5 "Liquid Glass" Wave 2 T3 — Liquid chrome recipe upgrade.
-     * The auth FormCard is the strongest glass surface in the app
-     * (strong surface + heavy blur + brand-tinted border), so it is
-     * the showpiece for the rim recipe. The card gains:
-     *   1. Specular rim (::before / ::after gradient layers).
-     *   2. data-glass-context="true" marker.
-     *   3. AuthButton gains a gel-flex transform on press.
-     *
-     * No scroll-edge dissolve — the auth canvas does not scroll content
-     * past the card edge.
+     * Liquid Glass chrome recipe. The auth FormCard is the strongest glass
+     * surface in the app (strong surface + heavy blur + brand-tinted border),
+     * so it carries the specular-rim recipe and the `data-glass-context`
+     * marker, and the AuthButton carries the gel-flex press transform.
      */
-    describe("Liquid Glass chrome recipe (Wave 2 T3)", () => {
-        const sheetText = () =>
-            Array.from(document.styleSheets)
-                .map((sheet) => {
-                    let rules: CSSRuleList;
-                    try {
-                        rules = sheet.cssRules;
-                    } catch {
-                        return "";
-                    }
-                    return Array.from(rules)
-                        .map((rule) => rule.cssText)
-                        .join("\n");
-                })
-                .join("\n");
+    describe("Liquid Glass chrome recipe", () => {
+        const cardClass = () => {
+            const { container } = renderLayout();
+            return (
+                container.querySelector(
+                    '[data-glass-context="true"]'
+                ) as HTMLElement
+            ).className;
+        };
 
         it('marks the FormCard root with data-glass-context="true"', () => {
-            const { container } = render(
-                <MemoryRouter initialEntries={["/login"]}>
-                    <Routes>
-                        <Route element={<AuthLayout />}>
-                            <Route
-                                path="/login"
-                                element={<div>Login outlet content</div>}
-                            />
-                        </Route>
-                    </Routes>
-                </MemoryRouter>
-            );
-            const card = container.querySelector(".ant-card");
+            const { container } = renderLayout();
+            const card = container.querySelector('[data-glass-context="true"]');
             expect(card).not.toBeNull();
             expect(card?.getAttribute("data-glass-context")).toBe("true");
         });
 
         it("emits a ::before specular-rim layer with --glass-specular-top", () => {
-            render(
-                <MemoryRouter initialEntries={["/login"]}>
-                    <Routes>
-                        <Route element={<AuthLayout />}>
-                            <Route
-                                path="/login"
-                                element={<div>Login outlet content</div>}
-                            />
-                        </Route>
-                    </Routes>
-                </MemoryRouter>
-            );
-            const css = sheetText();
-            expect(css).toMatch(
-                /::before[^}]*background:\s*var\(--glass-specular-top\)/
+            expect(cardClass()).toContain(
+                "before:[background:var(--glass-specular-top)]"
             );
         });
 
         it("emits a ::after companion layer with --glass-specular-bottom", () => {
-            render(
-                <MemoryRouter initialEntries={["/login"]}>
-                    <Routes>
-                        <Route element={<AuthLayout />}>
-                            <Route
-                                path="/login"
-                                element={<div>Login outlet content</div>}
-                            />
-                        </Route>
-                    </Routes>
-                </MemoryRouter>
-            );
-            const css = sheetText();
-            expect(css).toMatch(
-                /::after[^}]*background:\s*var\(--glass-specular-bottom\)/
+            expect(cardClass()).toContain(
+                "after:[background:var(--glass-specular-bottom)]"
             );
         });
 
-        it("applies gel-flex transform recipe to AuthButton", () => {
+        it("applies the gel-flex transform recipe to AuthButton", () => {
             render(<AuthButton>Continue</AuthButton>);
-            const css = sheetText();
-            expect(css).toMatch(/transform[^;]*var\(--motion-gel-flex/);
-            expect(css).toMatch(/:active[^}]*transform:\s*scale\(0\.97\)/);
+            const { className } = screen.getByRole("button", {
+                name: /continue/i
+            });
+            expect(className).toContain("var(--motion-gel-flex");
+            expect(className).toContain("active:scale-[0.97]");
         });
 
-        it("respects prefers-reduced-motion by neutralizing the AuthButton transition + active scale", () => {
+        it("neutralizes the AuthButton transition + active scale under prefers-reduced-motion", () => {
             render(<AuthButton>Continue</AuthButton>);
-            const css = sheetText();
-            expect(css).toMatch(/prefers-reduced-motion[^}]*reduce/);
-            expect(css).toMatch(/transform:\s*none/);
+            const { className } = screen.getByRole("button", {
+                name: /continue/i
+            });
+            expect(className).toContain("motion-reduce:[transition:none]");
+            expect(className).toContain("motion-reduce:active:scale-100");
         });
 
-        it("respects prefers-reduced-transparency on the FormCard by dropping the rim", () => {
-            render(
-                <MemoryRouter initialEntries={["/login"]}>
-                    <Routes>
-                        <Route element={<AuthLayout />}>
-                            <Route
-                                path="/login"
-                                element={<div>Login outlet content</div>}
-                            />
-                        </Route>
-                    </Routes>
-                </MemoryRouter>
+        it("drops the FormCard rim under prefers-reduced-transparency", () => {
+            expect(cardClass()).toContain(
+                "[@media(prefers-reduced-transparency:reduce)]:before:[background:none]"
             );
-            const css = sheetText();
-            expect(css).toMatch(/prefers-reduced-transparency[^}]*reduce/);
+        });
+
+        it("drops the FormCard rim under forced-colors (Windows high-contrast)", () => {
+            expect(cardClass()).toContain(
+                "forced-colors:before:[background:none]"
+            );
         });
     });
 });

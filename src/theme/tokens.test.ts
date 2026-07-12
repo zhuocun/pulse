@@ -15,8 +15,12 @@ import {
     accentAtDark,
     aurora,
     avatarGradients,
+    bg,
+    border,
+    brand,
     breakpoints,
     easing,
+    fill,
     fontFamily,
     fontSize,
     fontWeight,
@@ -31,7 +35,9 @@ import {
     semantic,
     shadow,
     space,
+    status,
     tag,
+    text,
     touchTargetCoarse,
     touchTargetMin,
     viewTransition,
@@ -414,6 +420,49 @@ describe("Phase 5 Liquid Glass token additions", () => {
                 expect(v).toMatch(/^pulse-/);
             }
         });
+    });
+});
+
+describe("AntD --ant-color-* equivalents (S8.5a)", () => {
+    // Every app-owned surface token is a `var(--pulse-*, <fallback>)`
+    // reference so a page repointed off `--ant-color-*` re-colors/flips via
+    // the cssVars-emitted var and still renders a sane literal in a stripped
+    // DOM (SSR / test) where the var is absent.
+    it("text / fill / border / bg tokens are var(--pulse-*, <fallback>) refs", () => {
+        const groups = [text, fill, border, bg];
+        for (const group of groups) {
+            for (const value of Object.values(group)) {
+                expect(value).toMatch(/^var\(--pulse-[a-z-]+,\s*.+\)$/);
+            }
+        }
+    });
+
+    it("text.base reuses the shared --pulse-text-base ink (== page text)", () => {
+        expect(text.base).toBe(
+            `var(--pulse-text-base, ${palette.page.textLight})`
+        );
+    });
+
+    it("neutral fallbacks are the slate-900 ink at AntD's opacity ladder", () => {
+        expect(text.secondary).toContain("rgba(15, 23, 42, 0.65)");
+        expect(text.tertiary).toContain("rgba(15, 23, 42, 0.45)");
+        expect(fill.base).toContain("rgba(15, 23, 42, 0.15)");
+        expect(fill.quaternary).toContain("rgba(15, 23, 42, 0.02)");
+        expect(border.secondary).toContain("rgba(15, 23, 42, 0.06)");
+        expect(bg.container).toContain("#ffffff");
+    });
+
+    it("brand.link points at --pulse-link with the light primaryHover fallback", () => {
+        expect(brand.link).toBe(
+            `var(--pulse-link, ${palette.brand.primaryHover})`
+        );
+    });
+
+    it("status.error / status.warning fall back to the semantic seeds", () => {
+        expect(status.error).toBe(`var(--pulse-error, ${semantic.error})`);
+        expect(status.warning).toBe(
+            `var(--pulse-warning, ${semantic.warning})`
+        );
     });
 });
 

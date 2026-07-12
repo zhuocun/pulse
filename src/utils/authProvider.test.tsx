@@ -50,7 +50,7 @@ describe("AuthProvider", () => {
             { wrapper: Wrapper(queryClient) }
         );
 
-        expect(container.querySelector(".ant-spin")).toBeInTheDocument();
+        expect(container.querySelector('[role="status"]')).toBeInTheDocument();
         expect(screen.queryByText("Routed content")).not.toBeInTheDocument();
 
         await act(async () => {
@@ -124,7 +124,9 @@ describe("AuthProvider", () => {
         // Pre-populated cache means no first-paint spinner even while
         // the probe may still be in flight (it won't be due to staleTime
         // = Infinity, but the assertion holds either way).
-        expect(container.querySelector(".ant-spin")).not.toBeInTheDocument();
+        expect(
+            container.querySelector('[role="status"]')
+        ).not.toBeInTheDocument();
         expect(screen.getByText("Routed content")).toBeInTheDocument();
     });
 });

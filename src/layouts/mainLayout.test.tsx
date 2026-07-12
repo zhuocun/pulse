@@ -195,19 +195,15 @@ describe("MainLayout", () => {
         expect(screen.getByText("App Header")).toBeInTheDocument();
         expect(screen.getByText("Project workspace")).toBeInTheDocument();
         expect(screen.getByText("Project Modal")).toBeInTheDocument();
-        expect(container.firstElementChild).toHaveStyle({
-            display: "grid"
-        });
+        expect(container.firstElementChild).toHaveClass("grid");
         expect(container.firstElementChild?.tagName.toLowerCase()).toBe("div");
-        expect(container.querySelector("main")).toHaveStyle({
-            display: "flex"
-        });
+        expect(container.querySelector("main")).toHaveClass("flex");
     });
 
     // The skip link is hidden until the user tabs to it (WCAG 2.4.1 Bypass
     // Blocks). It MUST keep `pointer-events: none` until focus, otherwise its
     // 1×1 hit target sits above the stacked chrome and steals clicks that
-    // belong to header buttons. Pairs the styled-anchor invariant with the
+    // belong to header buttons. Pairs the pointer-events invariant with the
     // first-tab-focus contract that the deleted strict file used to assert.
     it("renders a skip link that is non-interactive until tab focuses it", async () => {
         render(
@@ -224,7 +220,7 @@ describe("MainLayout", () => {
             name: microcopy.a11y.skipToMainContent
         });
         expect(skip).toHaveAttribute("href", "#main-content");
-        expect(skip).toHaveStyle({ pointerEvents: "none" });
+        expect(skip).toHaveClass("pointer-events-none");
         expect(skip).not.toHaveFocus();
 
         await userEvent.tab();
@@ -378,30 +374,15 @@ describe("MainLayout", () => {
                 </MemoryRouter>
             );
             const main = container.querySelector("main");
-            // The padding-bottom token references env(safe-area-inset-
-            // bottom) which jsdom resolves to 0px, so we inspect the
-            // styled-component sheet for the formula instead of
-            // getComputedStyle. The padding adds the bar height (64),
-            // the bottom gap (space.lg = 24), breathing room (space.sm = 12),
-            // and one viewport-edge buffer (space.xxl = 48) on top of the
-            // safe-area inset.
-            const sheets = Array.from(document.styleSheets)
-                .map((sheet) => {
-                    try {
-                        return Array.from(sheet.cssRules)
-                            .map((rule) => rule.cssText)
-                            .join("\n");
-                    } catch {
-                        return "";
-                    }
-                })
-                .join("\n");
             expect(main).not.toBeNull();
-            // The formula includes env(safe-area-inset-bottom)
-            // AND the additional 24+12+48 px gap.
-            expect(sheets).toMatch(
-                /calc\(64px \+ env\(safe-area-inset-bottom\) \+ 24px \+ 12px \+ 48px\)/
-            );
+            // The clearance is an inline `padding-bottom` on <main>. jsdom's
+            // CSSOM folds the constant px terms of the `calc()`, so the bar
+            // height (64) + bottom gap (space.lg = 24) + breathing room
+            // (space.sm = 12) + viewport-edge buffer (space.xxl = 48) collapse
+            // to a single 148px term, kept alongside env(safe-area-inset-bottom).
+            const inlineStyle = main?.getAttribute("style") ?? "";
+            expect(inlineStyle).toContain("env(safe-area-inset-bottom)");
+            expect(inlineStyle).toContain("148px");
         });
 
         it("does NOT mount the accessory slot when the env flag is off (rollback path)", () => {

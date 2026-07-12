@@ -183,18 +183,16 @@ describe("PullToRefresh — button mode (phone + reduced-motion)", () => {
 
         await user.click(button);
         expect(onRefresh).toHaveBeenCalledTimes(1);
-        // While pending, AntD marks the button as loading.
+        // While pending, the Button reflects loading via aria-busy.
         await waitFor(() =>
-            expect(button.className).toContain("ant-btn-loading")
+            expect(button).toHaveAttribute("aria-busy", "true")
         );
 
         // Resolve the refresh — spinner clears.
         await act(async () => {
             resolveRefresh?.();
         });
-        await waitFor(() =>
-            expect(button.className).not.toContain("ant-btn-loading")
-        );
+        await waitFor(() => expect(button).not.toHaveAttribute("aria-busy"));
     });
 
     it("reflects an externally-controlled refreshing prop on the spinner", () => {
@@ -203,8 +201,9 @@ describe("PullToRefresh — button mode (phone + reduced-motion)", () => {
                 <p>Body</p>
             </PullToRefresh>
         );
-        expect(screen.getByTestId("ptr-button").className).toContain(
-            "ant-btn-loading"
+        expect(screen.getByTestId("ptr-button")).toHaveAttribute(
+            "aria-busy",
+            "true"
         );
     });
 

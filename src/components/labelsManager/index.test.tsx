@@ -33,20 +33,12 @@ const mockedUseReactQuery = useReactQuery as jest.MockedFunction<
     typeof useReactQuery
 >;
 
-const installAntdBrowserMocks = () => {
-    Object.defineProperty(window, "matchMedia", {
-        writable: true,
-        value: (query: string) => ({
-            addEventListener: jest.fn(),
-            addListener: jest.fn(),
-            dispatchEvent: jest.fn(),
-            matches: false,
-            media: query,
-            onchange: null,
-            removeEventListener: jest.fn(),
-            removeListener: jest.fn()
-        })
-    });
+const installBrowserMocks = () => {
+    // Radix Popover drives its surface with pointer-capture APIs jsdom
+    // doesn't ship; polyfill them so the delete-confirm popover can open.
+    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+    Element.prototype.releasePointerCapture = jest.fn();
 };
 
 const createLabel = jest.fn();
@@ -129,7 +121,7 @@ const rowFor = (labelId: string): HTMLElement => {
 };
 
 describe("LabelsManager", () => {
-    beforeAll(installAntdBrowserMocks);
+    beforeAll(installBrowserMocks);
 
     beforeEach(() => {
         jest.clearAllMocks();

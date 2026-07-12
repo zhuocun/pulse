@@ -6,10 +6,11 @@ import {
     screen,
     waitFor
 } from "@testing-library/react";
-import { message, Modal } from "antd";
-import type { ReactNode } from "react";
+import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+
+import useAppMessage from "@/components/ui/toast";
 
 import { store } from "../../store";
 import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
@@ -22,49 +23,7 @@ import ProjectList from ".";
 jest.mock("../../utils/hooks/useAuth");
 jest.mock("../../utils/hooks/useProjectModal");
 jest.mock("../../utils/hooks/useReactMutation");
-
-type DropdownMenuItem = {
-    key?: string | number;
-    label?: ReactNode;
-    onClick?: () => void;
-};
-
-type DropdownMockProps = {
-    children: ReactNode;
-    menu?: {
-        items?: DropdownMenuItem[];
-    };
-};
-
-jest.mock("antd", () => {
-    const actual = jest.requireActual("antd");
-    const React = jest.requireActual("react");
-
-    return {
-        ...actual,
-        Dropdown: ({ children, menu }: DropdownMockProps) =>
-            React.createElement(
-                "div",
-                null,
-                children,
-                React.createElement(
-                    "div",
-                    { "data-testid": "dropdown-menu" },
-                    menu?.items?.map((item) =>
-                        React.createElement(
-                            "button",
-                            {
-                                key: item.key,
-                                onClick: item.onClick,
-                                type: "button"
-                            },
-                            item.label
-                        )
-                    )
-                )
-            )
-    };
-});
+jest.mock("@/components/ui/toast");
 
 /*
  * The grid's `ProjectCard` warms board queries on hover via
@@ -79,6 +38,16 @@ const queryClient = new QueryClient({
 const mockedUseAuth = useAuth as jest.Mock;
 const mockedUseProjectModal = useProjectModal as jest.Mock;
 const mockedUseReactMutation = useReactMutation as jest.Mock;
+const mockedUseAppMessage = useAppMessage as jest.Mock;
+
+const messageApi = {
+    destroy: jest.fn(),
+    error: jest.fn(),
+    info: jest.fn(),
+    loading: jest.fn(),
+    success: jest.fn(),
+    warning: jest.fn()
+};
 
 const member = (overrides: Partial<IMember> = {}): IMember => ({
     _id: "member-1",
@@ -115,22 +84,6 @@ const likeProject = jest.fn();
 const removeProject = jest.fn();
 const startEditing = jest.fn();
 
-const installAntdBrowserMocks = () => {
-    Object.defineProperty(window, "matchMedia", {
-        writable: true,
-        value: (query: string) => ({
-            addEventListener: jest.fn(),
-            addListener: jest.fn(),
-            dispatchEvent: jest.fn(),
-            matches: false,
-            media: query,
-            onchange: null,
-            removeEventListener: jest.fn(),
-            removeListener: jest.fn()
-        })
-    });
-};
-
 const renderList = ({
     dataSource = [
         project(),
@@ -162,8 +115,9 @@ const renderList = ({
     mockedUseReactMutation.mockImplementation((endpoint: string) =>
         endpoint === "users/likes"
             ? { mutateAsync: likeProject }
-            : { mutate: removeProject }
+            : { mutate: removeProject, mutateAsync: jest.fn() }
     );
+    mockedUseAppMessage.mockReturnValue(messageApi);
 
     return render(
         <QueryClientProvider client={queryClient}>
@@ -188,8 +142,13 @@ const renderList = ({
 };
 
 describe("ProjectList", () => {
+    // Radix Select/DropdownMenu drive their menus with pointer-capture and
+    // scroll APIs jsdom doesn't ship; polyfill them so the sort picker,
+    // page-size picker, and per-card action menu can open.
     beforeAll(() => {
-        installAntdBrowserMocks();
+        Element.prototype.scrollIntoView = jest.fn();
+        Element.prototype.hasPointerCapture = jest.fn(() => false);
+        Element.prototype.releasePointerCapture = jest.fn();
     });
 
     beforeEach(() => {
@@ -313,32 +272,13 @@ describe("ProjectList", () => {
         screen.getAllByRole("link").map((link) => link.textContent);
 
     const selectSortOrder = async (label: RegExp) => {
-        fireEvent.mouseDown(
+        const menuUser = userEvent.setup();
+        await menuUser.click(
             screen.getByRole("combobox", { name: /sort projects/i })
         );
-        /*
-         * AntD Select renders two parallel option surfaces:
-         *   1. A screen-reader listbox with `role="option"` and the
-         *      raw VALUE as `textContent` (and the human label as
-         *      `aria-label`). This is the one `findAllByRole("option")`
-         *      returns.
-         *   2. The visible virtual list, where options use `class=
-         *      "ant-select-item-option"` (no `role`) and the label
-         *      appears as `textContent` + the `title` attribute.
-         *
-         * We dispatch the click against the visible option (surface 2)
-         * since that's what mouse / keyboard users actually hit. The
-         * `title` attribute is the simplest way to locate it — it
-         * carries the label verbatim and is unique within the popup.
-         */
-        const candidates = await screen.findAllByTitle(label);
-        const option = candidates.find((node) =>
-            node.classList.contains("ant-select-item-option")
+        await menuUser.click(
+            await screen.findByRole("option", { name: label })
         );
-        if (!option) {
-            throw new Error(`No sort option matched ${label}.`);
-        }
-        fireEvent.click(option);
     };
 
     it("keeps stable order for empty createdAt when sorting newest", async () => {
@@ -401,10 +341,21 @@ describe("ProjectList", () => {
         ]);
     });
 
-    it("opens the edit flow from row actions", () => {
+    const openRowMenu = async () => {
+        const menuUser = userEvent.setup();
+        await menuUser.click(
+            screen.getByRole("button", { name: /more actions for/i })
+        );
+        return menuUser;
+    };
+
+    it("opens the edit flow from row actions", async () => {
         renderList({ dataSource: [project()] });
 
-        fireEvent.click(screen.getByRole("button", { name: /^edit$/i }));
+        const menuUser = await openRowMenu();
+        await menuUser.click(
+            await screen.findByRole("menuitem", { name: /^edit$/i })
+        );
 
         expect(startEditing).toHaveBeenCalledWith("project-1");
     });
@@ -430,65 +381,59 @@ describe("ProjectList", () => {
      * 2xx response, then reads Redux directly so the assertion is
      * independent of any particular drawer-UI affordance.
      */
-    it("records an activity-feed event when a project is deleted (Phase 4.3 integration)", () => {
-        const confirmSpy = jest
-            .spyOn(Modal, "confirm")
-            .mockImplementation((config) => {
-                config.onOk?.();
-                return {
-                    destroy: jest.fn(),
-                    update: jest.fn()
-                } as ReturnType<typeof Modal.confirm>;
-            });
-        try {
-            renderList({ dataSource: [project()] });
+    const confirmDeleteFlow = async () => {
+        const menuUser = await openRowMenu();
+        await menuUser.click(
+            await screen.findByRole("menuitem", { name: /^delete$/i })
+        );
+        await menuUser.click(
+            await screen.findByRole("button", { name: /delete project/i })
+        );
+    };
 
-            fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
-
-            // The real `useReactMutation` would fire `onSuccess` after
-            // the server returns 2xx. Our test mocks the mutation, so
-            // the callback never runs unless we trigger it directly —
-            // walk the mock's last call to grab the options object the
-            // component passed in and invoke `onSuccess` ourselves.
-            expect(removeProject).toHaveBeenCalled();
-            const lastCall = removeProject.mock.calls.at(-1);
-            const options = lastCall?.[1] as
-                | { onSuccess?: () => void }
-                | undefined;
-            act(() => {
-                options?.onSuccess?.();
-            });
-
-            const events = store.getState().activityFeed.events;
-            expect(events).toHaveLength(1);
-            expect(events[0].kind).toBe("project");
-            expect(events[0].action).toBe("delete");
-            expect(events[0].summary).toContain("Roadmap");
-        } finally {
-            confirmSpy.mockRestore();
-        }
-    });
-
-    it("confirms project deletion before calling the delete mutation", () => {
-        const confirmSpy = jest
-            .spyOn(Modal, "confirm")
-            .mockImplementation((config) => {
-                config.onOk?.();
-                return {
-                    destroy: jest.fn(),
-                    update: jest.fn()
-                } as ReturnType<typeof Modal.confirm>;
-            });
+    it("records an activity-feed event when a project is deleted (Phase 4.3 integration)", async () => {
         renderList({ dataSource: [project()] });
 
-        fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
+        await confirmDeleteFlow();
 
-        expect(confirmSpy).toHaveBeenCalledWith(
-            expect.objectContaining({
-                content: "This action cannot be undone.",
-                title: "Delete this project?"
-            })
+        // The real `useReactMutation` would fire `onSuccess` after
+        // the server returns 2xx. Our test mocks the mutation, so
+        // the callback never runs unless we trigger it directly —
+        // walk the mock's last call to grab the options object the
+        // component passed in and invoke `onSuccess` ourselves.
+        expect(removeProject).toHaveBeenCalled();
+        const lastCall = removeProject.mock.calls.at(-1);
+        const options = lastCall?.[1] as { onSuccess?: () => void } | undefined;
+        act(() => {
+            options?.onSuccess?.();
+        });
+
+        const events = store.getState().activityFeed.events;
+        expect(events).toHaveLength(1);
+        expect(events[0].kind).toBe("project");
+        expect(events[0].action).toBe("delete");
+        expect(events[0].summary).toContain("Roadmap");
+    });
+
+    it("confirms project deletion before calling the delete mutation", async () => {
+        renderList({ dataSource: [project()] });
+
+        // Opening the row menu and choosing Delete surfaces the confirm
+        // dialog; the mutation only fires once the dialog is confirmed.
+        const menuUser = await openRowMenu();
+        await menuUser.click(
+            await screen.findByRole("menuitem", { name: /^delete$/i })
         );
+        expect(
+            screen.getByText("This action cannot be undone.")
+        ).toBeInTheDocument();
+        expect(screen.getByText("Delete this project?")).toBeInTheDocument();
+        expect(removeProject).not.toHaveBeenCalled();
+
+        await menuUser.click(
+            screen.getByRole("button", { name: /delete project/i })
+        );
+
         expect(removeProject).toHaveBeenCalledWith(
             { projectId: "project-1" },
             expect.objectContaining({
@@ -503,15 +448,10 @@ describe("ProjectList", () => {
             expect.any(Function),
             expect.any(Function)
         );
-
-        confirmSpy.mockRestore();
     });
 
     it("clears the pending heart and toasts when the like mutation rejects", async () => {
         likeProject.mockRejectedValueOnce(new Error("offline"));
-        const errorSpy = jest
-            .spyOn(message, "error")
-            .mockImplementation(() => "" as never);
         renderList();
 
         const likeButton = screen.getByRole("button", {
@@ -520,19 +460,17 @@ describe("ProjectList", () => {
 
         fireEvent.click(likeButton);
 
-        await waitFor(() => expect(errorSpy).toHaveBeenCalledTimes(1));
-        expect(errorSpy.mock.calls[0][0]).toMatch(/like/i);
+        await waitFor(() => expect(messageApi.error).toHaveBeenCalledTimes(1));
+        expect(messageApi.error.mock.calls[0][0]).toMatch(/like/i);
         await waitFor(() => {
             expect(
                 screen.getByRole("button", { name: /like roadmap/i })
             ).toHaveAttribute("aria-pressed", "false");
         });
-
-        errorSpy.mockRestore();
     });
 
     it("renders skeleton placeholder cards while loading", () => {
-        const { container } = renderList({
+        renderList({
             dataSource: [],
             loading: true
         });
@@ -540,7 +478,7 @@ describe("ProjectList", () => {
         // The skeleton dataset replaces the empty state when loading.
         expect(screen.queryByText(/no projects yet/i)).not.toBeInTheDocument();
         expect(
-            container.querySelectorAll(".ant-skeleton").length
+            screen.getAllByTestId("project-skeleton").length
         ).toBeGreaterThan(0);
     });
 
@@ -588,7 +526,7 @@ describe("ProjectList", () => {
         expect(screen.queryByText("Project 13")).not.toBeInTheDocument();
 
         // Jump to page 2 — the remaining 8 cards render.
-        fireEvent.click(screen.getByTitle("2"));
+        fireEvent.click(screen.getByRole("button", { name: "2" }));
 
         const secondPage = visibleProjectNames();
         expect(secondPage).toHaveLength(8);
@@ -599,7 +537,7 @@ describe("ProjectList", () => {
     it("resets to page 1 when the filtered result set changes", () => {
         const { rerender } = renderList({ dataSource: manyProjects(20) });
 
-        fireEvent.click(screen.getByTitle("2"));
+        fireEvent.click(screen.getByRole("button", { name: "2" }));
         expect(visibleProjectNames()[0]).toBe("Project 13");
 
         // Simulate a parent-driven filter change: a narrower dataSource.
@@ -636,7 +574,7 @@ describe("ProjectList", () => {
     it("never renders an out-of-range (empty) page after the set shrinks", () => {
         const { rerender } = renderList({ dataSource: manyProjects(20) });
 
-        fireEvent.click(screen.getByTitle("2"));
+        fireEvent.click(screen.getByRole("button", { name: "2" }));
         expect(visibleProjectNames()[0]).toBe("Project 13");
 
         // Shrink to 13 projects. A different ID set trips the
@@ -676,11 +614,11 @@ describe("ProjectList", () => {
         expect(visibleProjectNames()).toHaveLength(12);
 
         // Open the page-size select and pick 24 / page so the whole set fits.
-        fireEvent.mouseDown(
-            screen.getByRole("combobox", { name: /page size/i })
+        const menuUser = userEvent.setup();
+        await menuUser.click(
+            screen.getByRole("combobox", { name: /project list pages/i })
         );
-        const option = await screen.findByText(/24 \/ page/i);
-        fireEvent.click(option);
+        await menuUser.click(await screen.findByRole("option", { name: "24" }));
 
         expect(visibleProjectNames()).toHaveLength(20);
     });

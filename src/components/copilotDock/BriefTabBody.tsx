@@ -1,22 +1,27 @@
+import { AlertCircle, AlertTriangle, Copy, Info, RotateCw } from "lucide-react";
 import {
-    CopyOutlined,
-    InfoCircleOutlined,
-    ReloadOutlined
-} from "@ant-design/icons";
-import styled from "@emotion/styled";
+    forwardRef,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState
+} from "react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-    Alert,
-    Button,
-    Card,
-    Divider,
-    List,
-    Skeleton,
-    Space,
-    Tag,
     Tooltip,
-    Typography
-} from "antd";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger
+} from "@/components/ui/tooltip";
+import { Paragraph, Text, Title } from "@/components/ui/typography";
+import { cn } from "@/lib/utils";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
@@ -25,15 +30,6 @@ import {
     BRIEF_AUTO_REFRESH_MIN_INTERVAL_MS,
     BRIEF_CACHE_TTL_MS
 } from "../../theme/aiTokens";
-import {
-    easing,
-    fontSize,
-    fontWeight,
-    lineHeight,
-    motion,
-    radius,
-    space
-} from "../../theme/tokens";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
 import { extractSuggestionRunId } from "../../utils/ai/extractSuggestionRunId";
 import { useRemoteAiConsent } from "../../utils/ai/remoteAiConsent";
@@ -41,7 +37,7 @@ import { formatRelativeTime } from "../../utils/formatRelativeTime";
 import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import useAgent from "../../utils/hooks/useAgent";
 import useAi from "../../utils/hooks/useAi";
-import useAppMessage from "../../utils/hooks/useAppMessage";
+import useAppMessage from "@/components/ui/toast";
 import useDelayedFlag from "../../utils/hooks/useDelayedFlag";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
@@ -51,135 +47,174 @@ import CopilotPrivacyPopover from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
 import { AiCopilotSurfaceFeedback } from "../aiFeedbackPopover";
 
+type DivProps = React.HTMLAttributes<HTMLDivElement>;
+type LiProps = React.LiHTMLAttributes<HTMLLIElement>;
+
 /**
- * Brief-drawer list rows are activatable (open the underlying task in
- * the modal). They render as `<li role="button">` so styling has to live
- * here — global :focus-visible would land on the inner content.
+ * Brief list rows are activatable (open the underlying task in the modal).
+ * They render as `<li role="button">` so styling lives here — a global
+ * :focus-visible would land on the inner content. Rows carry a hairline
+ * divider between them, mirroring the previous list split.
  */
-const ActivatableListItem = styled(List.Item)`
-    && {
-        border-radius: ${radius.sm}px;
-        cursor: pointer;
-        transition: background-color 120ms ease-out;
-    }
+const ActivatableListItem = forwardRef<HTMLLIElement, LiProps>(
+    ({ className, ...props }, ref) => (
+        <li
+            ref={ref}
+            className={cn(
+                "flex cursor-pointer flex-col gap-xxs rounded-sm px-xs py-xs transition-colors",
+                "border-b border-border last:border-b-0",
+                "hover:bg-muted/60",
+                "focus-visible:bg-muted/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary",
+                className
+            )}
+            {...props}
+        />
+    )
+);
+ActivatableListItem.displayName = "ActivatableListItem";
 
-    &&:hover {
-        background: var(--ant-color-bg-text-hover, rgba(15, 23, 42, 0.04));
-    }
+const WorkloadRow = forwardRef<HTMLLIElement, LiProps>(
+    ({ className, ...props }, ref) => (
+        <li
+            ref={ref}
+            className={cn(
+                "flex flex-col items-stretch gap-xxs border-b border-border py-xs last:border-b-0",
+                className
+            )}
+            {...props}
+        />
+    )
+);
+WorkloadRow.displayName = "WorkloadRow";
 
-    &&:focus-visible {
-        background: var(--ant-color-bg-text-hover, rgba(15, 23, 42, 0.04));
-        outline: 2px solid var(--ant-color-primary, #ea580c);
-        outline-offset: -2px;
-    }
-`;
-
-const WorkloadRow = styled(List.Item)`
-    && {
-        align-items: stretch;
-        flex-direction: column;
-        gap: ${space.xxs}px;
-    }
-`;
+/** Plain unordered wrapper matching the previous list container. */
+const BriefList = forwardRef<
+    HTMLUListElement,
+    React.HTMLAttributes<HTMLUListElement>
+>(({ className, ...props }, ref) => (
+    <ul
+        ref={ref}
+        className={cn("m-0 flex list-none flex-col p-0", className)}
+        {...props}
+    />
+));
+BriefList.displayName = "BriefList";
 
 /**
  * Top line of a workload row: the contributor name (semibold, primary
  * read) sits opposite its open-count / points tags so the username and the
- * metrics no longer collapse into one undifferentiated line (§1.2.12).
+ * metrics no longer collapse into one undifferentiated line.
  */
-const WorkloadHead = styled.div`
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xs}px;
-    justify-content: space-between;
-`;
+const WorkloadHead: React.FC<DivProps> = ({ className, ...props }) => (
+    <div
+        className={cn(
+            "flex flex-wrap items-center justify-between gap-xs",
+            className
+        )}
+        {...props}
+    />
+);
 
-const WorkloadName = styled.span`
-    flex: 1 1 auto;
-    font-weight: ${fontWeight.semibold};
-    min-width: 0;
-    overflow-wrap: anywhere;
-`;
+const WorkloadName: React.FC<React.HTMLAttributes<HTMLSpanElement>> = ({
+    className,
+    ...props
+}) => (
+    <span
+        className={cn(
+            "min-w-0 flex-1 font-semibold [overflow-wrap:anywhere]",
+            className
+        )}
+        {...props}
+    />
+);
 
-const WorkloadBarWrap = styled.div`
-    background: var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.04));
-    border-radius: ${radius.pill}px;
-    height: 6px;
-    overflow: hidden;
-    width: 100%;
-`;
+const WorkloadBarWrap: React.FC<DivProps> = ({ className, ...props }) => (
+    <div
+        className={cn(
+            "h-1.5 w-full overflow-hidden rounded-pill bg-muted",
+            className
+        )}
+        {...props}
+    />
+);
 
-const WorkloadBar = styled.div<{ overloaded: boolean }>`
-    background: ${(props) =>
-        props.overloaded
-            ? "var(--ant-color-warning, #F59E0B)"
-            : "var(--color-copilot-grad-mid, #EA580C)"};
-    height: 100%;
-    transform-origin: left;
-    transition: transform ${motion.long}ms ${easing.standard};
-    width: 100%;
-
-    @media (prefers-reduced-motion: reduce) {
-        transition: none;
-    }
-`;
+const WorkloadBar: React.FC<DivProps & { overloaded: boolean }> = ({
+    className,
+    overloaded,
+    ...props
+}) => (
+    <div
+        className={cn(
+            "h-full w-full origin-left transition-transform motion-reduce:transition-none",
+            overloaded ? "bg-warning" : "bg-primary",
+            className
+        )}
+        {...props}
+    />
+);
 
 /**
  * Compact stat-tile grid for the "At a glance" summary card. Auto-fits as
  * many tiles per row as fit at a 96px min, so the four stats wrap cleanly
  * on the narrow drawer / dock surface without magic breakpoints.
  */
-const SummaryGrid = styled.div`
-    display: grid;
-    gap: ${space.sm}px;
-    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-`;
+const SummaryGrid: React.FC<DivProps> = ({ className, ...props }) => (
+    <div
+        className={cn(
+            "grid gap-sm [grid-template-columns:repeat(auto-fit,minmax(96px,1fr))]",
+            className
+        )}
+        {...props}
+    />
+);
 
-const SummaryTile = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xxs}px;
-`;
+const SummaryTile: React.FC<DivProps> = ({ className, ...props }) => (
+    <div className={cn("flex flex-col gap-xxs", className)} {...props} />
+);
 
-const SummaryValue = styled.span`
-    font-size: ${fontSize.xl}px;
-    font-weight: ${fontWeight.semibold};
-    line-height: ${lineHeight.tight};
-`;
+const SummaryValue: React.FC<React.HTMLAttributes<HTMLSpanElement>> = ({
+    className,
+    ...props
+}) => (
+    <span
+        className={cn("text-xl font-semibold leading-tight", className)}
+        {...props}
+    />
+);
 
 /**
  * Per-column count visualization. A lightweight token-colored bar sized by
- * proportion of the busiest column — NOT a charting dependency (§1.2.12).
+ * proportion of the busiest column — NOT a charting dependency.
  */
-const CountRow = styled.div`
-    align-items: center;
-    display: grid;
-    gap: ${space.sm}px;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
-    padding-block: ${space.xxs}px;
-`;
+const CountRow: React.FC<DivProps> = ({ className, ...props }) => (
+    <div
+        className={cn(
+            "grid items-center gap-sm py-xxs [grid-template-columns:minmax(0,1fr)_minmax(0,2fr)_auto]",
+            className
+        )}
+        {...props}
+    />
+);
 
-const CountBarTrack = styled.div`
-    background: var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.04));
-    border-radius: ${radius.pill}px;
-    height: 8px;
-    overflow: hidden;
-    width: 100%;
-`;
+const CountBarTrack: React.FC<DivProps> = ({ className, ...props }) => (
+    <div
+        className={cn(
+            "h-2 w-full overflow-hidden rounded-pill bg-muted",
+            className
+        )}
+        {...props}
+    />
+);
 
-const CountBarFill = styled.div`
-    background: var(--color-copilot-grad-mid, #ea580c);
-    border-radius: ${radius.pill}px;
-    height: 100%;
-    transform-origin: left;
-    transition: transform ${motion.long}ms ${easing.standard};
-    width: 100%;
-
-    @media (prefers-reduced-motion: reduce) {
-        transition: none;
-    }
-`;
+const CountBarFill: React.FC<DivProps> = ({ className, ...props }) => (
+    <div
+        className={cn(
+            "h-full w-full origin-left rounded-pill bg-primary transition-transform motion-reduce:transition-none",
+            className
+        )}
+        {...props}
+    />
+);
 
 export interface BriefTabBodyProps {
     /**
@@ -206,16 +241,9 @@ export interface BriefTabBodyProps {
 const SectionHeading: React.FC<{ children: React.ReactNode }> = ({
     children
 }) => (
-    <Typography.Title
-        level={4}
-        style={{
-            fontSize: fontSize.base,
-            marginBottom: space.xs,
-            marginTop: space.md
-        }}
-    >
+    <Title className="mb-xs mt-md text-base" level={4}>
         {children}
-    </Typography.Title>
+    </Title>
 );
 
 interface ClickableListItemProps {
@@ -227,7 +255,7 @@ const ClickableListItem: React.FC<ClickableListItemProps> = ({
     onActivate,
     children
 }) => {
-    const handleKey = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const handleKey = (event: React.KeyboardEvent<HTMLLIElement>) => {
         if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
             onActivate();
@@ -301,14 +329,27 @@ const formatRelative = (then: number, now: number): string =>
         days: microcopy.brief.relativeDays
     });
 
-const STRENGTH_COLOR: Record<
+type ErrorSeverity = "error" | "warning" | "info";
+
+const severityVariant = (
+    severity: ErrorSeverity
+): "destructive" | "warning" | "info" =>
+    severity === "error" ? "destructive" : severity;
+
+const SeverityIcon: React.FC<{ severity: ErrorSeverity }> = ({ severity }) => {
+    if (severity === "error") return <AlertCircle aria-hidden />;
+    if (severity === "warning") return <AlertTriangle aria-hidden />;
+    return <Info aria-hidden />;
+};
+
+const STRENGTH_VARIANT: Record<
     NonNullable<IBoardBrief["recommendationDetail"]>["strength"],
-    "red" | "orange" | "blue" | "default"
+    "destructive" | "warning" | "info" | "secondary"
 > = {
-    strong: "red",
-    moderate: "orange",
-    low: "blue",
-    none: "default"
+    strong: "destructive",
+    moderate: "warning",
+    low: "info",
+    none: "secondary"
 };
 
 interface BriefRecommendationTitleProps {
@@ -331,13 +372,15 @@ const BriefRecommendationTitle: React.FC<BriefRecommendationTitleProps> = ({
             {`${microcopy.a11y.aiSuggestion}: ${microcopy.brief.recommendedNextStep}`}
         </span>
         {detail && (
-            <Tooltip title={microcopy.brief.strengthTooltips[detail.strength]}>
-                <Tag
-                    color={STRENGTH_COLOR[detail.strength]}
-                    style={{ marginInlineEnd: 0 }}
-                >
-                    {microcopy.brief.strengthLabels[detail.strength]}
-                </Tag>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Badge variant={STRENGTH_VARIANT[detail.strength]}>
+                        {microcopy.brief.strengthLabels[detail.strength]}
+                    </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                    {microcopy.brief.strengthTooltips[detail.strength]}
+                </TooltipContent>
             </Tooltip>
         )}
         {detail?.basis ? (
@@ -363,26 +406,16 @@ const BriefRecommendationBody: React.FC<BriefRecommendationBodyProps> = ({
     const text = detail?.text ?? fallbackText;
     return (
         <div>
-            <Typography.Paragraph
-                style={{ marginBottom: 4, overflowWrap: "anywhere" }}
-            >
+            <Paragraph className="mb-[4px] [overflow-wrap:anywhere]">
                 {text}
-            </Typography.Paragraph>
+            </Paragraph>
             {detail && detail.sources.length > 0 && (
-                <Space size={4} wrap>
+                <div className="flex flex-wrap gap-[4px]">
                     {detail.sources.map((source) => (
-                        <Tag
-                            color="purple"
+                        <Badge
+                            className="max-w-full cursor-pointer overflow-hidden text-ellipsis"
                             key={source.taskId}
                             onClick={() => onOpenTask(source.taskId)}
-                            style={{
-                                cursor: "pointer",
-                                marginInlineEnd: 0,
-                                maxWidth: "100%",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis"
-                            }}
-                            tabIndex={0}
                             onKeyDown={(event) => {
                                 if (
                                     event.key === "Enter" ||
@@ -392,11 +425,14 @@ const BriefRecommendationBody: React.FC<BriefRecommendationBodyProps> = ({
                                     onOpenTask(source.taskId);
                                 }
                             }}
+                            role="button"
+                            tabIndex={0}
+                            variant="secondary"
                         >
                             {source.taskName}
-                        </Tag>
+                        </Badge>
                     ))}
-                </Space>
+                </div>
             )}
         </div>
     );
@@ -461,9 +497,8 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
     tasks,
     members
 }) => {
-    // AntD v6: static `message` warns about dynamic theme;
-    // `useAppMessage()` returns a theme-aware instance (with a static
-    // fallback for tests that render without `<App>`).
+    // Toasts route through the sonner-backed `message` seam, which
+    // no-ops until a `<Toaster>` is mounted (test-safe by default).
     const message = useAppMessage();
     // `tabActive` defaults to `dockOpen` so a legacy single-surface caller
     // (drawer wrapper) inherits the original semantics. Inside this body:
@@ -913,44 +948,49 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
     );
 
     return (
-        <>
-            <Space
-                size={space.xs}
-                style={{
-                    display: "flex",
-                    justifyContent: "flex-end",
-                    marginBottom: space.xs
-                }}
-            >
-                <Tooltip title={microcopy.ai.regenerateLabel}>
-                    <Button
-                        aria-label={microcopy.ai.regenerateLabel}
-                        disabled={activeIsLoading}
-                        icon={<ReloadOutlined />}
-                        onClick={handleRefresh}
-                        size="small"
-                        type="text"
-                    />
+        <TooltipProvider>
+            <div className="mb-xs flex justify-end gap-xs">
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            aria-label={microcopy.ai.regenerateLabel}
+                            disabled={activeIsLoading}
+                            onClick={handleRefresh}
+                            size="icon"
+                            variant="ghost"
+                        >
+                            <RotateCw aria-hidden />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        {microcopy.ai.regenerateLabel}
+                    </TooltipContent>
                 </Tooltip>
-                <Tooltip title={microcopy.actions.copyAsMarkdown}>
-                    <Button
-                        aria-label={microcopy.a11y.copyBriefAsMarkdown}
-                        disabled={!briefData || activeIsLoading}
-                        icon={<CopyOutlined />}
-                        onClick={handleCopyMarkdown}
-                        size="small"
-                        type="text"
-                    />
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            aria-label={microcopy.a11y.copyBriefAsMarkdown}
+                            disabled={!briefData || activeIsLoading}
+                            onClick={handleCopyMarkdown}
+                            size="icon"
+                            variant="ghost"
+                        >
+                            <Copy aria-hidden />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        {microcopy.actions.copyAsMarkdown}
+                    </TooltipContent>
                 </Tooltip>
                 <CopilotPrivacyPopover
                     label={
                         <span aria-label={microcopy.ai.privacyLink}>
-                            <InfoCircleOutlined />
+                            <Info aria-hidden />
                         </span>
                     }
                     route="board-brief"
                 />
-            </Space>
+            </div>
             <CopilotRemoteConsentNotice route="board-brief" />
             <SrOnlyLive>{briefStatusAnnouncement}</SrOnlyLive>
             {showBriefLoadingSkeleton && (
@@ -958,83 +998,122 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
                     aria-label={microcopy.a11y.generatingBrief}
                     aria-busy="true"
                 >
-                    <Skeleton active paragraph={{ rows: 2 }} title />
-                    <Skeleton
-                        active
-                        paragraph={{ rows: 4 }}
-                        style={{ marginTop: space.lg }}
-                        title={false}
-                    />
+                    <div className="flex flex-col gap-xs">
+                        <Skeleton className="h-6 w-1/2" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-5/6" />
+                    </div>
+                    <div className="mt-lg flex flex-col gap-xs">
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-4/5" />
+                        <Skeleton className="h-4 w-3/5" />
+                    </div>
                 </div>
             )}
             {error && !briefData && (
-                <Alert
-                    action={
-                        errorView.retryable ? (
+                <Alert variant={severityVariant(errorView.severity)}>
+                    <SeverityIcon severity={errorView.severity} />
+                    <AlertTitle>{errorView.heading}</AlertTitle>
+                    {errorView.body ? (
+                        <AlertDescription>{errorView.body}</AlertDescription>
+                    ) : null}
+                    {errorView.retryable ? (
+                        <AlertDescription>
                             <Button
+                                className="h-auto p-0"
                                 onClick={handleRefresh}
-                                size="small"
-                                type="link"
+                                size="sm"
+                                variant="link"
                             >
                                 {microcopy.ai.retryLabel}
                             </Button>
-                        ) : null
-                    }
-                    description={errorView.body || undefined}
-                    showIcon
-                    title={errorView.heading}
-                    type={errorView.severity}
-                />
+                        </AlertDescription>
+                    ) : null}
+                </Alert>
             )}
             {briefData && (
                 <div
                     aria-label={microcopy.a11y.boardBriefContent}
                     aria-live="polite"
                 >
-                    <Typography.Title level={3} style={{ marginTop: 0 }}>
+                    <Title className="mt-0" level={3}>
                         {headline}
-                    </Typography.Title>
-                    <Card
-                        size="small"
-                        style={{ marginBottom: space.md }}
-                        title={microcopy.brief.summaryTitle}
-                    >
-                        <SummaryGrid>
-                            <SummaryTile>
-                                <SummaryValue>
-                                    {summary.totalTasks}
-                                </SummaryValue>
-                                <Typography.Text type="secondary">
-                                    {microcopy.brief.summaryTotalTasks}
-                                </Typography.Text>
-                            </SummaryTile>
-                            <SummaryTile>
-                                <SummaryValue>{summary.columns}</SummaryValue>
-                                <Typography.Text type="secondary">
-                                    {microcopy.brief.summaryColumns}
-                                </Typography.Text>
-                            </SummaryTile>
-                            <SummaryTile>
-                                <SummaryValue>{summary.unowned}</SummaryValue>
-                                <Typography.Text type="secondary">
-                                    {microcopy.brief.summaryUnowned}
-                                </Typography.Text>
-                            </SummaryTile>
-                            <SummaryTile>
-                                <SummaryValue>
-                                    {summary.contributors}
-                                </SummaryValue>
-                                <Typography.Text type="secondary">
-                                    {microcopy.brief.summaryContributors}
-                                </Typography.Text>
-                            </SummaryTile>
-                        </SummaryGrid>
+                    </Title>
+                    <Card className="mb-md">
+                        <CardHeader className="p-md pb-xxs">
+                            <CardTitle>
+                                {microcopy.brief.summaryTitle}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-md pt-xs">
+                            <SummaryGrid>
+                                <SummaryTile>
+                                    <SummaryValue>
+                                        {summary.totalTasks}
+                                    </SummaryValue>
+                                    <Text type="secondary">
+                                        {microcopy.brief.summaryTotalTasks}
+                                    </Text>
+                                </SummaryTile>
+                                <SummaryTile>
+                                    <SummaryValue>
+                                        {summary.columns}
+                                    </SummaryValue>
+                                    <Text type="secondary">
+                                        {microcopy.brief.summaryColumns}
+                                    </Text>
+                                </SummaryTile>
+                                <SummaryTile>
+                                    <SummaryValue>
+                                        {summary.unowned}
+                                    </SummaryValue>
+                                    <Text type="secondary">
+                                        {microcopy.brief.summaryUnowned}
+                                    </Text>
+                                </SummaryTile>
+                                <SummaryTile>
+                                    <SummaryValue>
+                                        {summary.contributors}
+                                    </SummaryValue>
+                                    <Text type="secondary">
+                                        {microcopy.brief.summaryContributors}
+                                    </Text>
+                                </SummaryTile>
+                            </SummaryGrid>
+                        </CardContent>
                     </Card>
                     {briefData.recommendation && (
                         <Alert
-                            action={
-                                recommendationFeedbackVisible &&
-                                !activeIsLoading ? (
+                            className="mb-md"
+                            variant={
+                                briefData.recommendationDetail?.strength ===
+                                "none"
+                                    ? "info"
+                                    : "warning"
+                            }
+                        >
+                            {briefData.recommendationDetail?.strength ===
+                            "none" ? (
+                                <Info aria-hidden />
+                            ) : (
+                                <AlertTriangle aria-hidden />
+                            )}
+                            <AlertTitle>
+                                <BriefRecommendationTitle
+                                    detail={briefData.recommendationDetail}
+                                />
+                            </AlertTitle>
+                            <AlertDescription>
+                                <BriefRecommendationBody
+                                    detail={briefData.recommendationDetail}
+                                    fallbackText={briefData.recommendation}
+                                    onOpenTask={openTaskFromBrief}
+                                />
+                            </AlertDescription>
+                            {recommendationFeedbackVisible &&
+                            !activeIsLoading ? (
+                                <AlertDescription className="mt-xs">
                                     <AiCopilotSurfaceFeedback
                                         ariaGroupLabel={(
                                             microcopy.feedback
@@ -1054,34 +1133,14 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
                                         }
                                         surface="board-brief"
                                     />
-                                ) : null
-                            }
-                            description={
-                                <BriefRecommendationBody
-                                    detail={briefData.recommendationDetail}
-                                    fallbackText={briefData.recommendation}
-                                    onOpenTask={openTaskFromBrief}
-                                />
-                            }
-                            showIcon
-                            style={{ marginBottom: space.md }}
-                            title={
-                                <BriefRecommendationTitle
-                                    detail={briefData.recommendationDetail}
-                                />
-                            }
-                            type={
-                                briefData.recommendationDetail?.strength ===
-                                "none"
-                                    ? "info"
-                                    : "warning"
-                            }
-                        />
+                                </AlertDescription>
+                            ) : null}
+                        </Alert>
                     )}
                     <SectionHeading>
                         {microcopy.brief.countsPerColumn}
                     </SectionHeading>
-                    <div style={{ marginBottom: space.md }}>
+                    <div className="mb-md">
                         {briefData.counts.map((entry) => {
                             const ratio =
                                 maxColumnCount > 0
@@ -1098,12 +1157,9 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
                                     key={entry.columnId}
                                     role="group"
                                 >
-                                    <Typography.Text
-                                        ellipsis
-                                        style={{ minWidth: 0 }}
-                                    >
+                                    <Text className="min-w-0 truncate">
                                         {entry.columnName}
-                                    </Typography.Text>
+                                    </Text>
                                     <CountBarTrack aria-hidden>
                                         <CountBarFill
                                             style={{
@@ -1111,93 +1167,81 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
                                             }}
                                         />
                                     </CountBarTrack>
-                                    <Typography.Text
-                                        strong
-                                        style={{
-                                            fontVariantNumeric: "tabular-nums"
-                                        }}
-                                    >
+                                    <Text className="tabular-nums" strong>
                                         {entry.count}
-                                    </Typography.Text>
+                                    </Text>
                                 </CountRow>
                             );
                         })}
                     </div>
-                    <Divider style={{ marginBlock: space.md }} />
+                    <Separator className="my-md" />
 
                     <SectionHeading>
                         {microcopy.brief.largestUnstarted}
                     </SectionHeading>
                     {briefData.largestUnstarted.length === 0 ? (
-                        <Typography.Text type="secondary">
+                        <Text type="secondary">
                             {microcopy.brief.noUnstarted}
-                        </Typography.Text>
+                        </Text>
                     ) : (
-                        <List
-                            dataSource={briefData.largestUnstarted}
-                            renderItem={(item) => (
+                        <BriefList className="mb-md">
+                            {briefData.largestUnstarted.map((item) => (
                                 <ClickableListItem
+                                    key={item.taskId}
                                     onActivate={() =>
                                         openTaskFromBrief(item.taskId)
                                     }
                                 >
-                                    <List.Item.Meta
-                                        description={
-                                            item.storyPoints !== undefined ? (
-                                                <Tag>
-                                                    {microcopy.brief.ptsCount.replace(
-                                                        "{count}",
-                                                        String(item.storyPoints)
-                                                    )}
-                                                </Tag>
-                                            ) : null
-                                        }
-                                        title={item.taskName}
-                                    />
+                                    <span className="font-medium text-foreground">
+                                        {item.taskName}
+                                    </span>
+                                    {item.storyPoints !== undefined ? (
+                                        <span>
+                                            <Badge variant="secondary">
+                                                {microcopy.brief.ptsCount.replace(
+                                                    "{count}",
+                                                    String(item.storyPoints)
+                                                )}
+                                            </Badge>
+                                        </span>
+                                    ) : null}
                                 </ClickableListItem>
-                            )}
-                            size="small"
-                            style={{ marginBottom: space.md }}
-                        />
+                            ))}
+                        </BriefList>
                     )}
 
-                    <Divider style={{ marginBlock: space.md }} />
+                    <Separator className="my-md" />
 
                     <SectionHeading>
                         {microcopy.brief.unownedTasks}
                     </SectionHeading>
                     {briefData.unowned.length === 0 ? (
-                        <Typography.Text type="secondary">
-                            {microcopy.brief.allOwned}
-                        </Typography.Text>
+                        <Text type="secondary">{microcopy.brief.allOwned}</Text>
                     ) : (
-                        <List
-                            dataSource={briefData.unowned}
-                            renderItem={(item) => (
+                        <BriefList className="mb-md">
+                            {briefData.unowned.map((item) => (
                                 <ClickableListItem
+                                    key={item.taskId}
                                     onActivate={() =>
                                         openTaskFromBrief(item.taskId)
                                     }
                                 >
                                     {item.taskName}
                                 </ClickableListItem>
-                            )}
-                            size="small"
-                            style={{ marginBottom: space.md }}
-                        />
+                            ))}
+                        </BriefList>
                     )}
 
-                    <Divider style={{ marginBlock: space.md }} />
+                    <Separator className="my-md" />
 
                     <SectionHeading>{microcopy.brief.workload}</SectionHeading>
                     {briefData.workload.length === 0 ? (
-                        <Typography.Text type="secondary">
+                        <Text type="secondary">
                             {microcopy.brief.noActivePerMember}
-                        </Typography.Text>
+                        </Text>
                     ) : (
-                        <List
-                            dataSource={briefData.workload}
-                            renderItem={(item) => {
+                        <BriefList>
+                            {briefData.workload.map((item) => {
                                 const ratio =
                                     teamAverage > 0
                                         ? Math.min(
@@ -1207,34 +1251,25 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
                                         : 0;
                                 const overloaded = ratio > 1.2;
                                 return (
-                                    <WorkloadRow>
+                                    <WorkloadRow key={item.username}>
                                         <WorkloadHead>
                                             <WorkloadName>
                                                 {item.username}
                                             </WorkloadName>
-                                            <Space size={space.xxs}>
-                                                <Tag
-                                                    style={{
-                                                        marginInlineEnd: 0
-                                                    }}
-                                                >
+                                            <span className="flex gap-xxs">
+                                                <Badge variant="secondary">
                                                     {microcopy.brief.openCount.replace(
                                                         "{count}",
                                                         String(item.openTasks)
                                                     )}
-                                                </Tag>
-                                                <Tag
-                                                    color="blue"
-                                                    style={{
-                                                        marginInlineEnd: 0
-                                                    }}
-                                                >
+                                                </Badge>
+                                                <Badge variant="info">
                                                     {microcopy.brief.ptsCount.replace(
                                                         "{count}",
                                                         String(item.openPoints)
                                                     )}
-                                                </Tag>
-                                            </Space>
+                                                </Badge>
+                                            </span>
                                         </WorkloadHead>
                                         <WorkloadBarWrap aria-hidden>
                                             <WorkloadBar
@@ -1246,26 +1281,19 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
                                         </WorkloadBarWrap>
                                     </WorkloadRow>
                                 );
-                            }}
-                            size="small"
-                        />
+                            })}
+                        </BriefList>
                     )}
                     {generatedAt !== null && (
-                        <Typography.Text
-                            style={{
-                                display: "block",
-                                marginTop: space.md
-                            }}
-                            type="secondary"
-                        >
+                        <Text className="mt-md block" type="secondary">
                             {microcopy.brief.generated.replace(
                                 "{time}",
                                 formatRelative(generatedAt, now)
                             )}
-                        </Typography.Text>
+                        </Text>
                     )}
                     {isRemote && remoteAgent.citations.length > 0 && (
-                        <Space size={4} style={{ marginTop: space.sm }} wrap>
+                        <div className="mt-sm flex flex-wrap gap-[4px]">
                             {remoteAgent.citations.map((c, i) => (
                                 <CitationChip
                                     citation={c}
@@ -1273,11 +1301,11 @@ const BriefTabBody: React.FC<BriefTabBodyProps> = ({
                                     key={`${c.id}-${i}`}
                                 />
                             ))}
-                        </Space>
+                        </div>
                     )}
                 </div>
             )}
-        </>
+        </TooltipProvider>
     );
 };
 

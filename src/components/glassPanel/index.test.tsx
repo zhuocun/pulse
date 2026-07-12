@@ -117,9 +117,9 @@ describe("GlassPanel", () => {
             const root = container.firstElementChild as HTMLElement;
             // Consumer class is present
             expect(root.classList.contains("from-consumer")).toBe(true);
-            // Emotion always adds a generated className — verify the
-            // styled root has more than one class so we know we're not
-            // dropping the styled-component's painting.
+            // The Tailwind recipe classes ride alongside the consumer
+            // class — verify the root carries more than one class so we
+            // know the surface styling is not being dropped.
             expect(root.className.split(" ").length).toBeGreaterThan(1);
         });
     });

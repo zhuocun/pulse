@@ -6,16 +6,29 @@ import {
     waitFor
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { message } from "antd";
+import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { microcopy } from "../../constants/microcopy";
 import { store } from "../../store";
 import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
-import { ruleTextsFor, styledClassFor } from "../../testUtils/styleRules";
+import useUndoToast from "../../utils/hooks/useUndoToast";
 
 import ColumnCreator from ".";
+
+// The transient Undo toast routes through the out-of-scope, AntD-backed
+// `useUndoToast`. Mock it so this suite stays free of AntD's global message
+// container while still asserting the create flow raises the toast with the
+// right copy and a working DELETE-the-column undo closure.
+jest.mock("../../utils/hooks/useUndoToast");
+
+interface UndoOptions {
+    description: string;
+    undo: () => Promise<void>;
+}
+const showUndoToast = jest.fn();
+let lastUndoOptions: UndoOptions | null = null;
 
 const response = (body: unknown, ok = true) =>
     ({
@@ -51,7 +64,22 @@ const renderCreator = () => {
 describe("ColumnCreator", () => {
     const fetchMock = jest.spyOn(global, "fetch");
 
+    // Radix Select drives its listbox with pointer-capture + scroll APIs
+    // jsdom doesn't ship; polyfill them so the category picker can open.
+    beforeAll(() => {
+        Element.prototype.scrollIntoView = jest.fn();
+        Element.prototype.hasPointerCapture = jest.fn(() => false);
+        Element.prototype.releasePointerCapture = jest.fn();
+    });
+
     beforeEach(() => {
+        lastUndoOptions = null;
+        showUndoToast.mockReset();
+        showUndoToast.mockImplementation((options: UndoOptions) => {
+            lastUndoOptions = options;
+            return { dismiss: jest.fn() };
+        });
+        (useUndoToast as jest.Mock).mockReturnValue({ show: showUndoToast });
         fetchMock.mockReset();
         fetchMock.mockResolvedValue(
             response({
@@ -75,10 +103,6 @@ describe("ColumnCreator", () => {
     afterEach(() => {
         act(() => {
             store.dispatch(activityFeedActions.clearActivityFeed());
-            // The Undo toast lives in a global AntD message container that
-            // outlives unmount (10 s window); tear it down so a leaked
-            // "Undo" button never bleeds into a sibling test's queries.
-            message.destroy();
         });
     });
 
@@ -141,8 +165,7 @@ describe("ColumnCreator", () => {
         // starts on the default "To do" (todo) bucket.
         expect(
             screen.getByRole("combobox", { name: "New column category" })
-        ).toBeInTheDocument();
-        expect(screen.getByTitle("To do")).toBeInTheDocument();
+        ).toHaveTextContent("To do");
     });
 
     it("sends the chosen category in the create payload", async () => {
@@ -152,10 +175,11 @@ describe("ColumnCreator", () => {
         fireEvent.change(input, { target: { value: "Shipped" } });
 
         // Open the category picker and pick the "Done" bucket.
-        fireEvent.mouseDown(
+        const user = userEvent.setup();
+        await user.click(
             screen.getByRole("combobox", { name: "New column category" })
         );
-        fireEvent.click(await screen.findByText("Done"));
+        await user.click(await screen.findByRole("option", { name: "Done" }));
 
         fireEvent.keyDown(input, {
             charCode: 13,
@@ -252,69 +276,13 @@ describe("ColumnCreator", () => {
     // WCAG 2.5.8 (Target Size, Minimum) requires interactive targets be at
     // least 24×24 CSS px, with AAA at 44×44. The "Add column" affordance is
     // the canvas-level commit point for adding a new column and must stay
-    // generous on touch. Its styled component declares `min-height: 3rem`
-    // (48 px in jsdom's default 16 px root). Walk the rendered stylesheet
-    // (same approach as `src/layouts/authLayout.test.tsx` for `AuthButton`)
-    // and assert the declaration is still emitted at >=44 px-equivalent so
-    // a future style refactor that drops it below the AAA target fails CI.
+    // generous on touch. It declares `min-h-[3rem]` (48 px), safely above
+    // the AAA target; assert the utility is present so a refactor that
+    // drops it fails CI.
     it("declares a touch-target height of at least 44 px (WCAG 2.5.8)", () => {
         renderCreator();
         const button = screen.getByRole("button", { name: "Add column" });
-        const styledCls = button.className
-            .split(/\s+/)
-            .find(
-                (tok) =>
-                    /^css-[a-z0-9]{4,}$/i.test(tok) &&
-                    !tok.startsWith("css-var-") &&
-                    !tok.startsWith("css-dev-only-")
-            );
-        expect(styledCls).toBeTruthy();
-
-        // Walk every stylesheet's rules and collect any `(min-)?height`
-        // declaration on a rule that mentions the styled class. Pixel
-        // values are kept as-is; `rem` values are converted with the
-        // jsdom default root font size of 16 px so the assertion can
-        // compare against the 44 px AAA target.
-        const heights: number[] = [];
-        const REM_PX = 16;
-        const visit = (rule: CSSRule) => {
-            if (rule instanceof CSSStyleRule) {
-                if (!styledCls || !rule.selectorText.includes(styledCls))
-                    return;
-                const pxRe =
-                    /(?:^|[\s;{])(?:min-)?height:\s*(\d+(?:\.\d+)?)px/gi;
-                let m: RegExpExecArray | null = pxRe.exec(rule.cssText);
-                while (m !== null) {
-                    heights.push(parseFloat(m[1] ?? "0"));
-                    m = pxRe.exec(rule.cssText);
-                }
-                const remRe =
-                    /(?:^|[\s;{])(?:min-)?height:\s*(\d+(?:\.\d+)?)rem/gi;
-                m = remRe.exec(rule.cssText);
-                while (m !== null) {
-                    heights.push(parseFloat(m[1] ?? "0") * REM_PX);
-                    m = remRe.exec(rule.cssText);
-                }
-            } else if ("cssRules" in rule) {
-                for (const child of Array.from(
-                    (rule as CSSGroupingRule).cssRules
-                )) {
-                    visit(child);
-                }
-            }
-        };
-        Array.from(document.styleSheets).forEach((sheet) => {
-            let rules: CSSRuleList;
-            try {
-                rules = sheet.cssRules;
-            } catch {
-                return;
-            }
-            for (const rule of Array.from(rules)) visit(rule);
-        });
-
-        expect(heights.length).toBeGreaterThan(0);
-        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
+        expect(button).toHaveClass("min-h-[3rem]");
     });
 
     it("keeps the collapsed desktop add-column slot compact enough to avoid clipping the board", () => {
@@ -322,11 +290,9 @@ describe("ColumnCreator", () => {
         const button = screen.getByRole("button", { name: "Add column" });
         const slot = button.parentElement;
         expect(slot).not.toBeNull();
-
-        const styledClass = styledClassFor(slot as Element);
-        expect(styledClass).toBeTruthy();
-        const ruleText = ruleTextsFor(styledClass ?? "").join("\n");
-        expect(ruleText).toContain("min-width: 9rem");
+        // The collapsed slot pins to a compact 9rem min-width on md+ so it
+        // doesn't clip the board; the editing slot widens to 16rem.
+        expect(slot).toHaveClass("md:min-w-[9rem]");
     });
 
     /*
@@ -391,12 +357,16 @@ describe("ColumnCreator", () => {
                 )
             ).toBe(true)
         );
-        expect(
-            await screen.findByText(microcopy.feedback.columnCreated)
-        ).toBeInTheDocument();
-        const undoButton = await screen.findByRole("button", { name: "Undo" });
+        // The create flow raises the transient Undo toast with the created
+        // copy; its `undo` closure DELETEs the just-created column by id.
+        await waitFor(() => expect(showUndoToast).toHaveBeenCalledTimes(1));
+        expect(showUndoToast).toHaveBeenCalledWith(
+            expect.objectContaining({
+                description: microcopy.feedback.columnCreated
+            })
+        );
         await act(async () => {
-            fireEvent.click(undoButton);
+            await lastUndoOptions?.undo();
         });
 
         const deleteCall = fetchMock.mock.calls.find(

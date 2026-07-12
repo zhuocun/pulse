@@ -1,10 +1,11 @@
-import { SendOutlined, StopOutlined } from "@ant-design/icons";
-import { Button, Input, Typography } from "antd";
-import type { TextAreaRef } from "antd/es/input/TextArea";
-import type { RefObject } from "react";
+import { Send, Square } from "lucide-react";
+import { useCallback, useLayoutEffect, useRef, type RefObject } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Text } from "@/components/ui/typography";
 
 import { microcopy } from "../../constants/microcopy";
-import { fontSize } from "../../theme/tokens";
 import type { AgentHealthStatus } from "../../utils/hooks/useAgentHealth";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 
@@ -20,8 +21,11 @@ export interface AiChatComposerProps {
     promptCharHintWarning: boolean;
     remoteHealthEnabled: boolean;
     healthStatus: AgentHealthStatus;
-    inputRef: RefObject<TextAreaRef | null>;
+    inputRef: RefObject<HTMLTextAreaElement | null>;
 }
+
+/** Auto-size ceiling: the textarea grows to at most four rows, then scrolls. */
+const COMPOSER_MAX_ROWS = 4;
 
 export const AiChatComposer: React.FC<AiChatComposerProps> = ({
     input,
@@ -50,6 +54,32 @@ export const AiChatComposer: React.FC<AiChatComposerProps> = ({
         if (isLoading) return;
         onSend();
     };
+
+    // Auto-grow the textarea 1→4 rows as the prompt wraps. Grows on every
+    // controlled `input` change; caps at four rows then scrolls.
+    const localRef = useRef<HTMLTextAreaElement | null>(null);
+    const setRefs = useCallback(
+        (node: HTMLTextAreaElement | null) => {
+            localRef.current = node;
+            inputRef.current = node;
+        },
+        [inputRef]
+    );
+
+    useLayoutEffect(() => {
+        const el = localRef.current;
+        if (!el) return;
+        el.style.height = "auto";
+        const styles = window.getComputedStyle(el);
+        const lineHeight = parseFloat(styles.lineHeight) || 20;
+        const verticalPadding =
+            parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom) ||
+            0;
+        const maxHeight = lineHeight * COMPOSER_MAX_ROWS + verticalPadding;
+        el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+        el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
+    }, [input]);
+
     /*
      * Coarse-pointer chrome has no hardware keyboard, so the
      * "(Shift+Enter for a new line)" hint reads as noise there — touch
@@ -59,15 +89,16 @@ export const AiChatComposer: React.FC<AiChatComposerProps> = ({
     return (
         <>
             <ComposerControlRow data-testid="ai-chat-composer-row">
-                <Input.TextArea
+                <Textarea
                     aria-label={microcopy.a11y.messageBoardCopilot}
                     autoComplete="off"
-                    autoSize={{ maxRows: 4, minRows: 1 }}
+                    className="min-h-[40px] resize-none"
                     enterKeyHint="send"
                     inputMode="text"
                     maxLength={microcopy.ai.characterCounterMax}
                     onChange={(e) => setInput(e.target.value)}
-                    onPressEnter={(e) => {
+                    onKeyDown={(e) => {
+                        if (e.key !== "Enter") return;
                         if (e.nativeEvent.isComposing) return;
                         if (e.shiftKey) return;
                         e.preventDefault();
@@ -78,17 +109,17 @@ export const AiChatComposer: React.FC<AiChatComposerProps> = ({
                             ? microcopy.placeholders.chatAskTouch
                             : microcopy.placeholders.chatAsk
                     }
-                    ref={inputRef}
+                    ref={setRefs}
+                    rows={1}
                     value={input}
                 />
                 {isLoading ? (
                     <Button
                         aria-label={microcopy.ai.stopResponse}
-                        danger
-                        icon={<StopOutlined aria-hidden />}
                         onClick={onAbort}
-                        type="default"
+                        variant="destructive"
                     >
+                        <Square aria-hidden />
                         <span className="ai-chat-composer-button-text">
                             {microcopy.actions.stop}
                         </span>
@@ -100,28 +131,23 @@ export const AiChatComposer: React.FC<AiChatComposerProps> = ({
                             !input.trim() ||
                             (remoteHealthEnabled && healthStatus === "offline")
                         }
-                        icon={<SendOutlined aria-hidden />}
                         onClick={handleSubmit}
-                        type="primary"
+                        variant="primary"
                     >
+                        <Send aria-hidden />
                         <span className="ai-chat-composer-button-text">
                             {microcopy.actions.send}
                         </span>
                     </Button>
                 )}
             </ComposerControlRow>
-            <Typography.Text
+            <Text
+                className="mt-[4px] block text-right text-xs"
                 data-testid="chat-prompt-char-hint"
-                style={{
-                    display: "block",
-                    fontSize: fontSize.xs,
-                    marginTop: 4,
-                    textAlign: "right"
-                }}
                 type={promptCharHintWarning ? "warning" : "secondary"}
             >
                 {promptCharHintText}
-            </Typography.Text>
+            </Text>
         </>
     );
 };

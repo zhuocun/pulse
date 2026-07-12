@@ -5,6 +5,7 @@ import {
     waitFor,
     within
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { axe, toHaveNoViolations } from "jest-axe";
 
 import { microcopy } from "../../constants/microcopy";
@@ -30,20 +31,13 @@ const mockedUseProjectMembers = useProjectMembers as jest.MockedFunction<
     typeof useProjectMembers
 >;
 
-const installAntdBrowserMocks = () => {
-    Object.defineProperty(window, "matchMedia", {
-        writable: true,
-        value: (query: string) => ({
-            addEventListener: jest.fn(),
-            addListener: jest.fn(),
-            dispatchEvent: jest.fn(),
-            matches: false,
-            media: query,
-            onchange: null,
-            removeEventListener: jest.fn(),
-            removeListener: jest.fn()
-        })
-    });
+const installBrowserMocks = () => {
+    // Radix DropdownMenu/Popover drive their surfaces with pointer-capture and
+    // scroll APIs jsdom doesn't ship; polyfill them so the mention picker and
+    // delete-confirm popover can open.
+    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+    Element.prototype.releasePointerCapture = jest.fn();
 };
 
 const createComment = jest.fn();
@@ -111,7 +105,7 @@ const renderThread = (
     render(<CommentsThread projectId="project-1" taskId="task-1" {...props} />);
 
 describe("CommentsThread", () => {
-    beforeAll(installAntdBrowserMocks);
+    beforeAll(installBrowserMocks);
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -280,18 +274,26 @@ describe("CommentsThread", () => {
 
     it("offers other members in the mention picker and posts the selected ids", async () => {
         createComment.mockResolvedValue("Comment created");
+        const menuUser = userEvent.setup();
         renderThread();
 
         // Open the mention multi-select.
-        const mentionSelect = screen.getByTestId("comment-mention-select");
-        fireEvent.mouseDown(within(mentionSelect).getByRole("combobox"));
+        await menuUser.click(screen.getByTestId("comment-mention-select"));
 
         // The current user (bob) is excluded; the other members appear.
-        expect(await screen.findByText("alice")).toBeInTheDocument();
-        expect(await screen.findByText("carol")).toBeInTheDocument();
-        expect(screen.queryByText("bob")).not.toBeInTheDocument();
+        expect(
+            await screen.findByRole("menuitemcheckbox", { name: "alice" })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("menuitemcheckbox", { name: "carol" })
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole("menuitemcheckbox", { name: "bob" })
+        ).not.toBeInTheDocument();
 
-        fireEvent.click(screen.getByText("carol"));
+        await menuUser.click(
+            screen.getByRole("menuitemcheckbox", { name: "carol" })
+        );
 
         fireEvent.change(screen.getByTestId("comment-composer-input"), {
             target: { value: "ping" }

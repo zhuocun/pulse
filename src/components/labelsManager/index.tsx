@@ -1,30 +1,25 @@
-import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
-import {
-    Button,
-    Input,
-    Popconfirm,
-    Skeleton,
-    Space,
-    Tag,
-    Typography
-} from "antd";
+import { Pencil, Trash2 } from "lucide-react";
 import React, { useCallback, useMemo, useState } from "react";
 
-import { microcopy, microcopyString } from "../../constants/microcopy";
-import { labelTagProps } from "../../utils/labelTagColor";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-    fontSize,
-    fontWeight,
-    radius,
-    space,
-    touchTargetCoarse
-} from "../../theme/tokens";
+    Popover,
+    PopoverContent,
+    PopoverTrigger
+} from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Typography } from "@/components/ui/typography";
+import { cn } from "@/lib/utils";
+
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import useAppMessage from "../../utils/hooks/useAppMessage";
 import useAuth from "../../utils/hooks/useAuth";
 import useLabels from "../../utils/hooks/useLabels";
 import useProjectMembers from "../../utils/hooks/useProjectMembers";
 import useReactQuery from "../../utils/hooks/useReactQuery";
+import { labelTagProps } from "../../utils/labelTagColor";
 
 /**
  * Project label management surface (PRD-GAP-011 — backend Collaboration
@@ -78,130 +73,30 @@ const COLOR_PRESETS: readonly string[] = [
     "#ec4899"
 ];
 
-const Wrapper = styled.section`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.md}px;
-`;
+const ICON_BUTTON_CLASS = "coarse:min-w-[44px]";
+const NAME_INPUT_CLASS = "flex-[1_1_12rem] min-w-[10rem]";
 
-const List = styled.ul`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xs}px;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-`;
+const onEnterKey =
+    (handler: () => void) => (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            handler();
+        }
+    };
 
-const Row = styled.li`
-    align-items: center;
-    border: 1px solid var(--ant-color-border-secondary, rgba(15, 23, 42, 0.08));
-    border-radius: ${space.xs}px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.sm}px;
-    margin: 0;
-    padding: ${space.sm}px;
-`;
-
-const Identity = styled.div`
-    align-items: center;
-    display: flex;
-    flex: 1 1 12rem;
-    gap: ${space.sm}px;
-    min-width: 0;
-`;
-
-const Controls = styled.div`
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xs}px;
-    margin-inline-start: auto;
-`;
-
-const IconButton = styled(Button)`
-    @media (pointer: coarse) {
-        min-height: ${touchTargetCoarse}px;
-        min-width: ${touchTargetCoarse}px;
+/**
+ * Chip colour styling: hex labels get a translucent themed fill (via
+ * `labelTagProps`); legacy AntD-named colours fall back to a coloured
+ * outline so the chip still reads without an antd `Tag`.
+ */
+const chipStyle = (color?: string | null): React.CSSProperties | undefined => {
+    const props = labelTagProps(color);
+    if (props.style) return props.style;
+    if (props.color) {
+        return { borderColor: props.color, color: props.color };
     }
-`;
-
-const EditRow = styled.div`
-    display: flex;
-    flex: 1 1 100%;
-    flex-direction: column;
-    gap: ${space.xs}px;
-`;
-
-const AddSection = styled.div`
-    border-top: 1px solid
-        var(--ant-color-border-secondary, rgba(15, 23, 42, 0.08));
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xs}px;
-    padding-block-start: ${space.md}px;
-`;
-
-const AddHeading = styled(Typography.Text)`
-    && {
-        font-size: ${fontSize.sm}px;
-        font-weight: ${fontWeight.semibold};
-    }
-`;
-
-const FieldRow = styled.div`
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xs}px;
-`;
-
-const NameInput = styled(Input)`
-    flex: 1 1 12rem;
-    min-width: 10rem;
-
-    @media (pointer: coarse) {
-        min-height: ${touchTargetCoarse}px;
-    }
-`;
-
-const Swatches = styled.div`
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xxs}px;
-`;
-
-const Swatch = styled.button<{ $color: string; $selected: boolean }>`
-    background: ${({ $color }) => $color};
-    border: 2px solid
-        ${({ $selected }) =>
-            $selected
-                ? "var(--ant-color-text, rgba(15, 23, 42, 0.92))"
-                : "transparent"};
-    border-radius: ${radius.sm}px;
-    cursor: pointer;
-    height: 24px;
-    padding: 0;
-    width: 24px;
-
-    &:focus-visible {
-        outline: 2px solid var(--ant-color-primary, #ea580c);
-        outline-offset: 1px;
-    }
-
-    @media (pointer: coarse) {
-        min-height: ${touchTargetCoarse}px;
-        min-width: ${touchTargetCoarse}px;
-    }
-`;
-
-const AddButton = styled(Button)`
-    @media (pointer: coarse) {
-        min-height: ${touchTargetCoarse}px;
-    }
-`;
+    return undefined;
+};
 
 interface LabelsManagerProps {
     projectId: string;
@@ -229,27 +124,87 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
         [value]
     );
     return (
-        <Swatches
-            role="radiogroup"
+        <div
             aria-label={microcopyString(microcopy.projectLabels.colorLabel)}
+            className="flex flex-wrap items-center gap-xxs"
             data-testid={testId}
+            role="radiogroup"
         >
             {presets.map((color) => (
-                <Swatch
-                    key={color}
-                    $color={color}
-                    $selected={color === value}
+                <button
                     aria-checked={color === value}
                     aria-label={microcopyString(
                         microcopy.projectLabels.colorSwatchAriaLabel
                     ).replace("{color}", color)}
+                    className={cn(
+                        "size-6 cursor-pointer rounded-sm border-2 p-0",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                        "coarse:min-h-[44px] coarse:min-w-[44px]",
+                        color === value
+                            ? "border-foreground"
+                            : "border-transparent"
+                    )}
                     data-color={color}
+                    key={color}
                     onClick={() => onChange(color)}
                     role="radio"
+                    style={{ background: color }}
                     type="button"
                 />
             ))}
-        </Swatches>
+        </div>
+    );
+};
+
+interface ConfirmPopoverProps {
+    trigger: React.ReactNode;
+    title: string;
+    description?: string;
+    okText: string;
+    cancelText: string;
+    onConfirm: () => void;
+}
+
+const ConfirmPopover: React.FC<ConfirmPopoverProps> = ({
+    trigger,
+    title,
+    description,
+    okText,
+    cancelText,
+    onConfirm
+}) => {
+    const [open, setOpen] = useState(false);
+    return (
+        <Popover onOpenChange={setOpen} open={open}>
+            <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+            <PopoverContent aria-label={title} className="w-64" role="dialog">
+                <p className="text-sm font-medium text-foreground">{title}</p>
+                {description ? (
+                    <p className="mt-xxs text-sm text-muted-foreground">
+                        {description}
+                    </p>
+                ) : null}
+                <div className="mt-sm flex justify-end gap-xs">
+                    <Button
+                        onClick={() => setOpen(false)}
+                        size="sm"
+                        variant="default"
+                    >
+                        {cancelText}
+                    </Button>
+                    <Button
+                        onClick={() => {
+                            setOpen(false);
+                            onConfirm();
+                        }}
+                        size="sm"
+                        variant="destructive"
+                    >
+                        {okText}
+                    </Button>
+                </div>
+            </PopoverContent>
+        </Popover>
     );
 };
 
@@ -371,72 +326,74 @@ const LabelsManager: React.FC<LabelsManagerProps> = ({ projectId }) => {
 
     if (isLoading && labels.length === 0) {
         return (
-            <div data-testid="labels-loading">
-                <Skeleton active paragraph={{ rows: 3 }} />
+            <div className="flex flex-col gap-xs" data-testid="labels-loading">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
             </div>
         );
     }
 
     return (
-        <Wrapper data-testid="labels-manager">
+        <section className="flex flex-col gap-md" data-testid="labels-manager">
             {!canManage ? (
                 <Typography.Text
                     data-testid="labels-read-only-hint"
                     type="secondary"
-                    style={{ fontSize: fontSize.sm }}
                 >
                     {microcopyString(microcopy.projectLabels.readOnlyHint)}
                 </Typography.Text>
             ) : null}
 
             {labels.length === 0 ? (
-                <Typography.Text
-                    data-testid="labels-empty"
-                    type="secondary"
-                    style={{ fontSize: fontSize.sm }}
-                >
+                <Typography.Text data-testid="labels-empty" type="secondary">
                     {microcopyString(microcopy.projectLabels.empty)}
                 </Typography.Text>
             ) : (
-                <List
+                <ul
                     aria-label={microcopyString(
                         microcopy.projectLabels.listAriaLabel
                     )}
+                    className="m-0 flex list-none flex-col gap-xs p-0"
                 >
                     {labels.map((label) => {
                         const isEditing = editingId === label._id;
                         return (
-                            <Row
-                                key={label._id}
-                                data-testid="label-row"
+                            <li
+                                className="m-0 flex flex-wrap items-center gap-sm rounded-md border border-border p-sm"
                                 data-label-id={label._id}
+                                data-testid="label-row"
+                                key={label._id}
                             >
-                                <Identity>
-                                    <Tag
+                                <div className="flex min-w-0 flex-[1_1_12rem] items-center gap-sm">
+                                    <Badge
                                         data-testid="label-chip"
-                                        {...labelTagProps(label.color)}
+                                        style={chipStyle(label.color)}
+                                        variant="outline"
                                     >
                                         {label.name}
-                                    </Tag>
-                                </Identity>
+                                    </Badge>
+                                </div>
                                 {canManage ? (
-                                    <Controls>
-                                        <IconButton
+                                    <div className="ms-auto flex flex-wrap items-center gap-xs">
+                                        <Button
                                             aria-label={microcopyString(
                                                 microcopy.projectLabels
                                                     .editAriaLabel
                                             ).replace("{name}", label.name)}
+                                            className={ICON_BUTTON_CLASS}
                                             data-testid="label-edit"
-                                            icon={<EditOutlined aria-hidden />}
                                             onClick={() =>
                                                 isEditing
                                                     ? cancelEdit()
                                                     : beginEdit(label)
                                             }
-                                            size="small"
-                                            type="text"
-                                        />
-                                        <Popconfirm
+                                            size="sm"
+                                            variant="ghost"
+                                        >
+                                            <Pencil aria-hidden />
+                                        </Button>
+                                        <ConfirmPopover
                                             cancelText={
                                                 microcopy.projectLabels.cancel
                                             }
@@ -454,34 +411,44 @@ const LabelsManager: React.FC<LabelsManagerProps> = ({ projectId }) => {
                                                 microcopy.projectLabels
                                                     .deleteConfirmTitle
                                             ).replace("{name}", label.name)}
-                                        >
-                                            <IconButton
-                                                aria-label={microcopyString(
-                                                    microcopy.projectLabels
-                                                        .deleteAriaLabel
-                                                ).replace("{name}", label.name)}
-                                                danger
-                                                data-testid="label-delete"
-                                                icon={
-                                                    <DeleteOutlined
+                                            trigger={
+                                                <Button
+                                                    aria-label={microcopyString(
+                                                        microcopy.projectLabels
+                                                            .deleteAriaLabel
+                                                    ).replace(
+                                                        "{name}",
+                                                        label.name
+                                                    )}
+                                                    className={
+                                                        ICON_BUTTON_CLASS
+                                                    }
+                                                    data-testid="label-delete"
+                                                    size="sm"
+                                                    variant="ghost"
+                                                >
+                                                    <Trash2
                                                         aria-hidden
+                                                        className="text-destructive"
                                                     />
-                                                }
-                                                size="small"
-                                                type="text"
-                                            />
-                                        </Popconfirm>
-                                    </Controls>
+                                                </Button>
+                                            }
+                                        />
+                                    </div>
                                 ) : null}
                                 {canManage && isEditing && editDraft ? (
-                                    <EditRow data-testid="label-edit-form">
-                                        <FieldRow>
-                                            <NameInput
+                                    <div
+                                        className="flex flex-[1_1_100%] flex-col gap-xs"
+                                        data-testid="label-edit-form"
+                                    >
+                                        <div className="flex flex-wrap items-center gap-xs">
+                                            <Input
                                                 aria-label={microcopyString(
                                                     microcopy.projectLabels
                                                         .addNamePlaceholder
                                                 )}
                                                 autoComplete="off"
+                                                className={NAME_INPUT_CLASS}
                                                 data-testid="label-edit-name"
                                                 enterKeyHint="done"
                                                 inputMode="text"
@@ -497,15 +464,15 @@ const LabelsManager: React.FC<LabelsManagerProps> = ({ projectId }) => {
                                                             : draft
                                                     )
                                                 }
-                                                onPressEnter={saveEdit}
+                                                onKeyDown={onEnterKey(saveEdit)}
                                                 placeholder={microcopyString(
                                                     microcopy.projectLabels
                                                         .addNamePlaceholder
                                                 )}
                                                 value={editDraft.name}
                                             />
-                                        </FieldRow>
-                                        <FieldRow>
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-xs">
                                             <ColorPalette
                                                 onChange={(color) =>
                                                     setEditDraft((draft) =>
@@ -520,7 +487,7 @@ const LabelsManager: React.FC<LabelsManagerProps> = ({ projectId }) => {
                                                 testId="label-edit-color"
                                                 value={editDraft.color}
                                             />
-                                            <Space>
+                                            <div className="flex items-center gap-xs">
                                                 <Button
                                                     data-testid="label-edit-save"
                                                     disabled={
@@ -529,7 +496,7 @@ const LabelsManager: React.FC<LabelsManagerProps> = ({ projectId }) => {
                                                     }
                                                     loading={isUpdating}
                                                     onClick={saveEdit}
-                                                    type="primary"
+                                                    variant="primary"
                                                 >
                                                     {microcopyString(
                                                         microcopy.projectLabels
@@ -539,56 +506,58 @@ const LabelsManager: React.FC<LabelsManagerProps> = ({ projectId }) => {
                                                 <Button
                                                     data-testid="label-edit-cancel"
                                                     onClick={cancelEdit}
+                                                    variant="default"
                                                 >
                                                     {microcopyString(
                                                         microcopy.projectLabels
                                                             .cancel
                                                     )}
                                                 </Button>
-                                            </Space>
-                                        </FieldRow>
-                                    </EditRow>
+                                            </div>
+                                        </div>
+                                    </div>
                                 ) : null}
-                            </Row>
+                            </li>
                         );
                     })}
-                </List>
+                </ul>
             )}
 
             {canManage ? (
-                <AddSection>
-                    <AddHeading>
+                <div className="flex flex-col gap-xs border-t border-border pt-md">
+                    <Typography.Text strong>
                         {microcopyString(microcopy.projectLabels.addHeading)}
-                    </AddHeading>
-                    <FieldRow>
-                        <NameInput
+                    </Typography.Text>
+                    <div className="flex flex-wrap items-center gap-xs">
+                        <Input
                             aria-label={microcopyString(
                                 microcopy.projectLabels.addNamePlaceholder
                             )}
                             autoComplete="off"
+                            className={NAME_INPUT_CLASS}
                             data-testid="label-add-name"
                             enterKeyHint="done"
                             inputMode="text"
                             onChange={(event) => setNewName(event.target.value)}
-                            onPressEnter={handleAdd}
+                            onKeyDown={onEnterKey(handleAdd)}
                             placeholder={microcopyString(
                                 microcopy.projectLabels.addNamePlaceholder
                             )}
                             value={newName}
                         />
-                    </FieldRow>
-                    <FieldRow>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-xs">
                         <ColorPalette
                             onChange={setNewColor}
                             testId="label-add-color"
                             value={newColor}
                         />
-                        <AddButton
+                        <Button
                             data-testid="label-add-submit"
                             disabled={!newName.trim() || isCreating}
                             loading={isCreating}
                             onClick={handleAdd}
-                            type="primary"
+                            variant="primary"
                         >
                             {isCreating
                                 ? microcopyString(
@@ -597,11 +566,11 @@ const LabelsManager: React.FC<LabelsManagerProps> = ({ projectId }) => {
                                 : microcopyString(
                                       microcopy.projectLabels.addButton
                                   )}
-                        </AddButton>
-                    </FieldRow>
-                </AddSection>
+                        </Button>
+                    </div>
+                </div>
             ) : null}
-        </Wrapper>
+        </section>
     );
 };
 

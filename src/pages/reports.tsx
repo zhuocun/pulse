@@ -1,12 +1,11 @@
-import styled from "@emotion/styled";
-import { Button, Typography } from "antd";
 import { useParams } from "react-router-dom";
 
+import { Button } from "@/components/ui/button";
+import { Typography } from "@/components/ui/typography";
 import AiSparkleIcon from "../components/aiSparkleIcon";
 import EmptyState from "../components/emptyState";
 import PageContainer from "../components/pageContainer";
 import { microcopy } from "../constants/microcopy";
-import { fontSize, fontWeight, lineHeight, space } from "../theme/tokens";
 import useReactQuery from "../utils/hooks/useReactQuery";
 import useTitle from "../utils/hooks/useTitle";
 
@@ -46,18 +45,6 @@ import useTitle from "../utils/hooks/useTitle";
 
 const ProjectQuery = "projects" as const;
 
-const PageHeading = styled(Typography.Title)`
-    && {
-        align-items: center;
-        display: inline-flex;
-        font-size: ${fontSize.xxl}px;
-        font-weight: ${fontWeight.semibold};
-        gap: ${space.xs}px;
-        line-height: ${lineHeight.tight};
-        margin-bottom: ${space.sm}px;
-    }
-`;
-
 const ReportsPage = () => {
     const { projectId } = useParams<{ projectId: string }>();
     const { data: project } = useReactQuery<IProject>(ProjectQuery, {
@@ -82,10 +69,13 @@ const ReportsPage = () => {
 
     return (
         <PageContainer data-testid="reports-page">
-            <PageHeading level={1}>
+            <Typography.Title
+                className="mb-sm inline-flex items-center gap-xs text-xxl font-semibold leading-tight"
+                level={1}
+            >
                 <AiSparkleIcon aria-hidden size="md" />
                 {microcopy.reports.heading}
-            </PageHeading>
+            </Typography.Title>
             <EmptyState
                 data-testid="reports-empty-state"
                 description={microcopy.reports.emptyDescription}
@@ -95,21 +85,15 @@ const ReportsPage = () => {
                 variant="search"
                 cta={
                     /*
-                     * `<Button href>` renders a real anchor under the
-                     * hood so the link is keyboard-accessible and the
-                     * browser's middle-click / right-click menu work
-                     * (vs. an onClick-driven `window.open` which
-                     * doesn't carry the URL into context menus). We
-                     * leave `rel`/`target` defaults — mailto: doesn't
-                     * open a new tab in any browser worth caring
-                     * about, so the AntD button's normal href
-                     * handling is sufficient.
+                     * Render a real anchor (via `asChild`) so the link is
+                     * keyboard-accessible and the browser's middle-click /
+                     * right-click menu carry the URL. mailto: never opens a
+                     * new tab, so the default anchor handling suffices.
                      */
-                    <Button
-                        href={microcopy.reports.feedbackHref}
-                        type="primary"
-                    >
-                        {microcopy.reports.feedbackCta}
+                    <Button asChild variant="primary">
+                        <a href={microcopy.reports.feedbackHref}>
+                            {microcopy.reports.feedbackCta}
+                        </a>
                     </Button>
                 }
             />

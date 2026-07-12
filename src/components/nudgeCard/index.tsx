@@ -1,22 +1,13 @@
-import {
-    AlertOutlined,
-    InfoCircleOutlined,
-    WarningOutlined
-} from "@ant-design/icons";
-import styled from "@emotion/styled";
-import { Button, Typography } from "antd";
+import { AlertCircle, AlertTriangle, Info } from "lucide-react";
 import React from "react";
+
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import { microcopy } from "../../constants/microcopy";
 import type { TriageNudge } from "../../interfaces/agent";
-import {
-    fontSize,
-    fontWeight,
-    radius,
-    space,
-    touchTargetCoarse
-} from "../../theme/tokens";
+import { fontSize, fontWeight } from "../../theme/tokens";
 
 /**
  * Compact nudge card (PRD v3 §10.3, C-R8, §7.2). Renders an inline
@@ -24,65 +15,26 @@ import {
  * title, optional CTA, dismiss link. Sized to slot inside the chat
  * transcript without forcing a layout shift.
  */
-const Wrap = styled.div<{ severity: TriageNudge["severity"] }>`
-    align-items: flex-start;
-    background: ${(props) =>
-        props.severity === "critical"
-            ? "var(--ant-color-error-bg, #FEF2F2)"
-            : props.severity === "warn"
-              ? "var(--ant-color-warning-bg, #FFFBEB)"
-              : "var(--color-copilot-bg-subtle)"};
-    border: 1px solid
-        ${(props) =>
-            props.severity === "critical"
-                ? "var(--ant-color-error-border, rgba(239, 68, 68, 0.4))"
-                : props.severity === "warn"
-                  ? "var(--ant-color-warning-border, rgba(245, 158, 11, 0.4))"
-                  : "var(--color-copilot-bg-medium)"};
-    border-radius: ${radius.md}px;
-    display: flex;
-    gap: ${space.xs}px;
-    margin: ${space.xxs}px 0;
-    padding: ${space.xs}px ${space.sm}px;
-`;
+type Severity = TriageNudge["severity"];
 
-const IconCol = styled.div<{ severity: TriageNudge["severity"] }>`
-    color: ${(props) =>
-        props.severity === "critical"
-            ? "var(--ant-color-error, #EF4444)"
-            : props.severity === "warn"
-              ? "var(--ant-color-warning, #F59E0B)"
-              : "var(--color-copilot-badge)"};
-    flex: 0 0 auto;
-    line-height: 1;
-    padding-top: 2px;
-`;
+const WRAP_TONE: Record<Severity, string> = {
+    critical: "border-error bg-errorBg",
+    warn: "border-warning bg-warningBg",
+    info: "border-[var(--color-copilot-bg-medium)] bg-[var(--color-copilot-bg-subtle)]"
+};
 
-const Body = styled.div`
-    flex: 1 1 auto;
-    min-width: 0;
-`;
+const ICON_TONE: Record<Severity, string> = {
+    critical: "text-error",
+    warn: "text-warning",
+    info: "text-[var(--color-copilot-badge)]"
+};
 
-const ActionRow = styled.div`
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xs}px;
-    margin-top: ${space.xxs}px;
-
-    @media (pointer: coarse) {
-        && .ant-btn {
-            min-height: ${touchTargetCoarse}px;
-            min-width: ${touchTargetCoarse}px;
-        }
-    }
-`;
-
-const SeverityIcon: React.FC<{ severity: TriageNudge["severity"] }> = ({
-    severity
-}) => {
-    if (severity === "critical") return <AlertOutlined aria-hidden />;
-    if (severity === "warn") return <WarningOutlined aria-hidden />;
-    return <InfoCircleOutlined aria-hidden />;
+const SeverityIcon: React.FC<{ severity: Severity }> = ({ severity }) => {
+    if (severity === "critical")
+        return <AlertCircle aria-hidden className="size-4" />;
+    if (severity === "warn")
+        return <AlertTriangle aria-hidden className="size-4" />;
+    return <Info aria-hidden className="size-4" />;
 };
 
 interface NudgeCardProps {
@@ -141,27 +93,41 @@ const NudgeCard: React.FC<NudgeCardProps> = ({
         });
     }, [nudge.kind, nudge.nudge_id]);
     return (
-        <Wrap role="alert" severity={nudge.severity}>
-            <IconCol severity={nudge.severity}>
+        <div
+            className={cn(
+                "my-xxs flex items-start gap-xs rounded-md border px-sm py-xs",
+                WRAP_TONE[nudge.severity]
+            )}
+            role="alert"
+        >
+            <div
+                className={cn(
+                    "flex-none pt-[2px] leading-none",
+                    ICON_TONE[nudge.severity]
+                )}
+            >
                 <SeverityIcon severity={nudge.severity} />
-            </IconCol>
-            <Body>
-                <Typography.Text
+            </div>
+            <div className="min-w-0 flex-1">
+                <span
+                    className="block"
                     style={{
-                        display: "block",
                         fontSize: fontSize.sm,
                         fontWeight: fontWeight.semibold,
                         overflowWrap: "anywhere"
                     }}
                 >
                     {nudge.summary}
-                </Typography.Text>
-                <ActionRow data-testid="nudge-card-action-row">
+                </span>
+                <div
+                    className="mt-xxs flex flex-wrap gap-xs"
+                    data-testid="nudge-card-action-row"
+                >
                     {onAction && (
                         <Button
                             onClick={handleAction}
-                            size="small"
-                            type="primary"
+                            size="sm"
+                            variant="primary"
                         >
                             {ctaLabel}
                         </Button>
@@ -170,15 +136,15 @@ const NudgeCard: React.FC<NudgeCardProps> = ({
                         <Button
                             aria-label={microcopy.ai.dismissNudge}
                             onClick={handleDismiss}
-                            size="small"
-                            type="link"
+                            size="sm"
+                            variant="link"
                         >
                             {microcopy.ai.dismissNudge}
                         </Button>
                     )}
-                </ActionRow>
-            </Body>
-        </Wrap>
+                </div>
+            </div>
+        </div>
     );
 };
 

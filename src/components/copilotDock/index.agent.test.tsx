@@ -10,7 +10,6 @@
  * and would break if env were globally overridden there.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { App as AntdApp } from "antd";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { Provider } from "react-redux";
@@ -118,7 +117,7 @@ const baseAgentChat = (
     ...overrides
 });
 
-const installAntdBrowserMocks = () => {
+const installBrowserMocks = () => {
     Object.defineProperty(window, "matchMedia", {
         writable: true,
         value: (query: string) => ({
@@ -141,6 +140,11 @@ const installAntdBrowserMocks = () => {
         writable: true,
         value: ResizeObserverMock
     });
+
+    // Radix's dialog/sheet/tabs lean on PointerEvent APIs jsdom doesn't ship.
+    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+    Element.prototype.releasePointerCapture = jest.fn();
 };
 
 const member = (overrides: Partial<IMember> = {}): IMember => ({
@@ -201,9 +205,7 @@ const renderControlled = (props: ControlledDockProps = {}) => {
         <Provider store={store}>
             <QueryClientProvider client={queryClient}>
                 <MemoryRouter>
-                    <AntdApp>
-                        <ControlledDock {...props} />
-                    </AntdApp>
+                    <ControlledDock {...props} />
                 </MemoryRouter>
             </QueryClientProvider>
         </Provider>
@@ -212,7 +214,7 @@ const renderControlled = (props: ControlledDockProps = {}) => {
 
 describe("CopilotDock — remote agent path", () => {
     beforeEach(() => {
-        installAntdBrowserMocks();
+        installBrowserMocks();
         resetRemoteAiConsentForTests();
         acknowledgeRemoteAi("https://agents.example");
         mockedUseAgent.mockReset();
@@ -229,9 +231,11 @@ describe("CopilotDock — remote agent path", () => {
         resetRemoteAiConsentForTests();
         renderControlled({ initialTab: "chat" });
 
+        // Both mounted tab bodies render the global consent gate, so the
+        // title appears once per body — assert presence, not singularity.
         expect(
-            screen.getByText(microcopy.ai.remoteConsentTitle)
-        ).toBeInTheDocument();
+            screen.getAllByText(microcopy.ai.remoteConsentTitle).length
+        ).toBeGreaterThan(0);
         expect(
             screen.queryByText(microcopy.ai.healthOffline)
         ).not.toBeInTheDocument();
@@ -284,7 +288,7 @@ describe("CopilotDock — remote agent path", () => {
         // Switch to Chat. surfaceVisible flips false on Brief; the
         // teardown branch is gated on `dockOpen` (still true), so no
         // abort either.
-        fireEvent.click(
+        fireEvent.mouseDown(
             screen.getByRole("tab", {
                 name: microcopy.copilotDock.tabChat as string
             })
@@ -304,7 +308,7 @@ describe("CopilotDock — remote agent path", () => {
         // so it must NOT fire again — the in-flight stream from the
         // first call is still running and would be aborted by a second
         // start (useAgent.start() calls controllerRef.current?.abort()).
-        fireEvent.click(
+        fireEvent.mouseDown(
             screen.getByRole("tab", {
                 name: microcopy.copilotDock.tabBrief as string
             })
@@ -361,7 +365,7 @@ describe("CopilotDock — remote agent path", () => {
         expect(start).not.toHaveBeenCalled();
 
         // Round-trip Chat → Brief.
-        fireEvent.click(
+        fireEvent.mouseDown(
             screen.getByRole("tab", {
                 name: microcopy.copilotDock.tabChat as string
             })
@@ -374,7 +378,7 @@ describe("CopilotDock — remote agent path", () => {
                 })
             ).toBeInTheDocument();
         });
-        fireEvent.click(
+        fireEvent.mouseDown(
             screen.getByRole("tab", {
                 name: microcopy.copilotDock.tabBrief as string
             })

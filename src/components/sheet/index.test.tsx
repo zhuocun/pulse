@@ -3,10 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { axe, toHaveNoViolations } from "jest-axe";
 import React from "react";
 
-import {
-    coarseTouchTargetsFor,
-    styledClassFor
-} from "../../testUtils/styleRules";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useReducedMotion from "../../utils/hooks/useReducedMotion";
 
@@ -187,11 +183,10 @@ describe("Sheet — animated phone branch", () => {
     it("declares a 44 px close target on coarse pointers", () => {
         render(<Harness />);
         const close = screen.getByTestId("test-sheet-close");
-        const styledClass = styledClassFor(close);
-        expect(styledClass).toBeTruthy();
-        const { heights, widths } = coarseTouchTargetsFor(styledClass ?? "");
-        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
-        expect(Math.max(...widths)).toBeGreaterThanOrEqual(44);
+        // The close button lifts to a 44 px minimum square under
+        // `@media (pointer: coarse)` via the coarse touch-target utilities.
+        expect(close).toHaveClass("coarse:min-h-[44px]");
+        expect(close).toHaveClass("coarse:min-w-[44px]");
     });
 
     it("hides the close button when closable=false", () => {
@@ -290,7 +285,7 @@ describe("Sheet — desktop drawer fallback", () => {
         mockedUseReducedMotion.mockReturnValue(false);
     });
 
-    it("renders an AntD Drawer on desktop", () => {
+    it("renders the shadcn Sheet fallback on desktop", () => {
         render(<Harness />);
         // No animated branch testids should be present.
         expect(
@@ -299,8 +294,10 @@ describe("Sheet — desktop drawer fallback", () => {
         expect(
             screen.queryByTestId("test-sheet-scrim")
         ).not.toBeInTheDocument();
-        // AntD drawer wrapper presence.
-        expect(document.querySelector(".ant-drawer")).toBeTruthy();
+        // The Radix-backed dialog fallback is present, named by the title.
+        expect(
+            screen.getByRole("dialog", { name: "Sheet title" })
+        ).toBeInTheDocument();
     });
 
     it("uses a caller-supplied close button label", () => {
@@ -332,12 +329,14 @@ describe("Sheet — reduced-motion fallback", () => {
         mockedUseReducedMotion.mockReturnValue(true);
     });
 
-    it("renders an AntD Drawer instead of the animated surface", () => {
+    it("renders the shadcn Sheet fallback instead of the animated surface", () => {
         render(<Harness />);
         expect(
             screen.queryByTestId("test-sheet-surface")
         ).not.toBeInTheDocument();
-        expect(document.querySelector(".ant-drawer")).toBeTruthy();
+        expect(
+            screen.getByRole("dialog", { name: "Sheet title" })
+        ).toBeInTheDocument();
     });
 
     it("uses a caller-supplied close button label", () => {
@@ -374,7 +373,9 @@ describe("Sheet — forceDrawerFallback escape hatch", () => {
         expect(
             screen.queryByTestId("test-sheet-surface")
         ).not.toBeInTheDocument();
-        expect(document.querySelector(".ant-drawer")).toBeTruthy();
+        expect(
+            screen.getByRole("dialog", { name: "Sheet title" })
+        ).toBeInTheDocument();
     });
 
     it("passes axe with no a11y violations in the forceDrawerFallback branch", async () => {

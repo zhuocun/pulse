@@ -253,9 +253,12 @@ describe("RegisterForm", () => {
     it("shows the submitting state from the mutation", () => {
         renderRegisterForm({ isLoading: true });
 
+        // The submit CTA swaps to its "Signing up…" label while the
+        // mutation is in flight — a behavior-level signal independent of
+        // any styling framework.
         expect(
-            screen.getByRole("button", { name: /sign(ing)? up/i })
-        ).toHaveClass("ant-btn-loading");
+            screen.getByRole("button", { name: /signing up/i })
+        ).toBeInTheDocument();
     });
 
     it("surfaces localized password strength feedback after typing", async () => {

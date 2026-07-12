@@ -110,11 +110,9 @@ describe("AiSearchInput useAi error state", () => {
         // surface-specific heading replaces it.
         expect(screen.getByText(/Search failed/i)).toBeInTheDocument();
         expect(screen.queryByText("AI offline")).not.toBeInTheDocument();
-        const close = document.querySelector(
-            ".ant-alert-warning .ant-alert-close-icon"
-        ) as HTMLElement | null;
+        const close = screen.getByRole("button", { name: /close/i });
         expect(close).toBeTruthy();
-        fireEvent.click(close!);
+        fireEvent.click(close);
         expect(reset).toHaveBeenCalled();
     });
 });

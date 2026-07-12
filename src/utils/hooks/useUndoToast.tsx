@@ -7,7 +7,7 @@ import { UNDO_WINDOW_MS } from "../../theme/aiTokens";
 import useAppMessage from "./useAppMessage";
 
 /**
- * Toast Undo (PRD v3 §7.3, T-R1, T-R4, D-R5). Shows an AntD `message` with
+ * Toast Undo (PRD v3 §7.3, T-R1, T-R4, D-R5). Shows a `message` toast with
  * a 10-second window to revert. The caller supplies:
  *
  *   - `apply`: the action that was just performed (used for analytics
@@ -56,9 +56,9 @@ interface ShowResult {
 const useUndoToast = (): {
     show: (options: UndoToastOptions) => ShowResult;
 } => {
-    // AntD v6: the static `message` import warns it can't read dynamic
-    // theme. `useAppMessage()` returns a theme-aware instance (with a
-    // static fallback for tests that render without `<App>`).
+    // Sonner-backed `message` API (`@/components/ui/toast`). No-ops until a
+    // `<Toaster>` is mounted, so a component rendered in isolation can call
+    // `show()` without a provider and without throwing.
     const message = useAppMessage();
     const dismissRef = useRef<(() => void) | null>(null);
     // Mirrors the latest `dismissOnUnmount` choice so the unmount cleanup
@@ -102,7 +102,7 @@ const useUndoToast = (): {
                         {/*
                          * Real <button> rather than an <a role="button"> so the
                          * native Enter / Space activation comes for free and so
-                         * the control carries the AntD button focus ring on
+                         * the control picks up the global focus ring on
                          * keyboard tab. The min-height lift keeps the tap target
                          * above the 44 px floor on coarse pointers — the toast
                          * appears center-screen on mobile and a thumb has to
@@ -113,7 +113,7 @@ const useUndoToast = (): {
                             style={{
                                 background: "transparent",
                                 border: 0,
-                                color: "var(--ant-color-primary, #EA580C)",
+                                color: "var(--pulse-brand-primary, #EA580C)",
                                 cursor: "pointer",
                                 font: "inherit",
                                 fontWeight: 500,

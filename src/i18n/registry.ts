@@ -3,17 +3,14 @@
  *
  *   1. Add a `*.ts` dictionary under `src/i18n/locales/` whose default export
  *      satisfies `Dictionary` (the type makes missing keys a compile error).
- *   2. Add a `LOCALES` row pointing at the new dictionary, the matching
- *      Ant Design locale pack from `antd/locale/*`, and the `dayjs` locale
- *      identifier.
+ *   2. Add a `LOCALES` row pointing at the new dictionary and the `dayjs`
+ *      locale identifier.
  *   3. (Optional) import the dayjs locale once in this module — dayjs
  *      registers itself globally so the call only needs to happen once.
  *
  * The rest of the codebase reads the active locale through `useTranslation`,
  * `useLocale`, or `getActiveDictionary`, so nothing else needs to change.
  */
-import enUS from "antd/locale/en_US";
-import zhCN from "antd/locale/zh_CN";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
 import "dayjs/locale/en";
@@ -21,11 +18,6 @@ import "dayjs/locale/en";
 import en from "./locales/en";
 import zhCNDict from "./locales/zh-CN";
 import type { Dictionary } from "./types";
-
-// Inferred from a concrete locale pack — `antd/locale`'s `Locale` interface
-// isn't re-exported from the `antd/locale` barrel, and chasing its internal
-// path (`antd/lib/locale`) would tie us to AntD's package layout.
-type AntdLocale = typeof enUS;
 
 export type LocaleCode = "en" | "zh-CN";
 
@@ -38,8 +30,6 @@ export interface LocaleEntry {
     readonly englishName: string;
     /** Active dictionary for this locale. */
     readonly dictionary: Dictionary;
-    /** Ant Design locale pack — drives DatePicker, Pagination, Empty, etc. */
-    readonly antd: AntdLocale;
     /** dayjs locale identifier (must be imported once at module top). */
     readonly dayjs: string;
     /** Value for the `<html lang>` attribute. */
@@ -54,7 +44,6 @@ export const LOCALES: readonly LocaleEntry[] = [
         nativeName: "English",
         englishName: "English",
         dictionary: en as unknown as Dictionary,
-        antd: enUS,
         dayjs: "en",
         htmlLang: "en"
     },
@@ -63,7 +52,6 @@ export const LOCALES: readonly LocaleEntry[] = [
         nativeName: "中文",
         englishName: "Chinese (Simplified)",
         dictionary: zhCNDict,
-        antd: zhCN,
         dayjs: "zh-cn",
         htmlLang: "zh-CN"
     }

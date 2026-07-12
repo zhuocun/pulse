@@ -1,12 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 
-import "antd/dist/reset.css";
 import App from "./App";
 import { setAnalyticsSink } from "./constants/analytics";
 import environment from "./constants/env";
 import reportWebVitals from "./reportWebVitals";
 import { palette, paletteToCss } from "./theme/palettes";
+import { tokenVarsCss } from "./theme/tailwindBridge";
 import AppProviders from "./utils/appProviders";
 import {
     devMemorySink,
@@ -33,6 +33,18 @@ const themeStyle = document.createElement("style");
 themeStyle.id = "pulse-theme-vars";
 themeStyle.textContent = paletteToCss(palette);
 document.head.appendChild(themeStyle);
+
+/*
+ * Design-token CSS vars (`--pulse-space-*`, `--pulse-radius-*`,
+ * `--pulse-font-*`, `--pulse-duration-*`, …) derived from `theme/tokens.ts`
+ * and consumed by the Tailwind theme. Static — no runtime switching — so
+ * seeded once here alongside the palette vars, before React's first render,
+ * so Tailwind utilities resolve to the token value from frame 1.
+ */
+const tokenStyle = document.createElement("style");
+tokenStyle.id = "pulse-token-vars";
+tokenStyle.textContent = tokenVarsCss;
+document.head.appendChild(tokenStyle);
 
 /*
  * Observability bootstrap — register production sinks when the env vars are
@@ -175,12 +187,11 @@ if ("serviceWorker" in navigator) {
                  * `updatefound` → `installed` and — only when there's
                  * already a controlling SW (otherwise this is the
                  * first install, no toast needed) — mount SwUpdateToast
-                 * inside the React tree so it picks up the AntD
-                 * notification context.
+                 * inside the React tree (wrapped in `AppProviders`) so it
+                 * picks up the sonner `Toaster` context.
                  *
-                 * Lazy-imported so the toast component (and its AntD
-                 * dependency surface) doesn't bloat the SW
-                 * registration codepath when no update is pending.
+                 * Lazy-imported so the toast component doesn't bloat the
+                 * SW registration codepath when no update is pending.
                  */
                 const promptUpdate = async () => {
                     if (!navigator.serviceWorker.controller) return;

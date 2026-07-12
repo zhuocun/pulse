@@ -1,6 +1,8 @@
 import React, { forwardRef, type KeyboardEvent } from "react";
 
-import { StyledSamplePromptChip } from "./aiChatDrawerStyles";
+import { cn } from "@/lib/utils";
+
+import { TOUCH_TARGET } from "../ui/touchTarget";
 
 interface SamplePromptProps {
     children: React.ReactNode;
@@ -11,31 +13,10 @@ interface SamplePromptProps {
 }
 
 /**
- * AntD's `CheckableTag` type does not declare `tabIndex`, `role`, or
- * `onKeyDown`, but its runtime implementation spreads `restProps` onto
- * the underlying `<span>`, so these attributes do reach the DOM. We
- * cast the JSX element to a permissive props bag so the type-checker
- * accepts the extra a11y attributes without us having to drop the
- * styled-component wrapper.
- */
-const ChipElement =
-    StyledSamplePromptChip as unknown as React.ForwardRefExoticComponent<
-        Omit<React.HTMLAttributes<HTMLSpanElement>, "onChange"> & {
-            checked: boolean;
-            onChange?: (checked: boolean) => void;
-            children?: React.ReactNode;
-        } & React.RefAttributes<HTMLSpanElement>
-    >;
-
-/**
- * Sample-prompt chip. Wraps `Tag.CheckableTag` (a bare <span> with no
- * tabIndex / role / keyboard handler) so the chip row is keyboard-
- * reachable via Tab and chips activate on Enter / Space — matching the
- * standard button semantics screen-reader and keyboard users expect.
- *
- * Visual treatment is preserved 1:1 with the previous styled wrapper —
- * only the a11y surface changes. Bug 3 in
- * `docs/design/ui-ux-comprehensive-review-2026-05.md`.
+ * Sample-prompt chip. A pill-shaped toggle rendered as a keyboard-reachable
+ * `role="button"` so the chip row is Tab-navigable and chips activate on
+ * Enter / Space — matching the standard button semantics screen-reader and
+ * keyboard users expect. `checked` paints the selected (primary) fill.
  */
 const SamplePrompt = forwardRef<HTMLSpanElement, SamplePromptProps>(
     function SamplePrompt(
@@ -60,18 +41,26 @@ const SamplePrompt = forwardRef<HTMLSpanElement, SamplePromptProps>(
         };
 
         return (
-            <ChipElement
+            <span
                 aria-label={ariaLabel}
-                checked={checked}
+                aria-pressed={checked}
+                className={cn(
+                    "inline-flex cursor-pointer items-center rounded-pill px-sm py-xxs text-sm font-medium transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+                    checked
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-foreground hover:bg-muted/80",
+                    TOUCH_TARGET
+                )}
                 data-testid={dataTestId}
-                onChange={onChange}
+                onClick={() => onChange(!checked)}
                 onKeyDown={handleKeyDown}
                 ref={ref}
                 role="button"
                 tabIndex={0}
             >
                 {children}
-            </ChipElement>
+            </span>
         );
     }
 );

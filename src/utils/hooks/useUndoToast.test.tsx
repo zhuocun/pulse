@@ -1,5 +1,13 @@
-import { act, fireEvent, renderHook, waitFor } from "@testing-library/react";
-import { message } from "antd";
+import {
+    act,
+    fireEvent,
+    render,
+    renderHook,
+    screen,
+    waitFor
+} from "@testing-library/react";
+
+import { message, type OpenArgs } from "@/components/ui/toast";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import { microcopy } from "../../constants/microcopy";
@@ -16,37 +24,41 @@ jest.mock("../../constants/analytics", () => ({
 
 const trackMock = track as jest.MockedFunction<typeof track>;
 
-const undoButton = async (): Promise<HTMLElement> => {
-    return waitFor(() => {
-        const buttons = Array.from(
-            document.querySelectorAll<HTMLButtonElement>(
-                ".ant-message-notice button"
-            )
-        );
-        const found = buttons.find(
-            (b) => b.textContent === microcopy.ai.undoLabel
-        );
-        if (!found) {
-            throw new Error("Undo button not yet mounted");
-        }
-        return found;
-    });
-};
-
+/*
+ * The Undo toast now routes through the sonner-backed `message` module
+ * (`@/components/ui/toast`) instead of AntD's global message container.
+ * We spy on the `message` API and render the ReactNode handed to
+ * `message.open` in isolation to drive the Undo button — deterministic
+ * without mounting a `<Toaster>` (sonner's portal + exit animations are
+ * fiddly to script in jsdom).
+ */
 describe("useUndoToast", () => {
-    afterEach(async () => {
-        act(() => {
-            message.destroy();
-        });
-        // Drain AntD's microtask queue so the next test starts with a clean
-        // notification surface.
-        await act(async () => {
-            await Promise.resolve();
-        });
+    let openSpy: jest.SpyInstance;
+    let successSpy: jest.SpyInstance;
+    let errorSpy: jest.SpyInstance;
+    let destroySpy: jest.SpyInstance;
+
+    beforeEach(() => {
+        openSpy = jest.spyOn(message, "open");
+        successSpy = jest.spyOn(message, "success");
+        errorSpy = jest.spyOn(message, "error");
+        destroySpy = jest.spyOn(message, "destroy");
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
         trackMock.mockClear();
     });
 
-    it("renders the toast description and an Undo button", async () => {
+    const lastOpenArgs = (): OpenArgs => {
+        const call = openSpy.mock.calls.at(-1);
+        if (!call) throw new Error("message.open was not called");
+        return call[0] as OpenArgs;
+    };
+
+    const renderLastToast = () => render(<>{lastOpenArgs().content}</>);
+
+    it("renders the toast description and an Undo button", () => {
         const { result } = renderHook(() => useUndoToast());
         act(() => {
             result.current.show({
@@ -54,11 +66,14 @@ describe("useUndoToast", () => {
                 undo: jest.fn()
             });
         });
-        const button = await undoButton();
-        expect(button.textContent).toBe(microcopy.ai.undoLabel);
-        expect(document.body.textContent).toContain(
-            "Estimate applied to 3 tasks."
-        );
+        expect(openSpy).toHaveBeenCalledTimes(1);
+        renderLastToast();
+        expect(
+            screen.getByRole("button", { name: microcopy.ai.undoLabel })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(/Estimate applied to 3 tasks\./)
+        ).toBeInTheDocument();
     });
 
     it("invokes the undo callback once and tracks the analytics event", async () => {
@@ -71,7 +86,10 @@ describe("useUndoToast", () => {
                 analyticsTag: "copilot.estimate.apply"
             });
         });
-        const button = await undoButton();
+        renderLastToast();
+        const button = screen.getByRole("button", {
+            name: microcopy.ai.undoLabel
+        });
         await act(async () => {
             fireEvent.click(button);
         });
@@ -79,6 +97,10 @@ describe("useUndoToast", () => {
         expect(trackMock).toHaveBeenCalledWith(ANALYTICS_EVENTS.UNDO_APPLIED, {
             surface: "copilot.estimate.apply"
         });
+        expect(successSpy).toHaveBeenCalledWith(
+            microcopy.mutation.undoApplied,
+            1.5
+        );
     });
 
     it("ignores repeated Undo clicks after the first", async () => {
@@ -90,7 +112,10 @@ describe("useUndoToast", () => {
                 undo
             });
         });
-        const button = await undoButton();
+        renderLastToast();
+        const button = screen.getByRole("button", {
+            name: microcopy.ai.undoLabel
+        });
         await act(async () => {
             fireEvent.click(button);
             fireEvent.click(button);
@@ -108,18 +133,22 @@ describe("useUndoToast", () => {
                 undo
             });
         });
-        const button = await undoButton();
+        renderLastToast();
+        const button = screen.getByRole("button", {
+            name: microcopy.ai.undoLabel
+        });
         await act(async () => {
             fireEvent.click(button);
         });
-        await waitFor(() => {
-            expect(document.body.textContent).toContain(
-                microcopy.feedback.operationFailed
-            );
-        });
+        await waitFor(() =>
+            expect(errorSpy).toHaveBeenCalledWith(
+                microcopy.feedback.operationFailed,
+                2
+            )
+        );
     });
 
-    it("dismiss() removes the toast", async () => {
+    it("dismiss() removes the toast", () => {
         const { result } = renderHook(() => useUndoToast());
         let ret: { dismiss: () => void } | null = null;
         act(() => {
@@ -128,16 +157,10 @@ describe("useUndoToast", () => {
                 undo: jest.fn()
             });
         });
-        await waitFor(() => {
-            expect(document.body.textContent).toContain("Will be dismissed.");
-        });
+        const { key } = lastOpenArgs();
         act(() => {
             ret?.dismiss();
         });
-        await waitFor(() => {
-            expect(document.body.textContent).not.toContain(
-                "Will be dismissed."
-            );
-        });
+        expect(destroySpy).toHaveBeenCalledWith(key);
     });
 });

@@ -1,15 +1,19 @@
+import { ArchiveRestore, Inbox, Trash2 } from "lucide-react";
+import React, { useCallback, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Empty } from "@/components/ui/empty";
 import {
-    DeleteOutlined,
-    InboxOutlined,
-    RollbackOutlined
-} from "@ant-design/icons";
-import styled from "@emotion/styled";
-import { Button, Empty, Popconfirm, Skeleton, Typography } from "antd";
-import React, { useCallback } from "react";
+    Popover,
+    PopoverContent,
+    PopoverTrigger
+} from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
+import useAppMessage from "@/components/ui/toast";
+import { Typography } from "@/components/ui/typography";
 
 import { microcopy, microcopyString } from "../../constants/microcopy";
-import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
-import useAppMessage from "../../utils/hooks/useAppMessage";
+import { space } from "../../theme/tokens";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useReactQuery from "../../utils/hooks/useReactQuery";
 import Sheet from "../sheet";
@@ -46,67 +50,83 @@ import Sheet from "../sheet";
  * single prefix invalidates every `["tasks", …]` observer in one call.
  */
 
-const DrawerHeader = styled.div`
-    align-items: center;
-    display: flex;
-    gap: ${space.xs}px;
-    justify-content: space-between;
-    padding-bottom: ${space.xs}px;
-`;
+/**
+ * Destructive-confirm affordance replacing antd `Popconfirm`. The trigger
+ * button opens a small `Popover` (click-to-open, unlike a dropdown menu)
+ * carrying the title / description and a destructive confirm plus a cancel
+ * button; confirming fires `onConfirm` and closes the popover.
+ */
+interface PurgeConfirmButtonProps {
+    triggerAriaLabel: string;
+    triggerLabel: string;
+    disabled?: boolean;
+    title: string;
+    description: string;
+    confirmLabel: string;
+    cancelLabel: string;
+    onConfirm: () => void;
+}
 
-const List = styled.ul`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xxs}px;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-`;
-
-const Row = styled.li`
-    align-items: flex-start;
-    border-radius: ${radius.md}px;
-    display: flex;
-    gap: ${space.xs}px;
-    padding: ${space.xs}px ${space.sm}px;
-`;
-
-const RowBody = styled.div`
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-`;
-
-const RowName = styled(Typography.Text)`
-    && {
-        font-size: ${fontSize.sm}px;
-        font-weight: ${fontWeight.medium};
-        word-break: break-word;
-    }
-`;
-
-const RowMeta = styled(Typography.Text)`
-    && {
-        color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45));
-        font-size: ${fontSize.xs}px;
-    }
-`;
-
-const RowActions = styled.div`
-    align-items: center;
-    display: flex;
-    flex: 0 0 auto;
-    gap: ${space.xxs}px;
-`;
-
-const LoadingState = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.sm}px;
-    padding: ${space.sm}px;
-`;
+const PurgeConfirmButton: React.FC<PurgeConfirmButtonProps> = ({
+    triggerAriaLabel,
+    triggerLabel,
+    disabled,
+    title,
+    description,
+    confirmLabel,
+    cancelLabel,
+    onConfirm
+}) => {
+    const [open, setOpen] = useState(false);
+    return (
+        <Popover onOpenChange={setOpen} open={open}>
+            <PopoverTrigger asChild>
+                <Button
+                    aria-label={triggerAriaLabel}
+                    className="!h-auto !p-0 text-destructive hover:text-destructive/80"
+                    data-testid="archive-drawer-purge"
+                    disabled={disabled}
+                    size="sm"
+                    variant="ghost"
+                >
+                    <Trash2 aria-hidden />
+                    {triggerLabel}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent
+                align="end"
+                aria-label={title}
+                className="w-auto max-w-[280px] p-sm"
+            >
+                <div className="text-sm font-semibold text-foreground">
+                    {title}
+                </div>
+                <div className="mt-xxs text-sm text-muted-foreground">
+                    {description}
+                </div>
+                <div className="mt-sm flex justify-end gap-xs">
+                    <Button
+                        onClick={() => setOpen(false)}
+                        size="sm"
+                        variant="default"
+                    >
+                        {cancelLabel}
+                    </Button>
+                    <Button
+                        onClick={() => {
+                            onConfirm();
+                            setOpen(false);
+                        }}
+                        size="sm"
+                        variant="destructive"
+                    >
+                        {confirmLabel}
+                    </Button>
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+};
 
 interface ArchiveDrawerProps {
     open: boolean;
@@ -215,117 +235,104 @@ const ArchiveDrawer: React.FC<ArchiveDrawerProps> = ({
 
     const body = (
         <div aria-busy={isLoading} data-testid="archive-drawer-body">
-            <DrawerHeader>
-                <Typography.Text strong style={{ fontSize: fontSize.sm }}>
+            <div className="flex items-center justify-between gap-xs pb-xs">
+                <Typography.Text className="text-sm" strong>
                     {drawerTitle}
                 </Typography.Text>
-            </DrawerHeader>
+            </div>
             {isLoading ? (
-                <LoadingState
+                <div
+                    className="flex flex-col gap-sm p-sm"
                     data-testid="archive-drawer-loading"
                     role="status"
                 >
                     <Typography.Text type="secondary">
                         {microcopyString(microcopy.archiveDrawer.loading)}
                     </Typography.Text>
-                    <Skeleton active paragraph={{ rows: 3 }} title={false} />
-                </LoadingState>
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                </div>
             ) : archivedTasks.length === 0 ? (
                 <Empty
                     data-testid="archive-drawer-empty"
-                    description={
-                        <span>
-                            <Typography.Text strong>
-                                {microcopyString(
-                                    microcopy.archiveDrawer.empty.title
-                                )}
-                            </Typography.Text>
-                            <br />
-                            <Typography.Text type="secondary">
-                                {microcopyString(
-                                    microcopy.archiveDrawer.empty.description
-                                )}
-                            </Typography.Text>
-                        </span>
-                    }
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description={microcopyString(
+                        microcopy.archiveDrawer.empty.description
+                    )}
+                    title={microcopyString(microcopy.archiveDrawer.empty.title)}
                 />
             ) : (
-                <List data-testid="archive-drawer-list">
+                <ul
+                    className="m-0 flex list-none flex-col gap-xxs p-0"
+                    data-testid="archive-drawer-list"
+                >
                     {archivedTasks.map((archivedTask) => (
-                        <Row
+                        <li
+                            className="flex items-start gap-xs rounded-md px-sm py-xs"
                             key={archivedTask._id}
                             data-testid="archive-drawer-row"
                             data-task-id={archivedTask._id}
                         >
-                            <RowBody>
-                                <RowName>{archivedTask.taskName}</RowName>
-                                <RowMeta>{archivedTask.type}</RowMeta>
-                            </RowBody>
-                            <RowActions>
+                            <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
+                                <Typography.Text className="text-sm font-medium break-words">
+                                    {archivedTask.taskName}
+                                </Typography.Text>
+                                <Typography.Text className="text-xs [color:var(--pulse-text-tertiary,rgba(15,23,42,0.45))]">
+                                    {archivedTask.type}
+                                </Typography.Text>
+                            </div>
+                            <div className="flex flex-none items-center gap-xxs">
                                 <Button
                                     aria-label={microcopyString(
                                         microcopy.archiveDrawer
                                             .unarchiveAriaLabel
                                     ).replace("{name}", archivedTask.taskName)}
+                                    className="!h-auto !p-0"
                                     data-testid="archive-drawer-unarchive"
                                     disabled={actionsBusy}
-                                    icon={<RollbackOutlined aria-hidden />}
                                     onClick={() =>
                                         handleUnarchive(archivedTask._id)
                                     }
-                                    size="small"
-                                    type="text"
+                                    size="sm"
+                                    variant="ghost"
                                 >
+                                    <ArchiveRestore aria-hidden />
                                     {microcopyString(
                                         microcopy.archiveDrawer.unarchive
                                     )}
                                 </Button>
-                                <Popconfirm
-                                    cancelText={microcopyString(
+                                <PurgeConfirmButton
+                                    cancelLabel={microcopyString(
                                         microcopy.actions.cancel
+                                    )}
+                                    confirmLabel={microcopyString(
+                                        microcopy.archiveDrawer.confirm
+                                            .confirmLabel
                                     )}
                                     description={microcopyString(
                                         microcopy.archiveDrawer.confirm
                                             .description
                                     )}
-                                    okButtonProps={{ danger: true }}
-                                    okText={microcopyString(
-                                        microcopy.archiveDrawer.confirm
-                                            .confirmLabel
-                                    )}
+                                    disabled={actionsBusy}
                                     onConfirm={() =>
                                         handlePurge(archivedTask._id)
                                     }
                                     title={microcopyString(
                                         microcopy.archiveDrawer.confirm.title
                                     )}
-                                >
-                                    <Button
-                                        aria-label={microcopyString(
-                                            microcopy.archiveDrawer
-                                                .deletePermanentlyAriaLabel
-                                        ).replace(
-                                            "{name}",
-                                            archivedTask.taskName
-                                        )}
-                                        danger
-                                        data-testid="archive-drawer-purge"
-                                        disabled={actionsBusy}
-                                        icon={<DeleteOutlined aria-hidden />}
-                                        size="small"
-                                        type="text"
-                                    >
-                                        {microcopyString(
-                                            microcopy.archiveDrawer
-                                                .deletePermanently
-                                        )}
-                                    </Button>
-                                </Popconfirm>
-                            </RowActions>
-                        </Row>
+                                    triggerAriaLabel={microcopyString(
+                                        microcopy.archiveDrawer
+                                            .deletePermanentlyAriaLabel
+                                    ).replace("{name}", archivedTask.taskName)}
+                                    triggerLabel={microcopyString(
+                                        microcopy.archiveDrawer
+                                            .deletePermanently
+                                    )}
+                                />
+                            </div>
+                        </li>
                     ))}
-                </List>
+                </ul>
             )}
         </div>
     );
@@ -353,8 +360,8 @@ const ArchiveDrawer: React.FC<ArchiveDrawerProps> = ({
                 }
             }}
             title={
-                <span>
-                    <InboxOutlined aria-hidden style={{ marginInlineEnd: 8 }} />
+                <span className="inline-flex items-center gap-xs">
+                    <Inbox aria-hidden className="size-4" />
                     {drawerTitle}
                 </span>
             }

@@ -6,19 +6,31 @@ import {
     waitFor
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { message } from "antd";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { microcopy } from "../../constants/microcopy";
 import { store } from "../../store";
 import { activityFeedActions } from "../../store/reducers/activityFeedSlice";
-import {
-    coarseTouchTargetsFor,
-    styledClassFor
-} from "../../testUtils/styleRules";
+import { overlaysActions } from "../../store/reducers/overlaysSlice";
+import useUndoToast from "../../utils/hooks/useUndoToast";
+
+import { declaresTouchTarget } from "../ui/testHelpers";
 
 import TaskCreator from ".";
+
+// The transient Undo toast routes through the out-of-scope, AntD-backed
+// `useUndoToast`. Mock it so this suite stays free of AntD's global message
+// container while still asserting the create flow raises the toast with the
+// right copy and a working DELETE-the-task undo closure.
+jest.mock("../../utils/hooks/useUndoToast");
+
+interface UndoOptions {
+    description: string;
+    undo: () => Promise<void>;
+}
+const showUndoToast = jest.fn();
+let lastUndoOptions: UndoOptions | null = null;
 
 const member = (overrides: Partial<IMember> = {}): IMember => ({
     _id: "member-1",
@@ -94,6 +106,13 @@ describe("TaskCreator", () => {
     });
 
     beforeEach(() => {
+        lastUndoOptions = null;
+        showUndoToast.mockReset();
+        showUndoToast.mockImplementation((options: UndoOptions) => {
+            lastUndoOptions = options;
+            return { dismiss: jest.fn() };
+        });
+        (useUndoToast as jest.Mock).mockReturnValue({ show: showUndoToast });
         fetchMock.mockReset();
         fetchMock.mockResolvedValue(
             response({
@@ -102,19 +121,21 @@ describe("TaskCreator", () => {
             })
         );
         // Clear the activity feed between tests so the integration
-        // assertion below can read a deterministic event list.
+        // assertion below can read a deterministic event list. The AI
+        // draft modal open-state also lives in the singleton `store`
+        // (overlays slice), so close it too — a leaked-open Radix Dialog
+        // applies `aria-hidden` to outside content and hides the
+        // "Create task" button from later tests.
         act(() => {
             store.dispatch(activityFeedActions.clearActivityFeed());
+            store.dispatch(overlaysActions.closeAiDraft());
         });
     });
 
     afterEach(() => {
         act(() => {
             store.dispatch(activityFeedActions.clearActivityFeed());
-            // The Undo toast lives in a global AntD message container that
-            // outlives unmount (10 s window); tear it down so a leaked
-            // "Undo" button never bleeds into a sibling test's queries.
-            message.destroy();
+            store.dispatch(overlaysActions.closeAiDraft());
         });
     });
 
@@ -213,71 +234,21 @@ describe("TaskCreator", () => {
     // WCAG 2.5.8 (Target Size, Minimum) requires interactive targets be at
     // least 24×24 CSS px, with AAA at 44×44. The per-column "Create task"
     // trigger is the primary commit point for adding work to the board and
-    // its styled component declares `@media (pointer: coarse) { min-height:
-    // 44px }` so a thumb can land it without zoom. Walk the rendered
-    // stylesheet (same approach as `src/layouts/authLayout.test.tsx` for
-    // `AuthButton`) and assert the 44 px declaration is still emitted — a
-    // future style refactor that drops it below 44 must fail CI.
+    // carries the canonical `coarse:min-h-[44px]` floor so a thumb can land
+    // it without zoom. Assert the utility is present — a refactor that
+    // drops it below 44 must fail CI.
     it("declares a touch-target height of at least 44 px (WCAG 2.5.8)", () => {
         renderCreator();
-        const button = createButton();
-        const styledCls = button.className
-            .split(/\s+/)
-            .find(
-                (tok) =>
-                    /^css-[a-z0-9]{4,}$/i.test(tok) &&
-                    !tok.startsWith("css-var-") &&
-                    !tok.startsWith("css-dev-only-")
-            );
-        expect(styledCls).toBeTruthy();
-
-        // Walk every stylesheet's rules — including nested rules inside
-        // `@media` blocks where the coarse-pointer 44 px lift lives —
-        // and collect any `(min-)?height: <N>px` declaration on a rule
-        // that mentions the styled class.
-        const heights: number[] = [];
-        const visit = (rule: CSSRule) => {
-            if (rule instanceof CSSStyleRule) {
-                if (!styledCls || !rule.selectorText.includes(styledCls))
-                    return;
-                const re = /(?:^|[\s;{])(?:min-)?height:\s*(\d+(?:\.\d+)?)px/gi;
-                let m: RegExpExecArray | null = re.exec(rule.cssText);
-                while (m !== null) {
-                    heights.push(parseFloat(m[1] ?? "0"));
-                    m = re.exec(rule.cssText);
-                }
-            } else if ("cssRules" in rule) {
-                for (const child of Array.from(
-                    (rule as CSSGroupingRule).cssRules
-                )) {
-                    visit(child);
-                }
-            }
-        };
-        Array.from(document.styleSheets).forEach((sheet) => {
-            let rules: CSSRuleList;
-            try {
-                rules = sheet.cssRules;
-            } catch {
-                return;
-            }
-            for (const rule of Array.from(rules)) visit(rule);
-        });
-
-        // The styled component's `@media (pointer: coarse) { min-height:
-        // 44px }` rule must surface. A regression to a smaller value or a
-        // removed rule fails loudly.
-        expect(heights).toContain(44);
+        expect(declaresTouchTarget(createButton())).toBe(true);
     });
 
     it("declares a touch-target height for the Draft with AI trigger", () => {
         renderCreator();
-        const button = screen.getByLabelText(microcopy.actions.draftWithAi);
-        const styledClass = styledClassFor(button);
-        expect(styledClass).toBeTruthy();
-
-        const { heights } = coarseTouchTargetsFor(styledClass ?? "");
-        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
+        expect(
+            declaresTouchTarget(
+                screen.getByLabelText(microcopy.actions.draftWithAi)
+            )
+        ).toBe(true);
     });
 
     /*
@@ -443,12 +414,16 @@ describe("TaskCreator", () => {
                 )
             ).toBe(true)
         );
-        expect(
-            await screen.findByText(microcopy.feedback.taskCreated)
-        ).toBeInTheDocument();
-        const undoButton = await screen.findByRole("button", { name: "Undo" });
+        // The create flow raises the transient Undo toast with the created
+        // copy; its `undo` closure DELETEs the just-created task by id.
+        await waitFor(() => expect(showUndoToast).toHaveBeenCalledTimes(1));
+        expect(showUndoToast).toHaveBeenCalledWith(
+            expect.objectContaining({
+                description: microcopy.feedback.taskCreated
+            })
+        );
         await act(async () => {
-            fireEvent.click(undoButton);
+            await lastUndoOptions?.undo();
         });
 
         const deleteCall = fetchMock.mock.calls.find(

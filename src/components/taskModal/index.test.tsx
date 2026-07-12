@@ -6,7 +6,6 @@ import {
     waitFor,
     within
 } from "@testing-library/react";
-import { message } from "antd";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -24,6 +23,58 @@ import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useReducedMotion from "../../utils/hooks/useReducedMotion";
 
 import TaskModal from ".";
+
+/*
+ * The transient Undo toast and the delete-failure error toast both route
+ * through the out-of-Batch-B, AntD-backed `useUndoToast` / `useAppMessage`
+ * hooks. Mock them so this suite stays free of AntD's global message
+ * container while still asserting the modal raises the toast with the right
+ * copy and that the undo closures replay the inverse PUT / POST.
+ */
+interface UndoOptions {
+    description: string;
+    undo: () => void | Promise<void>;
+    analyticsTag?: string;
+    dismissOnUnmount?: boolean;
+}
+let mockLastUndoOptions: UndoOptions | null = null;
+const mockShowUndoToast = jest.fn((options: UndoOptions) => {
+    mockLastUndoOptions = options;
+    return { dismiss: jest.fn() };
+});
+const mockMessageError = jest.fn();
+jest.mock("../../utils/hooks/useUndoToast", () => ({
+    __esModule: true,
+    default: () => ({ show: mockShowUndoToast })
+}));
+jest.mock("../../utils/hooks/useAppMessage", () => ({
+    __esModule: true,
+    default: () => ({
+        error: mockMessageError,
+        success: jest.fn(),
+        info: jest.fn(),
+        warning: jest.fn(),
+        loading: jest.fn(),
+        open: jest.fn(),
+        destroy: jest.fn()
+    })
+}));
+
+/*
+ * Radix `Popover` (SelectField / MultiSelectField) and `DropdownMenu`
+ * (the phone overflow menu) drive their surfaces with pointer-capture
+ * and `scrollIntoView`, neither of which jsdom implements.
+ */
+Element.prototype.scrollIntoView = jest.fn();
+if (!Element.prototype.hasPointerCapture) {
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+}
+if (!Element.prototype.setPointerCapture) {
+    Element.prototype.setPointerCapture = jest.fn();
+}
+if (!Element.prototype.releasePointerCapture) {
+    Element.prototype.releasePointerCapture = jest.fn();
+}
 
 // `ResponsiveFormSheet` swaps the desktop Modal for the animated bottom
 // Sheet on coarse-pointer chrome. Both hooks are auto-mocked so every
@@ -118,29 +169,22 @@ const installAntdBrowserMocks = () => {
     });
 };
 
-const expandMoreDetails = async () => {
-    const toggle = screen.getByText(microcopy.taskModal.moreDetails as string);
-    const header =
-        toggle.closest(".ant-collapse-header") ??
-        toggle.closest("button") ??
-        toggle;
-    if (header.getAttribute("aria-expanded") !== "true") {
-        fireEvent.click(header);
+// `Disclosure` (More details / AI assist) is now a native
+// `<details>`/`<summary>`. Open it by clicking the summary. jsdom keeps the
+// content queryable regardless, so this is belt-and-braces for realism.
+const openDetailsByLabel = (labelText: string) => {
+    const summary = screen.getByText(labelText);
+    const details = summary.closest("details");
+    if (details && !details.open) {
+        fireEvent.click(summary);
     }
 };
 
-const expandAiAssist = async () => {
-    const toggle = screen.getByText(
-        microcopy.taskModal.aiAssistLabel as string
-    );
-    const header =
-        toggle.closest(".ant-collapse-header") ??
-        toggle.closest("button") ??
-        toggle;
-    if (header.getAttribute("aria-expanded") !== "true") {
-        fireEvent.click(header);
-    }
-};
+const expandMoreDetails = async () =>
+    openDetailsByLabel(microcopy.taskModal.moreDetails as string);
+
+const expandAiAssist = async () =>
+    openDetailsByLabel(microcopy.taskModal.aiAssistLabel as string);
 
 const LocationProbe = () => {
     const location = useLocation();
@@ -258,7 +302,10 @@ describe("TaskModal", () => {
     beforeEach(() => {
         fetchMock.mockReset();
         fetchMock.mockResolvedValue(response({ _id: "task-1" }));
-        // Default every test to desktop chrome so the legacy `.ant-modal*`
+        mockShowUndoToast.mockClear();
+        mockMessageError.mockClear();
+        mockLastUndoOptions = null;
+        // Default every test to desktop chrome so the Dialog-branch
         // assertions hold; the phone-branch test overrides this locally.
         mockedUseIsPhoneChrome.mockReturnValue(false);
         mockedUseReducedMotion.mockReturnValue(false);
@@ -280,12 +327,6 @@ describe("TaskModal", () => {
 
     afterEach(() => {
         setActiveLocale(DEFAULT_LOCALE);
-        // The Undo toast lives in a global AntD message container that
-        // outlives unmount (10 s window); tear it down so a leaked "Undo"
-        // button never bleeds into a sibling test's queries.
-        act(() => {
-            message.destroy();
-        });
         act(() => {
             store.dispatch(activityFeedActions.clearActivityFeed());
             store.dispatch(aiLedgerActions.clearAiLedger());
@@ -324,11 +365,11 @@ describe("TaskModal", () => {
         ).toBeInTheDocument();
         expect(screen.getByDisplayValue("Build task")).toBeInTheDocument();
 
-        fireEvent.mouseDown(screen.getAllByRole("combobox")[0]);
+        fireEvent.click(screen.getAllByRole("combobox")[0]);
         expect((await screen.findAllByText("Alice")).length).toBeGreaterThan(0);
         expect((await screen.findAllByText("Bob")).length).toBeGreaterThan(0);
 
-        fireEvent.mouseDown(screen.getAllByRole("combobox")[1]);
+        fireEvent.click(screen.getAllByRole("combobox")[1]);
         expect((await screen.findAllByText("Task")).length).toBeGreaterThan(0);
         expect((await screen.findAllByText("Bug")).length).toBeGreaterThan(0);
     });
@@ -341,7 +382,7 @@ describe("TaskModal", () => {
         expect(
             await screen.findByText(/edit task · build task/i)
         ).toBeInTheDocument();
-        fireEvent.mouseDown(screen.getAllByRole("combobox")[1]);
+        fireEvent.click(screen.getAllByRole("combobox")[1]);
 
         expect((await screen.findAllByText("Task")).length).toBeGreaterThan(0);
         expect((await screen.findAllByText("Bug")).length).toBeGreaterThan(0);
@@ -360,7 +401,7 @@ describe("TaskModal", () => {
         expect(
             await screen.findByText(/edit task · fix bug/i)
         ).toBeInTheDocument();
-        fireEvent.mouseDown(screen.getAllByRole("combobox")[1]);
+        fireEvent.click(screen.getAllByRole("combobox")[1]);
 
         expect((await screen.findAllByText("Task")).length).toBeGreaterThan(0);
         expect((await screen.findAllByText("Bug")).length).toBeGreaterThan(0);
@@ -532,15 +573,15 @@ describe("TaskModal", () => {
         expect(fetchMock.mock.calls[0][1]).toEqual(
             expect.objectContaining({ method: "DELETE" })
         );
-        // The modal closes right away and a toast offers a real,
-        // focusable Undo button.
+        // The modal closes right away and the reversible delete raises the
+        // Undo toast with the "task deleted" copy.
         await waitFor(() =>
             expect(store.getState().overlays.editingTaskId).toBe(null)
         );
-        expect(await screen.findByText("Task deleted")).toBeInTheDocument();
-        expect(
-            screen.getByRole("button", { name: "Undo" })
-        ).toBeInTheDocument();
+        expect(mockShowUndoToast).toHaveBeenCalled();
+        expect(mockLastUndoOptions?.description).toBe(
+            microcopy.feedback.taskDeleted
+        );
     });
 
     it("re-creates the task via a POST when the Undo toast is clicked", async () => {
@@ -554,9 +595,9 @@ describe("TaskModal", () => {
         );
 
         await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-        const undoButton = await screen.findByRole("button", { name: "Undo" });
+        await waitFor(() => expect(mockShowUndoToast).toHaveBeenCalled());
         await act(async () => {
-            fireEvent.click(undoButton);
+            await mockLastUndoOptions?.undo();
         });
 
         // Undo replays the inverse mutation: a POST that re-creates the
@@ -580,12 +621,12 @@ describe("TaskModal", () => {
         fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
         await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-        expect(
-            await screen.findByText(microcopy.feedback.taskSaved)
-        ).toBeInTheDocument();
-        const undoButton = await screen.findByRole("button", { name: "Undo" });
+        await waitFor(() => expect(mockShowUndoToast).toHaveBeenCalled());
+        expect(mockLastUndoOptions?.description).toBe(
+            microcopy.feedback.taskSaved
+        );
         await act(async () => {
-            fireEvent.click(undoButton);
+            await mockLastUndoOptions?.undo();
         });
 
         // Undo issues a second PUT restoring the pre-edit name.
@@ -616,9 +657,11 @@ describe("TaskModal", () => {
         await waitFor(() =>
             expect(store.getState().overlays.editingTaskId).toBe(null)
         );
-        expect(
-            await screen.findByText("Couldn't delete Build task.")
-        ).toBeInTheDocument();
+        await waitFor(() =>
+            expect(mockMessageError).toHaveBeenCalledWith(
+                "Couldn't delete Build task."
+            )
+        );
     });
 
     it("allows deleting the last saved task but still disables delete for optimistic tasks", async () => {
@@ -815,8 +858,11 @@ describe("TaskModal", () => {
         renderModal();
 
         const dialog = await screen.findByRole("dialog");
+        // The body max-height rides the inline `styles.body` on the Dialog's
+        // body wrapper (the old `.ant-modal-body` was replaced by a plain
+        // styled `<div>` inside `DialogContent`).
         const body = dialog.querySelector(
-            ".ant-modal-body"
+            '[style*="max-height"]'
         ) as HTMLElement | null;
         expect(body).not.toBeNull();
         expect(body!.style.maxHeight).toMatch(/env\(keyboard-inset-height/);
@@ -834,9 +880,11 @@ describe("TaskModal", () => {
         renderModal();
         await screen.findByDisplayValue("Build task");
 
-        const footerButtons = Array.from(
-            document.querySelectorAll(".ant-modal-footer button")
-        ) as HTMLButtonElement[];
+        // The footer buttons render inside the Dialog's `DialogFooter`.
+        // Read every button in the dialog and locate Delete / Cancel / Save
+        // by label; the relative DOM order is the load-bearing assertion.
+        const dialog = await screen.findByRole("dialog");
+        const footerButtons = within(dialog).getAllByRole("button");
         const labels = footerButtons.map(
             (btn) => btn.textContent?.trim() ?? ""
         );
@@ -894,7 +942,7 @@ describe("TaskModal", () => {
 
         // Primary starts enabled (task resolved, no mutation in flight).
         expect(saveButton).toBeEnabled();
-        expect(saveButton).not.toHaveClass("ant-btn-loading");
+        expect(saveButton).not.toHaveAttribute("aria-busy");
 
         fireEvent.change(within(surface).getByDisplayValue("Build task"), {
             target: { value: "Build task details" }
@@ -903,8 +951,12 @@ describe("TaskModal", () => {
             fireEvent.click(saveButton);
         });
 
-        // PUT is pending -> the primary mirrors `confirmLoading`/disabled.
-        await waitFor(() => expect(saveButton).toHaveClass("ant-btn-loading"));
+        // PUT is pending -> the primary mirrors `loading`/disabled (the
+        // shadcn `Button` sets `aria-busy` + a spinner in place of AntD's
+        // `.ant-btn-loading` class).
+        await waitFor(() =>
+            expect(saveButton).toHaveAttribute("aria-busy", "true")
+        );
         expect(saveButton).toBeDisabled();
 
         await act(async () => {
@@ -1115,8 +1167,13 @@ describe("TaskModal", () => {
             fireEvent.click(noteSuggestion);
             expect(noteInput.value).toMatch(/## Acceptance criteria/);
 
-            const undoButtons = await screen.findAllByText("Undo");
-            fireEvent.click(undoButtons[undoButtons.length - 1]);
+            // Applying a readiness suggestion raises an Undo toast via the
+            // (mocked) `useUndoToast`; invoking the captured undo closure
+            // restores the pre-apply note value.
+            await waitFor(() => expect(mockShowUndoToast).toHaveBeenCalled());
+            act(() => {
+                void mockLastUndoOptions?.undo();
+            });
             await waitFor(() => expect(noteInput.value).toBe("Keep this note"));
         } finally {
             jest.useRealTimers();
@@ -1256,7 +1313,7 @@ describe("TaskModal", () => {
             const prioritySelect = screen.getByRole("combobox", {
                 name: /priority/i
             });
-            fireEvent.mouseDown(prioritySelect);
+            fireEvent.click(prioritySelect);
             expect(
                 (await screen.findAllByText("Urgent")).length
             ).toBeGreaterThan(0);
@@ -1268,10 +1325,12 @@ describe("TaskModal", () => {
         it("includes the chosen priority in the PUT payload on save", async () => {
             await openRichnessModal();
 
-            fireEvent.mouseDown(
+            fireEvent.click(
                 screen.getByRole("combobox", { name: /priority/i })
             );
-            fireEvent.click(await screen.findByText("Urgent"));
+            fireEvent.click(
+                await screen.findByRole("option", { name: "Urgent" })
+            );
 
             fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
@@ -1299,7 +1358,7 @@ describe("TaskModal", () => {
             const labelsSelect = screen.getByRole("combobox", {
                 name: /labels/i
             });
-            fireEvent.mouseDown(labelsSelect);
+            fireEvent.click(labelsSelect);
             expect(
                 (await screen.findAllByText("Backend")).length
             ).toBeGreaterThan(0);
@@ -1323,7 +1382,7 @@ describe("TaskModal", () => {
             const assigneesSelect = screen.getByRole("combobox", {
                 name: /assignees/i
             });
-            fireEvent.mouseDown(assigneesSelect);
+            fireEvent.click(assigneesSelect);
             // The project roster (Carol) drives this picker, distinct from
             // the global `users/members` directory that powers Coordinator.
             expect(
@@ -1337,39 +1396,41 @@ describe("TaskModal", () => {
             const parentSelect = screen.getByRole("combobox", {
                 name: /parent task/i
             });
-            fireEvent.mouseDown(parentSelect);
+            fireEvent.click(parentSelect);
             // "Fix bug" (task-2) is selectable; the current task ("Build
             // task", task-1) must not list itself as a parent option.
-            await screen.findByText("Fix bug");
-            const optionContents = Array.from(
-                document.querySelectorAll(".ant-select-item-option-content")
-            ).map((el) => el.textContent);
-            expect(optionContents).toContain("Fix bug");
+            await screen.findByRole("option", { name: "Fix bug" });
+            const optionLabels = screen
+                .getAllByRole("option")
+                .map((el) => el.textContent);
+            expect(optionLabels).toContain("Fix bug");
             // A task can't be its own parent — the editing task is filtered
             // out of the option list.
-            expect(optionContents).not.toContain("Build task");
+            expect(optionLabels).not.toContain("Build task");
         });
 
         it("includes labels, assignees, and parent in the PUT payload on save", async () => {
             await openRichnessModal();
 
             // Pick a label.
-            fireEvent.mouseDown(
-                screen.getByRole("combobox", { name: /labels/i })
+            fireEvent.click(screen.getByRole("combobox", { name: /labels/i }));
+            fireEvent.click(
+                await screen.findByRole("option", { name: "Backend" })
             );
-            fireEvent.click(await screen.findByText("Backend"));
 
             // Pick an assignee.
-            fireEvent.mouseDown(
+            fireEvent.click(
                 screen.getByRole("combobox", { name: /assignees/i })
             );
-            fireEvent.click(await screen.findByText("Bob"));
+            fireEvent.click(await screen.findByRole("option", { name: "Bob" }));
 
             // Pick a parent task.
-            fireEvent.mouseDown(
+            fireEvent.click(
                 screen.getByRole("combobox", { name: /parent task/i })
             );
-            fireEvent.click(await screen.findByText("Fix bug"));
+            fireEvent.click(
+                await screen.findByRole("option", { name: "Fix bug" })
+            );
 
             fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
@@ -1442,7 +1503,7 @@ describe("TaskModal", () => {
             const milestoneSelect = screen.getByRole("combobox", {
                 name: /milestone/i
             });
-            fireEvent.mouseDown(milestoneSelect);
+            fireEvent.click(milestoneSelect);
             expect(
                 (await screen.findAllByText("Beta launch")).length
             ).toBeGreaterThan(0);
@@ -1458,10 +1519,12 @@ describe("TaskModal", () => {
 
             // Pick a milestone — `milestoneId` rides the same `tasks` PUT as
             // `parentTaskId`, no separate write path.
-            fireEvent.mouseDown(
+            fireEvent.click(
                 screen.getByRole("combobox", { name: /milestone/i })
             );
-            fireEvent.click(await screen.findByText("Beta launch"));
+            fireEvent.click(
+                await screen.findByRole("option", { name: "Beta launch" })
+            );
 
             fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
@@ -1494,15 +1557,13 @@ describe("TaskModal", () => {
             });
 
             // The picker is seeded with the task's current milestone ("Beta
-            // launch"); click the allow-clear button to unset it.
-            const milestoneControl = screen
-                .getByRole("combobox", { name: /milestone/i })
-                .closest(".ant-select") as HTMLElement;
-            const clearButton =
-                milestoneControl.querySelector(".ant-select-clear");
-            expect(clearButton).not.toBeNull();
-            fireEvent.mouseDown(clearButton as Element);
-            fireEvent.click(clearButton as Element);
+            // launch"); click the allow-clear button to unset it. The
+            // milestone is the only control with a value set here, so its
+            // "Clear" button is unambiguous.
+            const clearButton = screen.getByRole("button", {
+                name: microcopy.actions.clear as string
+            });
+            fireEvent.click(clearButton);
 
             fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
@@ -1541,29 +1602,27 @@ describe("TaskModal", () => {
                 ]
             });
 
-            // Clear the parent-task single-select via its allow-clear button.
-            const parentControl = screen
-                .getByRole("combobox", { name: /parent task/i })
-                .closest(".ant-select") as HTMLElement;
-            const parentClear =
-                parentControl.querySelector(".ant-select-clear");
-            expect(parentClear).not.toBeNull();
-            fireEvent.mouseDown(parentClear as Element);
-            fireEvent.click(parentClear as Element);
+            // Clear the parent-task single-select via its "Clear" button.
+            // The parent is the only control with a value set here (the
+            // dates clear via their native inputs below), so the button is
+            // unambiguous.
+            fireEvent.click(
+                screen.getByRole("button", {
+                    name: microcopy.actions.clear as string
+                })
+            );
 
-            // Clear both date pickers via their allow-clear buttons (each
-            // picker is seeded with the task's stored ISO date string).
-            const clearDatePicker = (displayValue: string) => {
-                const picker = (
-                    screen.getByDisplayValue(displayValue) as HTMLElement
-                ).closest(".ant-picker") as HTMLElement;
-                const clearBtn = picker.querySelector(".ant-picker-clear");
-                expect(clearBtn).not.toBeNull();
-                fireEvent.mouseDown(clearBtn as Element);
-                fireEvent.click(clearBtn as Element);
+            // Clear both native date inputs by emptying their value — the
+            // `DateField` emits `undefined` on an empty value, which the
+            // modal's `?? null` coercion maps to an explicit `null`.
+            const clearDateInput = (displayValue: string) => {
+                const input = screen.getByDisplayValue(
+                    displayValue
+                ) as HTMLInputElement;
+                fireEvent.change(input, { target: { value: "" } });
             };
-            clearDatePicker("2026-03-01");
-            clearDatePicker("2026-03-15");
+            clearDateInput("2026-03-01");
+            clearDateInput("2026-03-15");
 
             fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
@@ -1617,21 +1676,23 @@ describe("TaskModal", () => {
                 ]
             });
 
-            // The seeded prerequisite renders as a selected tag inside the
-            // "Depends on" control (not merely as an option in the dropdown).
+            // The seeded prerequisite renders as a selected Badge inside the
+            // "Depends on" control (a sibling of the combobox trigger), not
+            // merely as an option in the dropdown.
             const dependsOnCombobox = screen.getByRole("combobox", {
                 name: /depends on/i
             });
-            const dependsOnControl = dependsOnCombobox.closest(
-                ".ant-select"
-            ) as HTMLElement;
+            const dependsOnControl =
+                dependsOnCombobox.parentElement as HTMLElement;
             expect(
                 within(dependsOnControl).getByText("Fix bug")
             ).toBeInTheDocument();
 
             // Add a second prerequisite and save.
-            fireEvent.mouseDown(dependsOnCombobox);
-            fireEvent.click(await screen.findByText("Write docs"));
+            fireEvent.click(dependsOnCombobox);
+            fireEvent.click(
+                await screen.findByRole("option", { name: "Write docs" })
+            );
             fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
             await waitFor(() =>
@@ -1662,10 +1723,12 @@ describe("TaskModal", () => {
                 ]
             });
 
-            fireEvent.mouseDown(
+            fireEvent.click(
                 screen.getByRole("combobox", { name: /depends on/i })
             );
-            fireEvent.click(await screen.findByText("Fix bug"));
+            fireEvent.click(
+                await screen.findByRole("option", { name: "Fix bug" })
+            );
             fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
             await waitFor(() =>
@@ -1696,8 +1759,9 @@ describe("TaskModal", () => {
             // The "Blocks" section header renders…
             const blocksLabel = screen.getByText("Blocks");
             expect(blocksLabel).toBeInTheDocument();
-            // …and the dependent task is listed as a read-only chip beneath it.
-            const blocksItem = blocksLabel.closest(".ant-form-item");
+            // …and the dependent task is listed as a read-only chip beneath
+            // it, inside the same `Form.Item` wrapper `<div>`.
+            const blocksItem = blocksLabel.closest("div");
             expect(blocksItem).not.toBeNull();
             expect(
                 within(blocksItem as HTMLElement).getByText("Fix bug")
@@ -1715,16 +1779,15 @@ describe("TaskModal", () => {
                 ]
             });
 
-            // Remove the only selected prerequisite tag ("Fix bug") so the
-            // dependsOn value becomes [].
-            const dependsOnControl = screen
-                .getByRole("combobox", { name: /depends on/i })
-                .closest(".ant-select") as HTMLElement;
-            const removeTag = dependsOnControl.querySelector(
-                ".ant-select-selection-item-remove"
+            // Remove the only selected prerequisite ("Fix bug") via the
+            // multi-select "Clear" button so the dependsOn value becomes [].
+            // It's the only control with a value set here, so the button is
+            // unambiguous.
+            fireEvent.click(
+                screen.getByRole("button", {
+                    name: microcopy.actions.clear as string
+                })
             );
-            expect(removeTag).not.toBeNull();
-            fireEvent.click(removeTag as Element);
 
             fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 

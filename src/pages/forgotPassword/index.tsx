@@ -1,22 +1,11 @@
-import styled from "@emotion/styled";
 import { Link } from "react-router";
 
 import { microcopy } from "../../constants/microcopy";
 import { AuthSubtitle, AuthTitle } from "../../layouts/authLayout";
-import { fontSize, space, touchTargetCoarse } from "../../theme/tokens";
 import useTitle, { composeBrandedTitle } from "../../utils/hooks/useTitle";
 
-const BackLink = styled(Link)`
-    align-items: center;
-    color: var(--ant-color-link);
-    display: inline-flex;
-    font-size: ${fontSize.base}px;
-    margin-top: ${space.lg}px;
-
-    @media (pointer: coarse) {
-        min-height: ${touchTargetCoarse}px;
-    }
-`;
+const BACK_LINK_CLASS =
+    "mt-lg inline-flex items-center text-base [color:var(--pulse-link)] coarse:min-h-[44px]";
 
 const ForgotPasswordPage = () => {
     useTitle(composeBrandedTitle(microcopy.pageTitle.forgotPassword), false);
@@ -29,7 +18,9 @@ const ForgotPasswordPage = () => {
             <AuthSubtitle>
                 {microcopy.auth.forgotPasswordPlaceholderBody}
             </AuthSubtitle>
-            <BackLink to="/login">{microcopy.auth.backToLogin}</BackLink>
+            <Link className={BACK_LINK_CLASS} to="/login">
+                {microcopy.auth.backToLogin}
+            </Link>
         </>
     );
 };

@@ -1,14 +1,33 @@
-import {
-    CloseOutlined,
-    FilterOutlined,
-    SaveOutlined,
-    SearchOutlined
-} from "@ant-design/icons";
-import styled from "@emotion/styled";
-import { Badge, Button, Input, Popover, Segmented, Select, Space } from "antd";
+import { Filter, Save, Search, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import { useParams } from "react-router-dom";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger
+} from "@/components/ui/popover";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import useAppMessage from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 
 import { microcopy } from "../../constants/microcopy";
 import type { ReduxDispatch, RootState } from "../../store";
@@ -17,18 +36,19 @@ import {
     userPreferencesActions,
     type SavedFilterPresetState
 } from "../../store/reducers/userPreferencesSlice";
-import {
-    breakpoints,
-    radius,
-    space,
-    touchTargetCoarse
-} from "../../theme/tokens";
-import useAppMessage from "../../utils/hooks/useAppMessage";
 import useAuth from "../../utils/hooks/useAuth";
 import useBoardDensity from "../../utils/hooks/useBoardDensity";
-import FilterChips, { FilterChip } from "../filterChips";
 import AiSparkleIcon from "../aiSparkleIcon";
+import FilterChips, { FilterChip } from "../filterChips";
 import { parseLensId } from "../lensChips";
+
+/*
+ * Radix `Select` reserves the empty-string value for its clear/placeholder
+ * state, so the "all" options can't ride `value=""` the way AntD's did. Map
+ * them through sentinels and translate back to `""` on change.
+ */
+const ALL_COORDINATORS = "__all_coordinators__";
+const ALL_TYPES = "__all_types__";
 
 export interface TaskSearchParam {
     taskName: string | null;
@@ -51,177 +71,6 @@ interface Props {
     loading: boolean;
     aiSearchSlot?: React.ReactNode;
 }
-
-const FilterShell = styled.div`
-    background: var(--ant-color-bg-container, #fff);
-    border: 1px solid var(--ant-color-border-secondary, rgba(15, 23, 42, 0.06));
-    border-radius: ${radius.lg}px;
-    margin-bottom: ${space.md}px;
-    padding: ${space.sm}px;
-
-    @media (min-width: ${breakpoints.md}px) {
-        padding: ${space.md}px;
-    }
-`;
-
-const FilterRow = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xs}px;
-
-    @media (min-width: ${breakpoints.md}px) {
-        align-items: center;
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: ${space.sm}px;
-    }
-`;
-
-/*
- * `flex: 1 1 14rem` only makes sense in row direction where the basis
- * sets the preferred WIDTH. In the mobile column layout the basis is
- * applied vertically and reserves a 14 rem-tall empty slot above each
- * sibling. Start with `auto` and switch to the proportional row basis
- * at the `md` breakpoint where the row reflows.
- */
-const FlexInput = styled.div`
-    flex: 0 0 auto;
-    min-width: 0;
-    width: 100%;
-
-    @media (min-width: ${breakpoints.md}px) {
-        flex: 1 1 14rem;
-        max-width: 22rem;
-        width: auto;
-    }
-`;
-
-const FlexSelect = styled.div`
-    flex: 0 0 auto;
-    min-width: 0;
-    width: 100%;
-
-    @media (min-width: ${breakpoints.md}px) {
-        flex: 1 1 12rem;
-        max-width: 14rem;
-        width: auto;
-    }
-`;
-
-/*
- * "Reset filters" should sit outside the per-field flex grid because it acts on
- * all of them. On phone widths it stretches full width below the inputs; on
- * tablet+ it shrinks to its natural width and aligns with the filter fields.
- */
-const ResetButtonSlot = styled.div`
-    align-items: center;
-    display: flex;
-    gap: ${space.xs}px;
-
-    > .ant-btn {
-        width: 100%;
-    }
-
-    @media (min-width: ${breakpoints.md}px) {
-        flex: 0 0 auto;
-        margin-inline-start: auto;
-
-        > .ant-btn {
-            width: auto;
-        }
-    }
-`;
-
-/*
- * Trailing row that holds the per-user preference controls — density
- * toggle on the left, preset save + load on the right. Sits below the
- * primary filter row so it doesn't push the filter inputs around when
- * presets are saved/loaded. On phone widths it stacks vertically.
- */
-const PrefRow = styled.div`
-    align-items: stretch;
-    border-top: 1px solid
-        var(--ant-color-border-secondary, rgba(15, 23, 42, 0.06));
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xs}px;
-    margin-top: ${space.sm}px;
-    padding-top: ${space.sm}px;
-
-    @media (min-width: ${breakpoints.md}px) {
-        align-items: center;
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: ${space.sm}px;
-    }
-`;
-
-const PrefRowTrailing = styled.div`
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xs}px;
-
-    @media (min-width: ${breakpoints.md}px) {
-        margin-inline-start: auto;
-    }
-`;
-
-const PresetSelectInner = styled.span`
-    align-items: center;
-    display: inline-flex;
-    gap: ${space.xs}px;
-    justify-content: space-between;
-    width: 100%;
-`;
-
-const FilterToggleSlot = styled.div`
-    flex: 0 0 auto;
-    width: 100%;
-
-    @media (min-width: ${breakpoints.md}px) {
-        width: auto;
-    }
-`;
-
-const AdvancedFiltersPanel = styled.div<{ $open: boolean }>`
-    display: ${({ $open }) => ($open ? "block" : "none")};
-    margin-top: ${space.xs}px;
-`;
-
-const AiSearchSlot = styled.div<{ $visible: boolean }>`
-    display: ${({ $visible }) => ($visible ? "block" : "none")};
-    margin-bottom: ${space.sm}px;
-    width: 100%;
-`;
-
-const PresetDeleteButton = styled.button`
-    align-items: center;
-    background: transparent;
-    border: 0;
-    border-radius: ${radius.sm}px;
-    color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45));
-    cursor: pointer;
-    display: inline-flex;
-    height: 24px;
-    justify-content: center;
-    margin-inline-start: ${space.xs}px;
-    padding: 0;
-    width: 24px;
-
-    &:hover,
-    &:focus-visible {
-        background: var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.04));
-        color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
-    }
-
-    @media (pointer: coarse) {
-        height: ${touchTargetCoarse}px;
-        min-height: ${touchTargetCoarse}px;
-        min-width: ${touchTargetCoarse}px;
-        width: ${touchTargetCoarse}px;
-    }
-`;
 
 const formatTemplate = (
     template: string,
@@ -467,305 +316,357 @@ const TaskSearchPanel: React.FC<Props> = ({
         dispatch(userPreferencesActions.removeSavedFilterPreset(presetId));
     };
 
-    const presetOptions = useMemo(
-        () =>
-            visiblePresets.map((p) => ({
-                value: p.id,
-                label: (
-                    <PresetSelectInner>
-                        <span>{p.name}</span>
-                        <PresetDeleteButton
-                            aria-label={formatTemplate(
-                                microcopy.board.presets
-                                    .deleteAriaLabel as string,
-                                { name: p.name }
-                            )}
-                            onClick={(e) => {
-                                /*
-                                 * Stop propagation + prevent default so
-                                 * clicking the delete glyph inside a
-                                 * Select option doesn't also fire the
-                                 * Select's "option chosen" path —
-                                 * otherwise we'd delete and apply on the
-                                 * same gesture.
-                                 */
-                                e.stopPropagation();
-                                e.preventDefault();
-                                handleDeletePreset(p.id);
-                            }}
-                            type="button"
-                        >
-                            <CloseOutlined aria-hidden />
-                        </PresetDeleteButton>
-                    </PresetSelectInner>
-                )
-            })),
-        [visiblePresets]
-    );
+    const managerLoading = loading ? (
+        <Spinner
+            aria-label={microcopy.placeholders.coordinator}
+            className="ms-auto"
+            data-testid="task-select-loading"
+            size="sm"
+        />
+    ) : null;
 
     return (
-        <FilterShell>
+        <div className="mb-md rounded-lg border border-border bg-card p-sm md:p-md">
             {aiSearchSlot ? (
-                <AiSearchSlot $visible={aiSearchOpen}>
+                <div
+                    className={cn(
+                        "mb-sm w-full",
+                        aiSearchOpen ? "block" : "hidden"
+                    )}
+                >
                     {aiSearchSlot}
-                </AiSearchSlot>
+                </div>
             ) : null}
-            <FilterRow role="search" aria-label={microcopy.a11y.filterTasks}>
-                <FlexInput>
-                    <Input
-                        aria-label={microcopy.a11y.searchTasksByName}
-                        allowClear
-                        autoComplete="off"
-                        enterKeyHint="search"
-                        inputMode="search"
-                        onChange={(e) =>
-                            setParam({
-                                ...param,
-                                taskName: e.target.value
-                            })
-                        }
-                        placeholder={microcopy.placeholders.searchBoard}
-                        prefix={
-                            <SearchOutlined
-                                aria-hidden
-                                style={{
-                                    color: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45))"
-                                }}
-                            />
-                        }
-                        suffix={
-                            aiSearchSlot ? (
+            <div
+                aria-label={microcopy.a11y.filterTasks}
+                className="flex flex-col gap-xs md:flex-row md:flex-wrap md:items-center md:gap-sm"
+                role="search"
+            >
+                <div className="w-full min-w-0 flex-none md:w-auto md:max-w-[22rem] md:flex-[1_1_14rem]">
+                    <div className="relative w-full">
+                        <Search
+                            aria-hidden
+                            className="pointer-events-none absolute left-sm top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                        />
+                        <Input
+                            aria-label={microcopy.a11y.searchTasksByName}
+                            autoComplete="off"
+                            className="pl-[2rem] pr-[2.5rem]"
+                            enterKeyHint="search"
+                            inputMode="search"
+                            onChange={(e) =>
+                                setParam({
+                                    ...param,
+                                    taskName: e.target.value
+                                })
+                            }
+                            placeholder={microcopy.placeholders.searchBoard}
+                            type="search"
+                            value={param.taskName ?? ""}
+                        />
+                        {aiSearchSlot ? (
+                            <div className="absolute right-sm top-1/2 flex -translate-y-1/2 items-center">
                                 <Button
                                     aria-expanded={aiSearchOpen}
                                     aria-label={
                                         microcopy.board.smartSearchToggleAria
                                     }
-                                    icon={<AiSparkleIcon aria-hidden />}
+                                    className="size-6"
                                     onClick={() =>
                                         setAiSearchOpen((open) => !open)
                                     }
-                                    size="small"
+                                    size="icon"
                                     title={microcopy.board.smartSearchToggle}
-                                    type={aiSearchOpen ? "primary" : "text"}
-                                />
-                            ) : undefined
-                        }
-                        type="search"
-                        value={param.taskName ?? ""}
-                    />
-                </FlexInput>
-                <FilterToggleSlot>
-                    <Badge count={advancedFilterCount} size="small">
+                                    variant={aiSearchOpen ? "primary" : "ghost"}
+                                >
+                                    <AiSparkleIcon aria-hidden />
+                                </Button>
+                            </div>
+                        ) : null}
+                    </div>
+                </div>
+                <div className="w-full flex-none md:w-auto">
+                    <div className="relative inline-flex">
                         <Button
                             aria-expanded={filtersOpen}
                             data-testid="task-search-panel-filters-toggle"
-                            icon={<FilterOutlined aria-hidden />}
                             onClick={() => setFiltersOpen((open) => !open)}
-                            type={filtersOpen ? "primary" : "default"}
+                            variant={filtersOpen ? "primary" : "default"}
                         >
+                            <Filter aria-hidden />
                             {microcopy.board.filtersToggle}
                         </Button>
-                    </Badge>
-                </FilterToggleSlot>
-            </FilterRow>
+                        {advancedFilterCount > 0 ? (
+                            <Badge className="absolute -right-1 -top-1 size-4 justify-center p-0 text-[10px] leading-none">
+                                {advancedFilterCount}
+                            </Badge>
+                        ) : null}
+                    </div>
+                </div>
+            </div>
             <FilterChips
                 chips={chips}
                 onClearAll={resetParams}
                 onDismiss={dismissChip}
             />
-            <AdvancedFiltersPanel
-                $open={filtersOpen}
+            <div
                 aria-label={microcopy.board.filtersToggleAria}
+                className={cn("mt-xs", filtersOpen ? "block" : "hidden")}
                 role="region"
             >
-                <FilterRow>
-                    <FlexSelect>
+                <div className="flex flex-col gap-xs md:flex-row md:flex-wrap md:items-center md:gap-sm">
+                    <div className="w-full min-w-0 flex-none md:w-auto md:max-w-[14rem] md:flex-[1_1_12rem]">
                         <Select
-                            allowClear
-                            aria-label={microcopy.a11y.filterByCoordinator}
-                            loading={loading}
-                            onChange={(value) =>
+                            onValueChange={(value) =>
                                 setParam({
                                     ...param,
-                                    coordinatorId: value ?? ""
+                                    coordinatorId:
+                                        value === ALL_COORDINATORS ? "" : value
                                 })
                             }
-                            placeholder={microcopy.placeholders.coordinator}
-                            style={{ width: "100%" }}
                             value={param.coordinatorId || undefined}
                         >
-                            <Select.Option value="">
-                                {microcopy.placeholders.coordinators}
-                            </Select.Option>
-                            {coordinators.map((member) => (
-                                <Select.Option
-                                    value={member._id}
-                                    key={member._id}
-                                >
-                                    {member.username}
-                                </Select.Option>
-                            ))}
+                            <SelectTrigger
+                                aria-label={microcopy.a11y.filterByCoordinator}
+                                className="w-full"
+                            >
+                                <SelectValue
+                                    placeholder={
+                                        microcopy.placeholders.coordinator
+                                    }
+                                />
+                                {managerLoading}
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={ALL_COORDINATORS}>
+                                    {microcopy.placeholders.coordinators}
+                                </SelectItem>
+                                {coordinators.map((member) => (
+                                    <SelectItem
+                                        key={member._id}
+                                        value={member._id}
+                                    >
+                                        {member.username}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
                         </Select>
-                    </FlexSelect>
-                    <FlexSelect>
+                    </div>
+                    <div className="w-full min-w-0 flex-none md:w-auto md:max-w-[14rem] md:flex-[1_1_12rem]">
                         <Select
-                            allowClear
-                            aria-label={microcopy.a11y.filterByType}
-                            loading={loading}
-                            onChange={(value) =>
+                            onValueChange={(value) =>
                                 setParam({
                                     ...param,
-                                    type: value ?? ""
+                                    type: value === ALL_TYPES ? "" : value
                                 })
                             }
-                            placeholder={microcopy.placeholders.type}
-                            style={{ width: "100%" }}
                             value={param.type || undefined}
                         >
-                            <Select.Option value="">
-                                {microcopy.placeholders.types}
-                            </Select.Option>
-                            {types.map((type) => (
-                                <Select.Option value={type} key={type}>
-                                    {typeLabel(type)}
-                                </Select.Option>
-                            ))}
+                            <SelectTrigger
+                                aria-label={microcopy.a11y.filterByType}
+                                className="w-full"
+                            >
+                                <SelectValue
+                                    placeholder={microcopy.placeholders.type}
+                                />
+                                {managerLoading}
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={ALL_TYPES}>
+                                    {microcopy.placeholders.types}
+                                </SelectItem>
+                                {types.map((type) => (
+                                    <SelectItem value={type} key={type}>
+                                        {typeLabel(type)}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
                         </Select>
-                    </FlexSelect>
-                    <ResetButtonSlot>
+                    </div>
+                    <div className="flex items-center gap-xs md:ms-auto md:flex-none">
                         <Button
+                            className="w-full md:w-auto"
                             disabled={chips.length === 0}
                             onClick={resetParams}
-                            type="text"
+                            variant="ghost"
                         >
                             {microcopy.actions.resetFilters}
                         </Button>
-                    </ResetButtonSlot>
-                </FilterRow>
-                <PrefRow>
-                    <Space size="small" align="center" wrap>
+                    </div>
+                </div>
+                <div className="mt-sm flex flex-col items-stretch gap-xs border-t border-border pt-sm md:flex-row md:flex-wrap md:items-center md:gap-sm">
+                    <div className="flex flex-wrap items-center gap-xs">
                         <span
+                            className="text-xs text-muted-foreground"
                             id="board-density-label"
-                            style={{
-                                color: "var(--ant-color-text-secondary, rgba(15, 23, 42, 0.55))",
-                                fontSize: "12px"
-                            }}
                         >
                             {microcopy.board.densityLabel}
                         </span>
-                        <Segmented
-                            aria-labelledby="board-density-label"
+                        <ToggleGroup
                             aria-label={microcopy.board.densityLabel}
-                            onChange={(value) =>
-                                setDensity(value as "comfortable" | "compact")
-                            }
-                            options={[
-                                {
-                                    label: microcopy.board.densityComfortable,
-                                    value: "comfortable"
-                                },
-                                {
-                                    label: microcopy.board.densityCompact,
-                                    value: "compact"
-                                }
-                            ]}
-                            size="small"
-                            value={density}
-                        />
-                    </Space>
-                    <PrefRowTrailing>
-                        <Select
-                            allowClear
-                            aria-label={microcopy.board.presets.loadAriaLabel}
-                            data-testid="task-search-panel-presets-select"
-                            notFoundContent={microcopy.empty.savedPresets.empty}
-                            onChange={(value) => {
-                                if (typeof value === "string")
-                                    handleApplyPreset(value);
+                            aria-labelledby="board-density-label"
+                            onValueChange={(value) => {
+                                if (
+                                    value === "comfortable" ||
+                                    value === "compact"
+                                )
+                                    setDensity(value);
                             }}
-                            options={presetOptions}
-                            placeholder={
-                                microcopy.board.presets.loadPlaceholder
-                            }
-                            size="small"
-                            style={{ minWidth: 160 }}
-                            value={null}
-                        />
-                        <Popover
-                            content={
-                                <Space
-                                    direction="vertical"
-                                    size="small"
-                                    style={{ width: "100%" }}
+                            size="sm"
+                            type="single"
+                            value={density}
+                        >
+                            <ToggleGroupItem value="comfortable">
+                                {microcopy.board.densityComfortable}
+                            </ToggleGroupItem>
+                            <ToggleGroupItem value="compact">
+                                {microcopy.board.densityCompact}
+                            </ToggleGroupItem>
+                        </ToggleGroup>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-xs md:ms-auto">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    aria-label={
+                                        microcopy.board.presets.loadAriaLabel
+                                    }
+                                    className="min-w-[10rem] justify-between"
+                                    data-testid="task-search-panel-presets-select"
+                                    size="sm"
+                                    variant="outline"
                                 >
-                                    <Input
-                                        aria-label={
-                                            microcopy.board.presets
-                                                .namePlaceholder
-                                        }
-                                        autoFocus
-                                        data-testid="task-search-panel-preset-name-input"
-                                        maxLength={60}
-                                        onChange={(e) =>
-                                            setDraftName(e.target.value)
-                                        }
-                                        onPressEnter={handleSavePreset}
-                                        placeholder={
-                                            microcopy.board.presets
-                                                .namePlaceholder
-                                        }
-                                        value={draftName}
-                                    />
-                                    <Space size="small" wrap>
-                                        <Button
-                                            onClick={handleSavePreset}
-                                            disabled={!draftName.trim()}
-                                            size="small"
-                                            type="primary"
-                                        >
-                                            {
-                                                microcopy.board.presets
-                                                    .saveConfirm
+                                    {microcopy.board.presets.loadPlaceholder}
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                                align="end"
+                                className="min-w-[12rem]"
+                            >
+                                {visiblePresets.length === 0 ? (
+                                    <DropdownMenuItem disabled>
+                                        {microcopy.empty.savedPresets.empty}
+                                    </DropdownMenuItem>
+                                ) : (
+                                    visiblePresets.map((p) => (
+                                        <DropdownMenuItem
+                                            className="justify-between gap-xs"
+                                            key={p.id}
+                                            onSelect={() =>
+                                                handleApplyPreset(p.id)
                                             }
-                                        </Button>
-                                        <Button
-                                            onClick={() => {
-                                                setSaveOpen(false);
-                                                setDraftName("");
-                                            }}
-                                            size="small"
                                         >
-                                            {microcopy.board.presets.saveCancel}
-                                        </Button>
-                                    </Space>
-                                </Space>
-                            }
+                                            <span>{p.name}</span>
+                                            <button
+                                                aria-label={formatTemplate(
+                                                    microcopy.board.presets
+                                                        .deleteAriaLabel as string,
+                                                    { name: p.name }
+                                                )}
+                                                className={cn(
+                                                    "ms-xs inline-flex size-6 items-center justify-center rounded-sm",
+                                                    "text-muted-foreground hover:bg-muted hover:text-foreground",
+                                                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                                    "coarse:size-[44px] coarse:min-h-[44px] coarse:min-w-[44px]",
+                                                    "[&_svg]:size-4"
+                                                )}
+                                                onClick={(e) => {
+                                                    /*
+                                                     * Stop propagation +
+                                                     * prevent default so the
+                                                     * delete glyph doesn't
+                                                     * also fire the menu
+                                                     * item's apply path —
+                                                     * otherwise we'd delete
+                                                     * and apply on the same
+                                                     * gesture.
+                                                     */
+                                                    e.stopPropagation();
+                                                    e.preventDefault();
+                                                    handleDeletePreset(p.id);
+                                                }}
+                                                type="button"
+                                            >
+                                                <X aria-hidden />
+                                            </button>
+                                        </DropdownMenuItem>
+                                    ))
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                        <Popover
                             onOpenChange={(open) => {
                                 setSaveOpen(open);
                                 if (!open) setDraftName("");
                             }}
                             open={saveOpen}
-                            placement="bottomRight"
-                            title={microcopy.board.presets.saveAction}
-                            trigger="click"
                         >
-                            <Button
-                                aria-label={
-                                    microcopy.board.presets.saveAriaLabel
-                                }
-                                data-testid="task-search-panel-save-preset"
-                                disabled={chips.length === 0}
-                                icon={<SaveOutlined aria-hidden />}
-                                size="small"
-                                type="text"
+                            <PopoverTrigger asChild>
+                                <Button
+                                    aria-label={
+                                        microcopy.board.presets.saveAriaLabel
+                                    }
+                                    data-testid="task-search-panel-save-preset"
+                                    disabled={chips.length === 0}
+                                    size="sm"
+                                    variant="ghost"
+                                >
+                                    <Save aria-hidden />
+                                    {microcopy.board.presets.saveAction}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                                align="end"
+                                aria-label={microcopy.board.presets.saveAction}
+                                className="flex w-64 flex-col gap-xs"
                             >
-                                {microcopy.board.presets.saveAction}
-                            </Button>
+                                <Input
+                                    aria-label={
+                                        microcopy.board.presets.namePlaceholder
+                                    }
+                                    autoFocus
+                                    data-testid="task-search-panel-preset-name-input"
+                                    maxLength={60}
+                                    onChange={(e) =>
+                                        setDraftName(e.target.value)
+                                    }
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                            e.preventDefault();
+                                            handleSavePreset();
+                                        }
+                                    }}
+                                    placeholder={
+                                        microcopy.board.presets.namePlaceholder
+                                    }
+                                    value={draftName}
+                                />
+                                <div className="flex flex-wrap items-center gap-xs">
+                                    <Button
+                                        disabled={!draftName.trim()}
+                                        onClick={handleSavePreset}
+                                        size="sm"
+                                        variant="primary"
+                                    >
+                                        {microcopy.board.presets.saveConfirm}
+                                    </Button>
+                                    <Button
+                                        onClick={() => {
+                                            setSaveOpen(false);
+                                            setDraftName("");
+                                        }}
+                                        size="sm"
+                                        variant="default"
+                                    >
+                                        {microcopy.board.presets.saveCancel}
+                                    </Button>
+                                </div>
+                            </PopoverContent>
                         </Popover>
-                    </PrefRowTrailing>
-                </PrefRow>
-            </AdvancedFiltersPanel>
-        </FilterShell>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 };
 

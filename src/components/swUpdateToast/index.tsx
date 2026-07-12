@@ -1,6 +1,9 @@
-import { ReloadOutlined } from "@ant-design/icons";
-import { App, Button, Space, Typography } from "antd";
+import { RefreshCw } from "lucide-react";
 import React from "react";
+
+import { Button } from "@/components/ui/button";
+import { message } from "@/components/ui/toast";
+import { Typography } from "@/components/ui/typography";
 
 import { microcopy } from "../../constants/microcopy";
 
@@ -11,8 +14,8 @@ import { microcopy } from "../../constants/microcopy";
  * combination is the canonical "this is an update, not a first install"
  * signal per the SW lifecycle spec.
  *
- * The toast renders once on mount via `App.useApp().notification.open`
- * and offers a "Reload" CTA that:
+ * The toast renders once on mount via the sonner-backed `message` seam and
+ * offers a "Reload" CTA that:
  *   1. Posts `{type: "SKIP_WAITING"}` to the waiting registration so the
  *      new worker calls `self.skipWaiting()` (the SW listens for that
  *      message — see `public/sw.js`).
@@ -21,8 +24,8 @@ import { microcopy } from "../../constants/microcopy";
  *   3. Reloads the page so the next paint is served by the new bundle.
  *
  * The component is render-less — it returns null and drives its UX
- * entirely through the AntD notification system. The notification key is
- * stable (`pulse-sw-update`) so re-mounts (e.g. React StrictMode dev
+ * entirely through the toast surface. The toast key is stable
+ * (`pulse-sw-update`) so re-mounts (e.g. React StrictMode dev
  * double-invoke) coalesce into a single toast rather than stacking.
  */
 
@@ -52,11 +55,10 @@ const SwUpdateToast: React.FC<SwUpdateToastProps> = ({
     onReload,
     onDismiss
 }) => {
-    const { notification } = App.useApp();
     /*
-     * `openedRef` guards against `App.useApp()` returning a fresh
-     * notification API instance across renders (e.g. theme changes) —
-     * we only want to surface the toast once per mount.
+     * `openedRef` guards against React re-invoking the mount effect (e.g.
+     * StrictMode dev double-invoke) — we only want to surface the toast
+     * once per mount.
      */
     const openedRef = React.useRef(false);
 
@@ -103,60 +105,63 @@ const SwUpdateToast: React.FC<SwUpdateToastProps> = ({
     }, [onReload, registration]);
 
     const handleDismiss = React.useCallback(() => {
-        notification.destroy(NOTIFICATION_KEY);
+        message.destroy(NOTIFICATION_KEY);
         onDismiss?.();
-    }, [notification, onDismiss]);
+    }, [onDismiss]);
 
     React.useEffect(() => {
         if (openedRef.current) return;
         openedRef.current = true;
 
-        notification.open({
+        message.info({
             key: NOTIFICATION_KEY,
-            // AntD v6 renames `message` → `title` and `btn` → `actions`.
-            title: microcopy.swUpdate.title,
-            description: (
-                <Typography.Paragraph
-                    style={{ marginBottom: 0 }}
-                    type="secondary"
-                    aria-label={microcopy.swUpdate.ariaLabel}
-                >
-                    {microcopy.swUpdate.description}
-                </Typography.Paragraph>
-            ),
             // Persistent until the user acts — silent staleness is the
             // bug we're fixing, so a quick auto-dismiss would defeat
             // the point.
             duration: 0,
-            placement: "topRight",
-            role: "status",
-            actions: (
-                <Space>
-                    <Button
-                        onClick={() => {
-                            handleReload();
-                            notification.destroy(NOTIFICATION_KEY);
-                            onDismiss?.();
-                        }}
-                        size="small"
-                        type="primary"
-                        icon={<ReloadOutlined aria-hidden />}
+            content: (
+                <div role="status" className="flex flex-col gap-xs">
+                    <Typography.Text strong>
+                        {microcopy.swUpdate.title}
+                    </Typography.Text>
+                    <Typography.Paragraph
+                        type="secondary"
+                        aria-label={microcopy.swUpdate.ariaLabel}
+                        className="mb-0"
                     >
-                        {microcopy.swUpdate.reload}
-                    </Button>
-                    <Button onClick={handleDismiss} size="small" type="text">
-                        {microcopy.swUpdate.dismiss}
-                    </Button>
-                </Space>
+                        {microcopy.swUpdate.description}
+                    </Typography.Paragraph>
+                    <div className="flex gap-xs">
+                        <Button
+                            onClick={() => {
+                                handleReload();
+                                message.destroy(NOTIFICATION_KEY);
+                                onDismiss?.();
+                            }}
+                            size="sm"
+                            variant="primary"
+                        >
+                            <RefreshCw aria-hidden />
+                            {microcopy.swUpdate.reload}
+                        </Button>
+                        <Button
+                            onClick={handleDismiss}
+                            size="sm"
+                            variant="ghost"
+                        >
+                            {microcopy.swUpdate.dismiss}
+                        </Button>
+                    </div>
+                </div>
             )
         });
 
         return () => {
             // Destroy on unmount so stale toasts can't linger after the
             // parent unmounts (e.g. user navigated to an auth route).
-            notification.destroy(NOTIFICATION_KEY);
+            message.destroy(NOTIFICATION_KEY);
         };
-    }, [handleDismiss, handleReload, notification, onDismiss]);
+    }, [handleDismiss, handleReload, onDismiss]);
 
     return null;
 };

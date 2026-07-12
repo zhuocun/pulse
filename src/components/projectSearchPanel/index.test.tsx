@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import ProjectSearchPanel from ".";
 
@@ -18,33 +19,13 @@ const members = [
     })
 ];
 
-const installAntdBrowserMocks = () => {
-    Object.defineProperty(window, "matchMedia", {
-        writable: true,
-        value: (query: string) => ({
-            addEventListener: jest.fn(),
-            addListener: jest.fn(),
-            dispatchEvent: jest.fn(),
-            matches: false,
-            media: query,
-            onchange: null,
-            removeEventListener: jest.fn(),
-            removeListener: jest.fn()
-        })
-    });
-
-    class ResizeObserverMock {
-        observe = jest.fn();
-
-        unobserve = jest.fn();
-
-        disconnect = jest.fn();
-    }
-
-    Object.defineProperty(window, "ResizeObserver", {
-        writable: true,
-        value: ResizeObserverMock
-    });
+const installBrowserMocks = () => {
+    // Radix Select/Tooltip drive their surfaces with pointer-capture and
+    // scroll APIs jsdom doesn't ship; polyfill them so the manager picker
+    // can open.
+    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+    Element.prototype.releasePointerCapture = jest.fn();
 };
 
 const openAdvancedFilters = () => {
@@ -53,7 +34,7 @@ const openAdvancedFilters = () => {
 
 describe("ProjectSearchPanel", () => {
     beforeAll(() => {
-        installAntdBrowserMocks();
+        installBrowserMocks();
     });
 
     it("shows the current project name and updates it from the search input", () => {
@@ -166,15 +147,18 @@ describe("ProjectSearchPanel", () => {
             />
         );
 
+        const menuUser = userEvent.setup();
         openAdvancedFilters();
-        fireEvent.mouseDown(screen.getByRole("combobox"));
+        await menuUser.click(screen.getByRole("combobox"));
 
-        expect(screen.getAllByText("Managers").length).toBeGreaterThanOrEqual(
-            1
-        );
-        expect(await screen.findByText("Alice")).toBeInTheDocument();
+        expect(
+            await screen.findByRole("option", { name: "Managers" })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("option", { name: "Alice" })
+        ).toBeInTheDocument();
 
-        fireEvent.click(await screen.findByText("Bob"));
+        await menuUser.click(screen.getByRole("option", { name: "Bob" }));
 
         expect(setParam).toHaveBeenCalledWith({
             managerId: "u2",
@@ -183,7 +167,7 @@ describe("ProjectSearchPanel", () => {
     });
 
     it("shows the placeholder and loading state while managers load", () => {
-        const { container } = render(
+        render(
             <ProjectSearchPanel
                 loading
                 members={members}
@@ -194,7 +178,7 @@ describe("ProjectSearchPanel", () => {
 
         expect(screen.getByLabelText("Filter by manager")).toBeInTheDocument();
         expect(
-            container.querySelector(".ant-select-loading")
+            screen.getByTestId("project-search-panel-manager-loading")
         ).toBeInTheDocument();
     });
 

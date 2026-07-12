@@ -1,25 +1,15 @@
 import {
-    CheckOutlined,
-    CopyOutlined,
-    EditOutlined,
-    MoreOutlined,
-    PlusOutlined,
-    ReloadOutlined
-} from "@ant-design/icons";
-import {
-    Alert,
-    Button,
-    Grid,
-    Modal,
-    Popover,
-    Select,
-    Skeleton,
-    Space,
-    Tag,
-    Tooltip,
-    Typography
-} from "antd";
-import type { TextAreaRef } from "antd/es/input/TextArea";
+    AlertCircle,
+    AlertTriangle,
+    Check,
+    Copy,
+    Info,
+    MoreHorizontal,
+    Pencil,
+    Plus,
+    RotateCw,
+    X
+} from "lucide-react";
 import {
     startTransition,
     useCallback,
@@ -35,10 +25,41 @@ import {
     QueryClientProvider
 } from "@tanstack/react-query";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger
+} from "@/components/ui/popover";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import useAppMessage from "@/components/ui/toast";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger
+} from "@/components/ui/tooltip";
+import { Text, Title } from "@/components/ui/typography";
+
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import environment from "../../constants/env";
 import { microcopy, microcopyString } from "../../constants/microcopy";
-import { fontSize, fontWeight, radius, space } from "../../theme/tokens";
 import SrOnlyLive from "../../utils/a11y/SrOnlyLive";
 import { formatAgentHealthMessage } from "../../utils/ai/agentHealthCopy";
 import { aiErrorView } from "../../utils/ai/errorTemplate";
@@ -52,7 +73,6 @@ import useAiChat from "../../utils/hooks/useAiChat";
 import useAgentChat from "../../utils/hooks/useAgentChat";
 import useAgentHealth from "../../utils/hooks/useAgentHealth";
 import { useAutonomyLevel } from "../../utils/hooks/useAiEnabled";
-import useAppMessage from "../../utils/hooks/useAppMessage";
 import useChatAgentMetadata from "../../utils/hooks/useChatAgentMetadata";
 import useDelayedFlag from "../../utils/hooks/useDelayedFlag";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
@@ -86,12 +106,51 @@ import {
 import AiSparkleIcon from "../aiSparkleIcon";
 import CitationChip from "../citationChip";
 import CopilotAboutPopover from "../copilotAboutPopover";
+import CopilotChip from "../copilotChip";
 import CopilotPrivacyPopover from "../copilotPrivacyPopover";
 import CopilotRemoteConsentNotice from "../copilotRemoteConsentNotice";
 import MutationProposalCard from "../mutationProposalCard";
 import NudgeCard from "../nudgeCard";
 
-const { Text } = Typography;
+/**
+ * Responsive `md` breakpoint hook — true at ≥768px. SSR/jsdom-safe:
+ * defaults to desktop (`true`) when `matchMedia` is unavailable so server
+ * output and test sandboxes render the wide layout by default.
+ */
+const MD_BREAKPOINT_QUERY = "(min-width: 768px)";
+const useMdUp = (): boolean => {
+    const [mdUp, setMdUp] = useState<boolean>(() => {
+        if (typeof window === "undefined" || !window.matchMedia) return true;
+        return window.matchMedia(MD_BREAKPOINT_QUERY).matches;
+    });
+    useEffect(() => {
+        if (typeof window === "undefined" || !window.matchMedia) return;
+        const mql = window.matchMedia(MD_BREAKPOINT_QUERY);
+        const onChange = () => setMdUp(mql.matches);
+        onChange();
+        mql.addEventListener("change", onChange);
+        return () => mql.removeEventListener("change", onChange);
+    }, []);
+    return mdUp;
+};
+
+/**
+ * Error-template severity → `Alert` variant + composed icon. Mirrors the
+ * `BriefTabBody` helpers so both dock surfaces paint copilot errors the
+ * same way.
+ */
+type ErrorSeverity = "error" | "warning" | "info";
+
+const severityVariant = (
+    severity: ErrorSeverity
+): "destructive" | "warning" | "info" =>
+    severity === "error" ? "destructive" : severity;
+
+const SeverityIcon: React.FC<{ severity: ErrorSeverity }> = ({ severity }) => {
+    if (severity === "error") return <AlertCircle aria-hidden />;
+    if (severity === "warning") return <AlertTriangle aria-hidden />;
+    return <Info aria-hidden />;
+};
 
 interface ChatTurnFeedback {
     /** Index of the assistant message in the visible transcript. */
@@ -308,22 +367,48 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
         });
     }, []);
     const pendingRegenAfter = useRef<number | null>(null);
-    const inputRef = useRef<TextAreaRef | null>(null);
+    const inputRef = useRef<HTMLTextAreaElement | null>(null);
     const historyRestoredForRef = useRef<string | null>(null);
-    const screens = Grid.useBreakpoint();
+    const mdUp = useMdUp();
     const isPhone = useIsPhoneChrome();
     const initialPromptHandled = useRef<string | null>(null);
     const message = useAppMessage();
+    const [newConvoConfirmOpen, setNewConvoConfirmOpen] = useState(false);
+    const [healthAlertDismissed, setHealthAlertDismissed] = useState(false);
+
+    /**
+     * Focus the composer and drop the caret at the end. The composer is a
+     * plain `<textarea>` behind the `ui/textarea` primitive, so move the
+     * selection to the end after focusing.
+     */
+    const focusComposerEnd = useCallback(() => {
+        const el = inputRef.current;
+        if (!el) return;
+        el.focus();
+        const end = el.value.length;
+        try {
+            el.setSelectionRange(end, end);
+        } catch {
+            /* selection APIs are unavailable on some input modes */
+        }
+    }, []);
 
     useEffect(() => {
         if (!surfaceVisible) {
             return;
         }
         const handle = window.setTimeout(() => {
-            inputRef.current?.focus({ cursor: "end" });
+            focusComposerEnd();
         }, 0);
         return () => window.clearTimeout(handle);
-    }, [surfaceVisible]);
+    }, [focusComposerEnd, surfaceVisible]);
+
+    // The health alert mounts/unmounts as the status flips, so re-arm the
+    // dismiss flag whenever the status changes to keep the "a new problem
+    // re-shows the banner" behavior.
+    useEffect(() => {
+        setHealthAlertDismissed(false);
+    }, [healthStatus]);
 
     const chatCtx = useMemo(() => {
         const knownProjectSet = new Set(knownProjectIds);
@@ -529,6 +614,16 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
         setBudgetWarnDismissed(false);
         pendingRegenAfter.current = null;
     }, [reset]);
+
+    // A controlled `Dialog` gates the reset behind a confirmation only when
+    // there's history to lose, otherwise start fresh immediately.
+    const handleNewConversation = useCallback(() => {
+        if (messages.length > 0) {
+            setNewConvoConfirmOpen(true);
+        } else {
+            resetAll();
+        }
+    }, [messages.length, resetAll]);
 
     const dispatch = useCallback(
         (text: string): boolean => {
@@ -845,11 +940,11 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
             return;
         }
 
-        const composer = inputRef.current?.resizableTextArea?.textArea ?? null;
+        const composer = inputRef.current;
         if (composer !== null && document.activeElement === composer) {
-            inputRef.current?.focus({ cursor: "end" });
+            focusComposerEnd();
         }
-    }, [isLoading]);
+    }, [focusComposerEnd, isLoading]);
 
     useEffect(() => {
         if (project?._id && messages.length > 0) {
@@ -866,863 +961,860 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
     );
 
     return (
-        <ChatTabLayout>
-            {isPhone ? (
-                <Space
-                    size={space.xs}
-                    style={{
-                        display: "flex",
-                        justifyContent: "flex-end",
-                        marginBottom: space.xs,
-                        width: "100%"
-                    }}
-                >
-                    <Popover
-                        content={
-                            <Space
-                                direction="vertical"
-                                size={space.sm}
-                                style={{ maxWidth: 280, width: "100%" }}
+        <TooltipProvider>
+            <ChatTabLayout>
+                {isPhone ? (
+                    <div className="mb-xs flex w-full justify-end gap-xs">
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    aria-label={
+                                        microcopy.a11y.boardCopilotSettings
+                                    }
+                                    size="icon"
+                                    variant="ghost"
+                                >
+                                    <MoreHorizontal aria-hidden />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                                align="end"
+                                className="flex w-[280px] max-w-[280px] flex-col gap-sm"
                             >
                                 <Select
-                                    aria-label={microcopyString(
-                                        microcopy.ai.autonomySelectorAriaLabel
-                                    )}
-                                    onChange={(value: AutonomyLevel) =>
-                                        setAutonomyLevel(value)
+                                    onValueChange={(value) =>
+                                        setAutonomyLevel(value as AutonomyLevel)
                                     }
-                                    options={autonomySelectorOptions.map(
-                                        (opt) => ({
-                                            value: opt.value,
-                                            disabled: opt.disabled,
-                                            label: microcopyString(
-                                                microcopy.ai[
-                                                    opt.labelKey as keyof typeof microcopy.ai
-                                                ]
-                                            )
-                                        })
-                                    )}
-                                    size="small"
-                                    style={{ width: "100%" }}
                                     value={autonomyLevel}
-                                />
+                                >
+                                    <SelectTrigger
+                                        aria-label={microcopyString(
+                                            microcopy.ai
+                                                .autonomySelectorAriaLabel
+                                        )}
+                                        className="h-8 w-full"
+                                    >
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {autonomySelectorOptions.map((opt) => (
+                                            <SelectItem
+                                                disabled={opt.disabled}
+                                                key={opt.value}
+                                                value={opt.value}
+                                            >
+                                                {microcopyString(
+                                                    microcopy.ai[
+                                                        opt.labelKey as keyof typeof microcopy.ai
+                                                    ]
+                                                )}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                                 <CopilotAboutPopover />
                                 <CopilotPrivacyPopover route="chat" />
-                            </Space>
-                        }
-                        placement="bottomRight"
-                        trigger={["click"]}
-                    >
-                        <Button
-                            aria-label={microcopy.a11y.boardCopilotSettings}
-                            icon={<MoreOutlined aria-hidden />}
-                            size="small"
-                            type="text"
-                        />
-                    </Popover>
-                    <Button
-                        aria-label={microcopy.ai.newConversation}
-                        disabled={messages.length === 0 || isLoading}
-                        icon={<PlusOutlined aria-hidden />}
-                        onClick={() => {
-                            if (messages.length > 0) {
-                                Modal.confirm({
-                                    content:
-                                        microcopy.ai.newConversationConfirm,
-                                    onOk: resetAll
-                                });
-                            } else {
-                                resetAll();
-                            }
-                        }}
-                        size="small"
-                        type="text"
-                    />
-                </Space>
-            ) : (
-                <Space
-                    size={space.xs}
-                    style={{
-                        display: "flex",
-                        flexWrap: "wrap",
-                        justifyContent: "flex-end",
-                        marginBottom: space.xs
-                    }}
-                >
-                    <Select
-                        aria-label={microcopyString(
-                            microcopy.ai.autonomySelectorAriaLabel
-                        )}
-                        onChange={(value: AutonomyLevel) =>
-                            setAutonomyLevel(value)
-                        }
-                        options={autonomySelectorOptions.map((opt) => {
-                            const labelText = microcopyString(
-                                microcopy.ai[
-                                    opt.labelKey as keyof typeof microcopy.ai
-                                ]
-                            );
-                            const tooltip = opt.disabledTooltipKey
-                                ? microcopyString(
-                                      microcopy.ai[
-                                          opt.disabledTooltipKey as keyof typeof microcopy.ai
-                                      ]
-                                  )
-                                : undefined;
-                            return {
-                                value: opt.value,
-                                disabled: opt.disabled,
-                                title: opt.disabled ? tooltip : undefined,
-                                label: opt.disabled ? (
-                                    <Tooltip placement="left" title={tooltip}>
-                                        <span
-                                            data-testid={`autonomy-option-${opt.value}`}
-                                        >
-                                            {labelText}
-                                        </span>
-                                    </Tooltip>
-                                ) : (
-                                    labelText
-                                )
-                            };
-                        })}
-                        size="small"
-                        style={{ minWidth: 90 }}
-                        value={autonomyLevel}
-                    />
-                    <CopilotAboutPopover />
-                    {screens.md && <CopilotPrivacyPopover route="chat" />}
-                    <Tooltip
-                        title={
-                            !screens.md
-                                ? microcopy.ai.newConversation
-                                : undefined
-                        }
-                    >
+                            </PopoverContent>
+                        </Popover>
                         <Button
                             aria-label={microcopy.ai.newConversation}
                             disabled={messages.length === 0 || isLoading}
-                            icon={
-                                !screens.md ? (
-                                    <PlusOutlined aria-hidden />
-                                ) : undefined
-                            }
-                            onClick={() => {
-                                if (messages.length > 0) {
-                                    Modal.confirm({
-                                        content:
-                                            microcopy.ai.newConversationConfirm,
-                                        onOk: resetAll
-                                    });
-                                } else {
-                                    resetAll();
-                                }
-                            }}
-                            size="small"
-                            type="link"
+                            onClick={handleNewConversation}
+                            size="icon"
+                            variant="ghost"
                         >
-                            {screens.md ? microcopy.ai.newConversation : null}
+                            <Plus aria-hidden />
                         </Button>
-                    </Tooltip>
-                </Space>
-            )}
-            <CopilotRemoteConsentNotice route="chat" />
-            {/* Inline health status alert */}
-            {remoteHealthActive &&
-                health.lastChecked !== null &&
-                (healthStatus === "degraded" || healthStatus === "offline") && (
-                    <Alert
-                        closable={healthStatus === "degraded"}
-                        message={formatAgentHealthMessage(health)}
-                        showIcon
-                        style={{ marginBottom: space.sm }}
-                        type={healthStatus === "offline" ? "error" : "warning"}
-                    />
+                    </div>
+                ) : (
+                    <div className="mb-xs flex flex-wrap justify-end gap-xs">
+                        <Select
+                            onValueChange={(value) =>
+                                setAutonomyLevel(value as AutonomyLevel)
+                            }
+                            value={autonomyLevel}
+                        >
+                            <SelectTrigger
+                                aria-label={microcopyString(
+                                    microcopy.ai.autonomySelectorAriaLabel
+                                )}
+                                className="h-8 min-w-[90px]"
+                            >
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {autonomySelectorOptions.map((opt) => {
+                                    const labelText = microcopyString(
+                                        microcopy.ai[
+                                            opt.labelKey as keyof typeof microcopy.ai
+                                        ]
+                                    );
+                                    const tooltip = opt.disabledTooltipKey
+                                        ? microcopyString(
+                                              microcopy.ai[
+                                                  opt.disabledTooltipKey as keyof typeof microcopy.ai
+                                              ]
+                                          )
+                                        : undefined;
+                                    return (
+                                        <SelectItem
+                                            disabled={opt.disabled}
+                                            key={opt.value}
+                                            title={
+                                                opt.disabled
+                                                    ? tooltip
+                                                    : undefined
+                                            }
+                                            value={opt.value}
+                                        >
+                                            {opt.disabled ? (
+                                                <span
+                                                    data-testid={`autonomy-option-${opt.value}`}
+                                                >
+                                                    {labelText}
+                                                </span>
+                                            ) : (
+                                                labelText
+                                            )}
+                                        </SelectItem>
+                                    );
+                                })}
+                            </SelectContent>
+                        </Select>
+                        <CopilotAboutPopover />
+                        {mdUp && <CopilotPrivacyPopover route="chat" />}
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    aria-label={microcopy.ai.newConversation}
+                                    disabled={
+                                        messages.length === 0 || isLoading
+                                    }
+                                    onClick={handleNewConversation}
+                                    size={mdUp ? "sm" : "icon"}
+                                    variant="link"
+                                >
+                                    {mdUp ? (
+                                        microcopy.ai.newConversation
+                                    ) : (
+                                        <Plus aria-hidden />
+                                    )}
+                                </Button>
+                            </TooltipTrigger>
+                            {!mdUp && (
+                                <TooltipContent>
+                                    {microcopy.ai.newConversation}
+                                </TooltipContent>
+                            )}
+                        </Tooltip>
+                    </div>
                 )}
-            <SrOnlyLive>{completionAnnouncement}</SrOnlyLive>
-            <SrOnlyLive aria-atomic={false}>{streamingAnnouncement}</SrOnlyLive>
-            <div
-                style={{ flex: "1 1 auto", minHeight: 0, position: "relative" }}
-            >
-                {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Escape refocuses composer from scroll container */}
+                <Dialog
+                    onOpenChange={setNewConvoConfirmOpen}
+                    open={newConvoConfirmOpen}
+                >
+                    <DialogContent className="max-w-sm">
+                        <DialogHeader>
+                            <DialogTitle>
+                                {microcopy.ai.newConversation}
+                            </DialogTitle>
+                            <DialogDescription>
+                                {microcopy.ai.newConversationConfirm}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button
+                                onClick={() => setNewConvoConfirmOpen(false)}
+                                variant="default"
+                            >
+                                {microcopy.actions.cancel}
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    resetAll();
+                                    setNewConvoConfirmOpen(false);
+                                }}
+                                variant="primary"
+                            >
+                                {microcopy.ai.startNew}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+                <CopilotRemoteConsentNotice route="chat" />
+                {/* Inline health status alert */}
+                {remoteHealthActive &&
+                    health.lastChecked !== null &&
+                    (healthStatus === "degraded" ||
+                        healthStatus === "offline") &&
+                    !(healthStatus === "degraded" && healthAlertDismissed) && (
+                        <Alert
+                            className="relative mb-sm"
+                            variant={
+                                healthStatus === "offline"
+                                    ? "destructive"
+                                    : "warning"
+                            }
+                        >
+                            {healthStatus === "offline" ? (
+                                <AlertCircle aria-hidden />
+                            ) : (
+                                <AlertTriangle aria-hidden />
+                            )}
+                            <AlertTitle>
+                                {formatAgentHealthMessage(health)}
+                            </AlertTitle>
+                            {healthStatus === "degraded" && (
+                                <Button
+                                    aria-label={microcopy.actions.close}
+                                    className="absolute right-xs top-xs size-6"
+                                    onClick={() =>
+                                        setHealthAlertDismissed(true)
+                                    }
+                                    size="icon"
+                                    variant="ghost"
+                                >
+                                    <X aria-hidden />
+                                </Button>
+                            )}
+                        </Alert>
+                    )}
+                <SrOnlyLive>{completionAnnouncement}</SrOnlyLive>
+                <SrOnlyLive aria-atomic={false}>
+                    {streamingAnnouncement}
+                </SrOnlyLive>
                 <div
-                    aria-busy={isLoading}
-                    onKeyDown={(e) => {
-                        if (e.key === "Escape") {
-                            inputRef.current?.focus({ cursor: "end" });
-                        }
-                    }}
-                    onScroll={() => {
-                        const el = messagesContainerRef.current;
-                        if (!el) return;
-                        const atBottom =
-                            el.scrollTop >=
-                            el.scrollHeight - el.clientHeight - 100;
-                        if (isLoading && !atBottom) {
-                            setShowScrollFab(true);
-                        } else {
-                            setShowScrollFab(false);
-                        }
-                    }}
-                    ref={messagesContainerRef}
                     style={{
-                        height: "100%",
-                        marginBottom: space.sm,
-                        overflowY: "auto",
-                        overscrollBehavior: "contain"
+                        flex: "1 1 auto",
+                        minHeight: 0,
+                        position: "relative"
                     }}
                 >
-                    {approxTokenCount >= BUDGET_CRITICAL_THRESHOLD ? (
-                        <Alert
-                            action={
-                                <Button
-                                    onClick={resetAll}
-                                    size="small"
-                                    type="link"
-                                >
-                                    {microcopy.ai.startNew}
-                                </Button>
+                    {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Escape refocuses composer from scroll container */}
+                    <div
+                        aria-busy={isLoading}
+                        onKeyDown={(e) => {
+                            if (e.key === "Escape") {
+                                focusComposerEnd();
                             }
-                            closable={false}
-                            message={microcopy.ai.conversationTooLong}
-                            showIcon
-                            style={{ marginBottom: space.sm }}
-                            type="error"
-                        />
-                    ) : approxTokenCount >= BUDGET_WARN_THRESHOLD &&
-                      !budgetWarnDismissed ? (
-                        <Alert
-                            closable
-                            message={microcopy.ai.conversationLongWarning}
-                            onClose={() => setBudgetWarnDismissed(true)}
-                            showIcon
-                            style={{ marginBottom: space.sm }}
-                            type="warning"
-                        />
-                    ) : null}
-                    {messages.length === 0 && !isLoading && (
-                        <Space
-                            size={space.sm}
-                            style={{ width: "100%", flexDirection: "column" }}
-                        >
-                            <Text type="secondary">
-                                {microcopy.ai.emptyChatLead}
-                            </Text>
-                            <Space size={space.xs} wrap>
-                                {microcopy.ai.chatSuggestions.map((prompt) => (
-                                    <SamplePrompt
-                                        aria-label={microcopy.a11y.trySamplePrompt.replace(
-                                            "{prompt}",
-                                            prompt
-                                        )}
-                                        checked={false}
-                                        key={prompt}
-                                        onChange={() => dispatch(prompt)}
-                                    >
-                                        {prompt}
-                                    </SamplePrompt>
-                                ))}
-                            </Space>
-                            <Text
-                                type="secondary"
-                                style={{ fontSize: fontSize.xs }}
-                            >
-                                {microcopy.ai.sessionNotSaved}
-                            </Text>
-                        </Space>
-                    )}
-                    {messages.map((m, index) => {
-                        if (
-                            m.role === "assistant" &&
-                            !m.content.trim() &&
-                            (m.toolCalls?.length ?? 0) > 0
-                        ) {
-                            return null;
-                        }
-                        if (m.role === "tool") {
-                            const toolPayloadOpen =
-                                expandedToolIndices.has(index);
-                            const timeMs = messageTimeAt(index);
-                            const toggleId = `chat-tool-toggle-${index}`;
-                            const panelId = `chat-tool-payload-${index}`;
-                            return (
-                                <MessageRow
-                                    $isUser={false}
-                                    key={`tool-${m.toolCallId ?? index}`}
-                                >
-                                    <Text
-                                        type="secondary"
-                                        style={{
-                                            display: "block",
-                                            fontSize: fontSize.xs,
-                                            marginBottom: 2
-                                        }}
-                                    >
-                                        <time
-                                            data-testid="tool-message-time"
-                                            dateTime={new Date(
-                                                timeMs
-                                            ).toISOString()}
-                                        >
-                                            {formatClock(timeMs)}
-                                        </time>
-                                    </Text>
-                                    <ToolPayloadPanel data-testid="chat-tool-payload-block">
-                                        <div>
-                                            {`${humanizeTool(m.toolName)} · ${summarizeToolBody(m.content)}`}
-                                        </div>
-                                        <Button
-                                            aria-controls={panelId}
-                                            aria-expanded={toolPayloadOpen}
-                                            id={toggleId}
-                                            onClick={() =>
-                                                toggleToolPayload(index)
-                                            }
-                                            size="small"
-                                            type="link"
-                                        >
-                                            {toolPayloadOpen
-                                                ? microcopyString(
-                                                      microcopy.ai
-                                                          .toolDetailsHide
-                                                  )
-                                                : microcopyString(
-                                                      microcopy.ai
-                                                          .toolDetailsToggle
-                                                  )}
-                                        </Button>
-                                        {toolPayloadOpen ? (
-                                            <pre
-                                                aria-labelledby={toggleId}
-                                                id={panelId}
-                                                role="region"
-                                                style={{
-                                                    fontSize: fontSize.xs - 1,
-                                                    margin: `${space.xxs}px 0 0`,
-                                                    whiteSpace: "pre-wrap",
-                                                    wordBreak: "break-word"
-                                                }}
-                                            >
-                                                {m.content}
-                                            </pre>
-                                        ) : null}
-                                    </ToolPayloadPanel>
-                                </MessageRow>
-                            );
-                        }
-                        const isUser = m.role === "user";
-                        const isAssistant = m.role === "assistant";
-                        const turnFeedback = feedback.find(
-                            (entry) => entry.index === index
-                        );
-                        const isRegenerated =
-                            isAssistant && regeneratedIndices.has(index);
-                        const groupAriaLabel = isAssistant
-                            ? isRegenerated
-                                ? `${microcopy.ai.copilotLabel} · ${microcopy.ai.regeneratedBadge}`
-                                : microcopy.ai.copilotLabel
-                            : undefined;
-                        const wordCount = m.content
-                            .split(/\s+/)
-                            .filter(Boolean).length;
-                        const isProseLong =
-                            isAssistant &&
-                            wordCount > 300 &&
-                            !/^[#\-*]/.test(m.content.trim());
-                        const isExpanded = expandedMessages.has(index);
-                        const renderMarkdown = (
-                            text: string
-                        ): React.ReactNode => {
-                            const lines = text.split("\n");
-                            return lines.map((line, li) => {
-                                if (/^### /.test(line)) {
-                                    return (
-                                        <Typography.Title
-                                            key={li}
-                                            level={3}
-                                            style={{
-                                                fontSize: fontSize.sm,
-                                                fontWeight: fontWeight.semibold,
-                                                margin: `${space.xs}px 0 ${space.xxs}px`
-                                            }}
-                                        >
-                                            {line.replace(/^### /, "")}
-                                        </Typography.Title>
-                                    );
-                                }
-                                if (/^## /.test(line)) {
-                                    return (
-                                        <Typography.Title
-                                            key={li}
-                                            level={3}
-                                            style={{
-                                                fontSize: fontSize.sm,
-                                                fontWeight: fontWeight.semibold,
-                                                margin: `${space.xs}px 0 ${space.xxs}px`
-                                            }}
-                                        >
-                                            {line.replace(/^## /, "")}
-                                        </Typography.Title>
-                                    );
-                                }
-                                if (/^# /.test(line)) {
-                                    return (
-                                        <Typography.Title
-                                            key={li}
-                                            level={3}
-                                            style={{
-                                                fontSize: fontSize.sm,
-                                                fontWeight: fontWeight.semibold,
-                                                margin: `${space.xs}px 0 ${space.xxs}px`
-                                            }}
-                                        >
-                                            {line.replace(/^# /, "")}
-                                        </Typography.Title>
-                                    );
-                                }
-                                const parts: React.ReactNode[] = [];
-                                let remaining = line;
-                                let key = 0;
-                                while (remaining.length > 0) {
-                                    const boldMatch =
-                                        remaining.match(/^(.*?)\*\*(.*?)\*\*/);
-                                    const italicMatch =
-                                        remaining.match(/^(.*?)\*(.*?)\*/);
-                                    const codeMatch =
-                                        remaining.match(/^(.*?)`([^`]+)`/);
-                                    const firstBold = boldMatch
-                                        ? boldMatch.index! + boldMatch[1].length
-                                        : Infinity;
-                                    const firstItalic = italicMatch
-                                        ? italicMatch.index! +
-                                          italicMatch[1].length
-                                        : Infinity;
-                                    const firstCode = codeMatch
-                                        ? codeMatch.index! + codeMatch[1].length
-                                        : Infinity;
-                                    if (
-                                        boldMatch &&
-                                        firstBold <= firstItalic &&
-                                        firstBold <= firstCode
-                                    ) {
-                                        if (boldMatch[1])
-                                            parts.push(boldMatch[1]);
-                                        parts.push(
-                                            <strong key={key++}>
-                                                {boldMatch[2]}
-                                            </strong>
-                                        );
-                                        remaining = remaining.slice(
-                                            boldMatch[0].length
-                                        );
-                                    } else if (
-                                        italicMatch &&
-                                        firstItalic <= firstCode
-                                    ) {
-                                        if (italicMatch[1])
-                                            parts.push(italicMatch[1]);
-                                        parts.push(
-                                            <em key={key++}>
-                                                {italicMatch[2]}
-                                            </em>
-                                        );
-                                        remaining = remaining.slice(
-                                            italicMatch[0].length
-                                        );
-                                    } else if (codeMatch) {
-                                        if (codeMatch[1])
-                                            parts.push(codeMatch[1]);
-                                        parts.push(
-                                            <code
-                                                key={key++}
-                                                style={{
-                                                    background:
-                                                        "var(--ant-color-fill-secondary)",
-                                                    borderRadius: radius.sm,
-                                                    fontSize: "0.9em",
-                                                    padding: "1px 4px"
-                                                }}
-                                            >
-                                                {codeMatch[2]}
-                                            </code>
-                                        );
-                                        remaining = remaining.slice(
-                                            codeMatch[0].length
-                                        );
-                                    } else {
-                                        parts.push(remaining);
-                                        remaining = "";
-                                    }
-                                }
-                                return (
-                                    <span key={li}>
-                                        {parts}
-                                        {li < lines.length - 1 && <br />}
-                                    </span>
-                                );
-                            });
-                        };
-                        return (
-                            <MessageRow
-                                $isUser={isUser}
-                                key={`msg-${index}`}
-                                aria-label={groupAriaLabel}
-                                ref={
-                                    isAssistant && index === lastAssistantIndex
-                                        ? lastAssistantRef
-                                        : undefined
-                                }
-                                role={isAssistant ? "group" : undefined}
-                                tabIndex={
-                                    isAssistant && index === lastAssistantIndex
-                                        ? -1
-                                        : undefined
-                                }
-                            >
-                                {isUser && (
-                                    <Text
-                                        type="secondary"
-                                        style={{
-                                            display: "block",
-                                            fontSize: fontSize.xs,
-                                            marginBottom: 2,
-                                            maxWidth: "min(100%, 36rem)",
-                                            textAlign: "right",
-                                            width: "100%"
-                                        }}
-                                    >
-                                        <time
-                                            data-testid="user-message-time"
-                                            dateTime={new Date(
-                                                messageTimeAt(index)
-                                            ).toISOString()}
-                                        >
-                                            {formatClock(messageTimeAt(index))}
-                                        </time>
-                                    </Text>
-                                )}
-                                {isAssistant && (
-                                    <AssistantAttribution>
-                                        <span
-                                            style={{
-                                                alignItems: "center",
-                                                display: "inline-flex",
-                                                flexWrap: "wrap",
-                                                gap: 4
-                                            }}
-                                        >
-                                            <AiSparkleIcon aria-hidden />
-                                            <span>
-                                                {microcopy.ai.copilotLabel}
-                                            </span>
-                                            {isRegenerated && (
-                                                <Tooltip
-                                                    title={
-                                                        microcopy.ai
-                                                            .regeneratedTooltip
-                                                    }
-                                                >
-                                                    <Tag
-                                                        color="purple"
-                                                        style={{
-                                                            marginInlineStart: 4,
-                                                            marginInlineEnd: 0
-                                                        }}
-                                                    >
-                                                        <ReloadOutlined
-                                                            aria-hidden
-                                                            style={{
-                                                                fontSize:
-                                                                    fontSize.xs -
-                                                                    1,
-                                                                marginInlineEnd: 4
-                                                            }}
-                                                        />
-                                                        {
-                                                            microcopy.ai
-                                                                .regeneratedBadge
-                                                        }
-                                                    </Tag>
-                                                </Tooltip>
-                                            )}
-                                        </span>
-                                        <time
-                                            data-testid="assistant-message-time"
-                                            dateTime={new Date(
-                                                messageTimeAt(index)
-                                            ).toISOString()}
-                                            style={{
-                                                fontVariantNumeric:
-                                                    "tabular-nums",
-                                                marginInlineStart: "auto",
-                                                whiteSpace: "nowrap"
-                                            }}
-                                        >
-                                            {formatClock(messageTimeAt(index))}
-                                        </time>
-                                    </AssistantAttribution>
-                                )}
-                                {isUser && !isLoading && (
+                        }}
+                        onScroll={() => {
+                            const el = messagesContainerRef.current;
+                            if (!el) return;
+                            const atBottom =
+                                el.scrollTop >=
+                                el.scrollHeight - el.clientHeight - 100;
+                            if (isLoading && !atBottom) {
+                                setShowScrollFab(true);
+                            } else {
+                                setShowScrollFab(false);
+                            }
+                        }}
+                        className="mb-sm"
+                        ref={messagesContainerRef}
+                        style={{
+                            height: "100%",
+                            overflowY: "auto",
+                            overscrollBehavior: "contain"
+                        }}
+                    >
+                        {approxTokenCount >= BUDGET_CRITICAL_THRESHOLD ? (
+                            <Alert className="mb-sm" variant="destructive">
+                                <AlertCircle aria-hidden />
+                                <AlertTitle>
+                                    {microcopy.ai.conversationTooLong}
+                                </AlertTitle>
+                                <AlertDescription>
                                     <Button
-                                        aria-label={microcopy.a11y.editMessage}
-                                        icon={<EditOutlined aria-hidden />}
-                                        onClick={() => {
-                                            setInput(m.content);
-                                            inputRef.current?.focus({
-                                                cursor: "end"
-                                            });
-                                        }}
-                                        size="small"
-                                        type="text"
-                                    />
-                                )}
-                                <MessageBubble $isUser={isUser}>
-                                    {isAssistant ? (
-                                        isProseLong && !isExpanded ? (
-                                            <>
-                                                {renderMarkdown(
-                                                    m.content
-                                                        .split(/\s+/)
-                                                        .slice(0, 150)
-                                                        .join(" ")
+                                        className="h-auto p-0"
+                                        onClick={resetAll}
+                                        size="sm"
+                                        variant="link"
+                                    >
+                                        {microcopy.ai.startNew}
+                                    </Button>
+                                </AlertDescription>
+                            </Alert>
+                        ) : approxTokenCount >= BUDGET_WARN_THRESHOLD &&
+                          !budgetWarnDismissed ? (
+                            <Alert className="relative mb-sm" variant="warning">
+                                <AlertTriangle aria-hidden />
+                                <AlertTitle>
+                                    {microcopy.ai.conversationLongWarning}
+                                </AlertTitle>
+                                <Button
+                                    aria-label={microcopy.actions.close}
+                                    className="absolute right-xs top-xs size-6"
+                                    onClick={() => setBudgetWarnDismissed(true)}
+                                    size="icon"
+                                    variant="ghost"
+                                >
+                                    <X aria-hidden />
+                                </Button>
+                            </Alert>
+                        ) : null}
+                        {messages.length === 0 && !isLoading && (
+                            <div className="flex w-full flex-col gap-sm">
+                                <Text type="secondary">
+                                    {microcopy.ai.emptyChatLead}
+                                </Text>
+                                <div className="flex flex-wrap gap-xs">
+                                    {microcopy.ai.chatSuggestions.map(
+                                        (prompt) => (
+                                            <SamplePrompt
+                                                aria-label={microcopy.a11y.trySamplePrompt.replace(
+                                                    "{prompt}",
+                                                    prompt
                                                 )}
-                                                <Button
-                                                    onClick={() =>
-                                                        setExpandedMessages(
-                                                            (prev) => {
-                                                                const next =
-                                                                    new Set(
-                                                                        prev
-                                                                    );
-                                                                next.add(index);
-                                                                return next;
-                                                            }
-                                                        )
-                                                    }
-                                                    size="small"
-                                                    style={{
-                                                        display: "block",
-                                                        marginTop: space.xxs
-                                                    }}
-                                                    type="link"
-                                                >
-                                                    {
-                                                        microcopy.ai
-                                                            .showFullResponse
-                                                    }
-                                                </Button>
-                                            </>
-                                        ) : (
-                                            renderMarkdown(m.content)
+                                                checked={false}
+                                                key={prompt}
+                                                onChange={() =>
+                                                    dispatch(prompt)
+                                                }
+                                            >
+                                                {prompt}
+                                            </SamplePrompt>
                                         )
-                                    ) : (
-                                        m.content
                                     )}
-                                    {isAssistant &&
-                                        m.citations &&
-                                        m.citations.length > 0 &&
-                                        (() => {
-                                            const all = m.citations;
-                                            const citationsExpanded =
-                                                expandedCitations.has(index);
-                                            const showAll =
-                                                citationsExpanded ||
-                                                all.length <=
-                                                    CITATION_INLINE_LIMIT;
-                                            const visible = showAll
-                                                ? all
-                                                : all.slice(
-                                                      0,
-                                                      CITATION_INLINE_LIMIT
-                                                  );
-                                            const overflow =
-                                                all.length - visible.length;
-                                            return (
-                                                <span
-                                                    style={{
-                                                        display: "inline-block",
-                                                        marginInlineStart: 6
-                                                    }}
-                                                >
-                                                    {visible.map(
-                                                        (citation, idx) => (
-                                                            <CitationChip
-                                                                citation={
-                                                                    citation
-                                                                }
-                                                                index={idx + 1}
-                                                                key={`${citation.source}-${citation.id}-${idx}`}
-                                                            />
-                                                        )
-                                                    )}
-                                                    {overflow > 0 && (
-                                                        <Button
-                                                            aria-label={microcopy.a11y.showAllSources.replace(
-                                                                "{count}",
-                                                                String(
-                                                                    all.length
-                                                                )
-                                                            )}
-                                                            onClick={(
-                                                                event
-                                                            ) => {
-                                                                event.stopPropagation();
-                                                                expandCitations(
-                                                                    index
-                                                                );
-                                                            }}
-                                                            size="small"
-                                                            style={{
-                                                                color: "var(--color-copilot-badge, #EA580C)",
-                                                                fontSize:
-                                                                    fontSize.xs,
-                                                                height: "auto",
-                                                                marginInlineStart: 4,
-                                                                paddingInline: 0,
-                                                                verticalAlign:
-                                                                    "super"
-                                                            }}
-                                                            type="link"
-                                                        >
-                                                            {microcopy.ai.moreSources.replace(
-                                                                "{count}",
-                                                                String(overflow)
-                                                            )}
-                                                        </Button>
-                                                    )}
-                                                </span>
-                                            );
-                                        })()}
-                                </MessageBubble>
-                                {isAssistant &&
-                                    m.citations?.length === 0 &&
-                                    !assistantHadToolStep(index) && (
-                                        <Typography.Text
-                                            style={{
-                                                color: "var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65))",
-                                                display: "block",
-                                                fontSize: fontSize.sm,
-                                                fontWeight: fontWeight.medium,
-                                                marginTop: 2
-                                            }}
+                                </div>
+                                <Text className="text-xs" type="secondary">
+                                    {microcopy.ai.sessionNotSaved}
+                                </Text>
+                            </div>
+                        )}
+                        {messages.map((m, index) => {
+                            if (
+                                m.role === "assistant" &&
+                                !m.content.trim() &&
+                                (m.toolCalls?.length ?? 0) > 0
+                            ) {
+                                return null;
+                            }
+                            if (m.role === "tool") {
+                                const toolPayloadOpen =
+                                    expandedToolIndices.has(index);
+                                const timeMs = messageTimeAt(index);
+                                const toggleId = `chat-tool-toggle-${index}`;
+                                const panelId = `chat-tool-payload-${index}`;
+                                return (
+                                    <MessageRow
+                                        $isUser={false}
+                                        key={`tool-${m.toolCallId ?? index}`}
+                                    >
+                                        <Text
+                                            className="mb-[2px] block text-xs"
                                             type="secondary"
                                         >
-                                            {microcopy.ai.chatNoSourcesCaveat}
-                                        </Typography.Text>
+                                            <time
+                                                data-testid="tool-message-time"
+                                                dateTime={new Date(
+                                                    timeMs
+                                                ).toISOString()}
+                                            >
+                                                {formatClock(timeMs)}
+                                            </time>
+                                        </Text>
+                                        <ToolPayloadPanel data-testid="chat-tool-payload-block">
+                                            <div>
+                                                {`${humanizeTool(m.toolName)} · ${summarizeToolBody(m.content)}`}
+                                            </div>
+                                            <Button
+                                                aria-controls={panelId}
+                                                aria-expanded={toolPayloadOpen}
+                                                className="h-auto p-0"
+                                                id={toggleId}
+                                                onClick={() =>
+                                                    toggleToolPayload(index)
+                                                }
+                                                size="sm"
+                                                variant="link"
+                                            >
+                                                {toolPayloadOpen
+                                                    ? microcopyString(
+                                                          microcopy.ai
+                                                              .toolDetailsHide
+                                                      )
+                                                    : microcopyString(
+                                                          microcopy.ai
+                                                              .toolDetailsToggle
+                                                      )}
+                                            </Button>
+                                            {toolPayloadOpen ? (
+                                                <pre
+                                                    aria-labelledby={toggleId}
+                                                    className="mb-0 mt-xxs whitespace-pre-wrap break-words text-[11px]"
+                                                    id={panelId}
+                                                    role="region"
+                                                >
+                                                    {m.content}
+                                                </pre>
+                                            ) : null}
+                                        </ToolPayloadPanel>
+                                    </MessageRow>
+                                );
+                            }
+                            const isUser = m.role === "user";
+                            const isAssistant = m.role === "assistant";
+                            const turnFeedback = feedback.find(
+                                (entry) => entry.index === index
+                            );
+                            const isRegenerated =
+                                isAssistant && regeneratedIndices.has(index);
+                            const groupAriaLabel = isAssistant
+                                ? isRegenerated
+                                    ? `${microcopy.ai.copilotLabel} · ${microcopy.ai.regeneratedBadge}`
+                                    : microcopy.ai.copilotLabel
+                                : undefined;
+                            const wordCount = m.content
+                                .split(/\s+/)
+                                .filter(Boolean).length;
+                            const isProseLong =
+                                isAssistant &&
+                                wordCount > 300 &&
+                                !/^[#\-*]/.test(m.content.trim());
+                            const isExpanded = expandedMessages.has(index);
+                            const renderMarkdown = (
+                                text: string
+                            ): React.ReactNode => {
+                                const lines = text.split("\n");
+                                return lines.map((line, li) => {
+                                    if (/^### /.test(line)) {
+                                        return (
+                                            <Title
+                                                className="mb-xxs mt-xs text-sm font-semibold"
+                                                key={li}
+                                                level={3}
+                                            >
+                                                {line.replace(/^### /, "")}
+                                            </Title>
+                                        );
+                                    }
+                                    if (/^## /.test(line)) {
+                                        return (
+                                            <Title
+                                                className="mb-xxs mt-xs text-sm font-semibold"
+                                                key={li}
+                                                level={3}
+                                            >
+                                                {line.replace(/^## /, "")}
+                                            </Title>
+                                        );
+                                    }
+                                    if (/^# /.test(line)) {
+                                        return (
+                                            <Title
+                                                className="mb-xxs mt-xs text-sm font-semibold"
+                                                key={li}
+                                                level={3}
+                                            >
+                                                {line.replace(/^# /, "")}
+                                            </Title>
+                                        );
+                                    }
+                                    const parts: React.ReactNode[] = [];
+                                    let remaining = line;
+                                    let key = 0;
+                                    while (remaining.length > 0) {
+                                        const boldMatch =
+                                            remaining.match(
+                                                /^(.*?)\*\*(.*?)\*\*/
+                                            );
+                                        const italicMatch =
+                                            remaining.match(/^(.*?)\*(.*?)\*/);
+                                        const codeMatch =
+                                            remaining.match(/^(.*?)`([^`]+)`/);
+                                        const firstBold = boldMatch
+                                            ? boldMatch.index! +
+                                              boldMatch[1].length
+                                            : Infinity;
+                                        const firstItalic = italicMatch
+                                            ? italicMatch.index! +
+                                              italicMatch[1].length
+                                            : Infinity;
+                                        const firstCode = codeMatch
+                                            ? codeMatch.index! +
+                                              codeMatch[1].length
+                                            : Infinity;
+                                        if (
+                                            boldMatch &&
+                                            firstBold <= firstItalic &&
+                                            firstBold <= firstCode
+                                        ) {
+                                            if (boldMatch[1])
+                                                parts.push(boldMatch[1]);
+                                            parts.push(
+                                                <strong key={key++}>
+                                                    {boldMatch[2]}
+                                                </strong>
+                                            );
+                                            remaining = remaining.slice(
+                                                boldMatch[0].length
+                                            );
+                                        } else if (
+                                            italicMatch &&
+                                            firstItalic <= firstCode
+                                        ) {
+                                            if (italicMatch[1])
+                                                parts.push(italicMatch[1]);
+                                            parts.push(
+                                                <em key={key++}>
+                                                    {italicMatch[2]}
+                                                </em>
+                                            );
+                                            remaining = remaining.slice(
+                                                italicMatch[0].length
+                                            );
+                                        } else if (codeMatch) {
+                                            if (codeMatch[1])
+                                                parts.push(codeMatch[1]);
+                                            parts.push(
+                                                <code
+                                                    className="rounded-sm bg-muted px-[4px] py-[1px] text-[0.9em]"
+                                                    key={key++}
+                                                >
+                                                    {codeMatch[2]}
+                                                </code>
+                                            );
+                                            remaining = remaining.slice(
+                                                codeMatch[0].length
+                                            );
+                                        } else {
+                                            parts.push(remaining);
+                                            remaining = "";
+                                        }
+                                    }
+                                    return (
+                                        <span key={li}>
+                                            {parts}
+                                            {li < lines.length - 1 && <br />}
+                                        </span>
+                                    );
+                                });
+                            };
+                            return (
+                                <MessageRow
+                                    $isUser={isUser}
+                                    key={`msg-${index}`}
+                                    aria-label={groupAriaLabel}
+                                    ref={
+                                        isAssistant &&
+                                        index === lastAssistantIndex
+                                            ? lastAssistantRef
+                                            : undefined
+                                    }
+                                    role={isAssistant ? "group" : undefined}
+                                    tabIndex={
+                                        isAssistant &&
+                                        index === lastAssistantIndex
+                                            ? -1
+                                            : undefined
+                                    }
+                                >
+                                    {isUser && (
+                                        <Text
+                                            className="mb-[2px] block w-full max-w-[min(100%,36rem)] text-right text-xs"
+                                            type="secondary"
+                                        >
+                                            <time
+                                                data-testid="user-message-time"
+                                                dateTime={new Date(
+                                                    messageTimeAt(index)
+                                                ).toISOString()}
+                                            >
+                                                {formatClock(
+                                                    messageTimeAt(index)
+                                                )}
+                                            </time>
+                                        </Text>
                                     )}
-                                {isAssistant && (
-                                    <AssistantDisclaimer>
-                                        {microcopy.a11y.aiBadge}
-                                    </AssistantDisclaimer>
-                                )}
-                                {isAssistant && !isLoading && (
-                                    <AssistantActionRow data-testid="assistant-action-row">
+                                    {isAssistant && (
+                                        <AssistantAttribution>
+                                            <span className="inline-flex flex-wrap items-center gap-[4px]">
+                                                <AiSparkleIcon aria-hidden />
+                                                <span>
+                                                    {microcopy.ai.copilotLabel}
+                                                </span>
+                                                {isRegenerated && (
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <CopilotChip
+                                                                className="ms-[4px]"
+                                                                variant="badge"
+                                                            >
+                                                                <RotateCw
+                                                                    aria-hidden
+                                                                    className="size-3"
+                                                                />
+                                                                {
+                                                                    microcopy.ai
+                                                                        .regeneratedBadge
+                                                                }
+                                                            </CopilotChip>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            {
+                                                                microcopy.ai
+                                                                    .regeneratedTooltip
+                                                            }
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                )}
+                                            </span>
+                                            <time
+                                                className="ms-auto whitespace-nowrap [font-variant-numeric:tabular-nums]"
+                                                data-testid="assistant-message-time"
+                                                dateTime={new Date(
+                                                    messageTimeAt(index)
+                                                ).toISOString()}
+                                            >
+                                                {formatClock(
+                                                    messageTimeAt(index)
+                                                )}
+                                            </time>
+                                        </AssistantAttribution>
+                                    )}
+                                    {isUser && !isLoading && (
                                         <Button
-                                            aria-label={microcopyString(
-                                                microcopy.ai.copyMessage
-                                            )}
-                                            icon={
-                                                copyConfirmedAssistantIndex ===
-                                                index ? (
-                                                    <CheckOutlined
-                                                        aria-hidden
-                                                    />
-                                                ) : (
-                                                    <CopyOutlined aria-hidden />
-                                                )
+                                            aria-label={
+                                                microcopy.a11y.editMessage
                                             }
                                             onClick={() => {
-                                                const plainText =
-                                                    m.content.replace(
-                                                        /\*\*|__|~~|`{1,3}|\[|\]|\(|\)/g,
-                                                        ""
-                                                    );
-                                                void navigator.clipboard
-                                                    .writeText(plainText)
-                                                    .then(() => {
-                                                        if (
-                                                            copyConfirmClearRef.current !==
-                                                            null
-                                                        ) {
-                                                            window.clearTimeout(
-                                                                copyConfirmClearRef.current
-                                                            );
-                                                        }
-                                                        setCopyConfirmedAssistantIndex(
-                                                            index
-                                                        );
-                                                        copyConfirmClearRef.current =
-                                                            window.setTimeout(
-                                                                () => {
-                                                                    setCopyConfirmedAssistantIndex(
-                                                                        null
-                                                                    );
-                                                                    copyConfirmClearRef.current =
-                                                                        null;
-                                                                },
-                                                                2000
-                                                            );
-                                                    });
+                                                setInput(m.content);
+                                                focusComposerEnd();
                                             }}
-                                            size="small"
-                                            type="text"
-                                        />
-                                        <Button
-                                            aria-label={
-                                                microcopy.a11y
-                                                    .regenerateResponse
-                                            }
-                                            icon={
-                                                <ReloadOutlined aria-hidden />
-                                            }
-                                            onClick={() =>
-                                                handleRegenerate(index)
-                                            }
-                                            size="small"
-                                            type="text"
-                                        />
-                                        <Button
-                                            aria-label={
-                                                microcopy.a11y.helpfulAnswer
-                                            }
-                                            aria-pressed={
-                                                turnFeedback?.value === "up"
-                                            }
-                                            onClick={() =>
-                                                handleThumbsUp(index)
-                                            }
-                                            size="small"
-                                            type={
-                                                turnFeedback?.value === "up"
-                                                    ? "primary"
-                                                    : "text"
-                                            }
+                                            size="icon"
+                                            variant="ghost"
                                         >
-                                            👍
+                                            <Pencil aria-hidden />
                                         </Button>
-                                        <AiFeedbackPopover
-                                            onOpenChange={(next) =>
-                                                handleFeedbackPopoverChange(
-                                                    index,
-                                                    next
-                                                )
-                                            }
-                                            onSkip={() =>
-                                                handleSkipFeedbackDown(index)
-                                            }
-                                            onSubmit={(submission) =>
-                                                handleSubmitFeedbackDown(
-                                                    index,
-                                                    submission
-                                                )
-                                            }
-                                            open={feedbackOpenFor === index}
-                                        >
-                                            <Tooltip
-                                                title={
+                                    )}
+                                    <MessageBubble $isUser={isUser}>
+                                        {isAssistant ? (
+                                            isProseLong && !isExpanded ? (
+                                                <>
+                                                    {renderMarkdown(
+                                                        m.content
+                                                            .split(/\s+/)
+                                                            .slice(0, 150)
+                                                            .join(" ")
+                                                    )}
+                                                    <Button
+                                                        className="mt-xxs block h-auto p-0"
+                                                        onClick={() =>
+                                                            setExpandedMessages(
+                                                                (prev) => {
+                                                                    const next =
+                                                                        new Set(
+                                                                            prev
+                                                                        );
+                                                                    next.add(
+                                                                        index
+                                                                    );
+                                                                    return next;
+                                                                }
+                                                            )
+                                                        }
+                                                        size="sm"
+                                                        variant="link"
+                                                    >
+                                                        {
+                                                            microcopy.ai
+                                                                .showFullResponse
+                                                        }
+                                                    </Button>
+                                                </>
+                                            ) : (
+                                                renderMarkdown(m.content)
+                                            )
+                                        ) : (
+                                            m.content
+                                        )}
+                                        {isAssistant &&
+                                            m.citations &&
+                                            m.citations.length > 0 &&
+                                            (() => {
+                                                const all = m.citations;
+                                                const citationsExpanded =
+                                                    expandedCitations.has(
+                                                        index
+                                                    );
+                                                const showAll =
+                                                    citationsExpanded ||
+                                                    all.length <=
+                                                        CITATION_INLINE_LIMIT;
+                                                const visible = showAll
+                                                    ? all
+                                                    : all.slice(
+                                                          0,
+                                                          CITATION_INLINE_LIMIT
+                                                      );
+                                                const overflow =
+                                                    all.length - visible.length;
+                                                return (
+                                                    <span className="ms-[6px] inline-block">
+                                                        {visible.map(
+                                                            (citation, idx) => (
+                                                                <CitationChip
+                                                                    citation={
+                                                                        citation
+                                                                    }
+                                                                    index={
+                                                                        idx + 1
+                                                                    }
+                                                                    key={`${citation.source}-${citation.id}-${idx}`}
+                                                                />
+                                                            )
+                                                        )}
+                                                        {overflow > 0 && (
+                                                            <Button
+                                                                aria-label={microcopy.a11y.showAllSources.replace(
+                                                                    "{count}",
+                                                                    String(
+                                                                        all.length
+                                                                    )
+                                                                )}
+                                                                className="ms-[4px] h-auto px-0 align-super text-xs text-[color:var(--color-copilot-badge,#EA580C)]"
+                                                                onClick={(
+                                                                    event
+                                                                ) => {
+                                                                    event.stopPropagation();
+                                                                    expandCitations(
+                                                                        index
+                                                                    );
+                                                                }}
+                                                                size="sm"
+                                                                variant="link"
+                                                            >
+                                                                {microcopy.ai.moreSources.replace(
+                                                                    "{count}",
+                                                                    String(
+                                                                        overflow
+                                                                    )
+                                                                )}
+                                                            </Button>
+                                                        )}
+                                                    </span>
+                                                );
+                                            })()}
+                                    </MessageBubble>
+                                    {isAssistant &&
+                                        m.citations?.length === 0 &&
+                                        !assistantHadToolStep(index) && (
+                                            <Text
+                                                className="mt-[2px] block text-sm font-medium"
+                                                type="secondary"
+                                            >
+                                                {
                                                     microcopy.ai
-                                                        .feedbackThumbsDownTooltip
+                                                        .chatNoSourcesCaveat
                                                 }
+                                            </Text>
+                                        )}
+                                    {isAssistant && (
+                                        <AssistantDisclaimer>
+                                            {microcopy.a11y.aiBadge}
+                                        </AssistantDisclaimer>
+                                    )}
+                                    {isAssistant && !isLoading && (
+                                        <AssistantActionRow data-testid="assistant-action-row">
+                                            <Button
+                                                aria-label={microcopyString(
+                                                    microcopy.ai.copyMessage
+                                                )}
+                                                onClick={() => {
+                                                    const plainText =
+                                                        m.content.replace(
+                                                            /\*\*|__|~~|`{1,3}|\[|\]|\(|\)/g,
+                                                            ""
+                                                        );
+                                                    void navigator.clipboard
+                                                        .writeText(plainText)
+                                                        .then(() => {
+                                                            if (
+                                                                copyConfirmClearRef.current !==
+                                                                null
+                                                            ) {
+                                                                window.clearTimeout(
+                                                                    copyConfirmClearRef.current
+                                                                );
+                                                            }
+                                                            setCopyConfirmedAssistantIndex(
+                                                                index
+                                                            );
+                                                            copyConfirmClearRef.current =
+                                                                window.setTimeout(
+                                                                    () => {
+                                                                        setCopyConfirmedAssistantIndex(
+                                                                            null
+                                                                        );
+                                                                        copyConfirmClearRef.current =
+                                                                            null;
+                                                                    },
+                                                                    2000
+                                                                );
+                                                        });
+                                                }}
+                                                size="icon"
+                                                variant="ghost"
+                                            >
+                                                {copyConfirmedAssistantIndex ===
+                                                index ? (
+                                                    <Check aria-hidden />
+                                                ) : (
+                                                    <Copy aria-hidden />
+                                                )}
+                                            </Button>
+                                            <Button
+                                                aria-label={
+                                                    microcopy.a11y
+                                                        .regenerateResponse
+                                                }
+                                                onClick={() =>
+                                                    handleRegenerate(index)
+                                                }
+                                                size="icon"
+                                                variant="ghost"
+                                            >
+                                                <RotateCw aria-hidden />
+                                            </Button>
+                                            <Button
+                                                aria-label={
+                                                    microcopy.a11y.helpfulAnswer
+                                                }
+                                                aria-pressed={
+                                                    turnFeedback?.value === "up"
+                                                }
+                                                onClick={() =>
+                                                    handleThumbsUp(index)
+                                                }
+                                                size="sm"
+                                                variant={
+                                                    turnFeedback?.value === "up"
+                                                        ? "primary"
+                                                        : "ghost"
+                                                }
+                                            >
+                                                👍
+                                            </Button>
+                                            <AiFeedbackPopover
+                                                onOpenChange={(next) =>
+                                                    handleFeedbackPopoverChange(
+                                                        index,
+                                                        next
+                                                    )
+                                                }
+                                                onSkip={() =>
+                                                    handleSkipFeedbackDown(
+                                                        index
+                                                    )
+                                                }
+                                                onSubmit={(submission) =>
+                                                    handleSubmitFeedbackDown(
+                                                        index,
+                                                        submission
+                                                    )
+                                                }
+                                                open={feedbackOpenFor === index}
                                             >
                                                 <Button
                                                     aria-expanded={
@@ -1743,232 +1835,235 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
                                                             index
                                                         )
                                                     }
-                                                    size="small"
-                                                    type={
+                                                    size="sm"
+                                                    title={
+                                                        microcopy.ai
+                                                            .feedbackThumbsDownTooltip
+                                                    }
+                                                    variant={
                                                         turnFeedback?.value ===
                                                         "down"
                                                             ? "primary"
-                                                            : "text"
+                                                            : "ghost"
                                                     }
                                                 >
                                                     👎
                                                 </Button>
-                                            </Tooltip>
-                                        </AiFeedbackPopover>
-                                    </AssistantActionRow>
-                                )}
-                            </MessageRow>
-                        );
-                    })}
-                    {environment.aiMutationProposalsEnabled &&
-                        visibleProposal && (
-                            <MutationProposalCard
-                                onAccept={() =>
-                                    handleAcceptProposal(visibleProposal)
-                                }
-                                onReject={() =>
-                                    handleRejectProposal(visibleProposal)
-                                }
-                                onUndo={
-                                    onUndoProposal
-                                        ? () => onUndoProposal(visibleProposal)
-                                        : undefined
-                                }
-                                proposal={visibleProposal}
-                            />
-                        )}
-                    {visibleNudges.length > 0 && (
-                        <>
-                            {visibleNudges.map((nudge) => (
-                                <NudgeCard
-                                    key={nudge.nudge_id}
-                                    nudge={nudge}
-                                    onAction={
-                                        onActionNudge
-                                            ? handleNudgeAction
+                                            </AiFeedbackPopover>
+                                        </AssistantActionRow>
+                                    )}
+                                </MessageRow>
+                            );
+                        })}
+                        {environment.aiMutationProposalsEnabled &&
+                            visibleProposal && (
+                                <MutationProposalCard
+                                    onAccept={() =>
+                                        handleAcceptProposal(visibleProposal)
+                                    }
+                                    onReject={() =>
+                                        handleRejectProposal(visibleProposal)
+                                    }
+                                    onUndo={
+                                        onUndoProposal
+                                            ? () =>
+                                                  onUndoProposal(
+                                                      visibleProposal
+                                                  )
                                             : undefined
                                     }
-                                    onDismiss={handleNudgeDismiss}
+                                    proposal={visibleProposal}
                                 />
-                            ))}
-                        </>
-                    )}
-                    {!isLoading && messages.length > 0 && (
-                        <Space
-                            size={space.xs}
-                            style={{
-                                display: "flex",
-                                flexWrap: "wrap",
-                                marginTop: space.xs
-                            }}
-                        >
-                            {followUpChips.map((prompt) => (
-                                <SamplePrompt
-                                    aria-label={microcopy.a11y.tryFollowUp.replace(
-                                        "{prompt}",
-                                        prompt
-                                    )}
-                                    checked={false}
-                                    data-testid="chat-follow-up-chip"
-                                    key={prompt}
-                                    onChange={() => {
-                                        setInput(prompt);
-                                        inputRef.current?.focus({
-                                            cursor: "end"
-                                        });
-                                    }}
-                                >
-                                    {prompt}
-                                </SamplePrompt>
-                            ))}
-                        </Space>
-                    )}
-                    {isLoading &&
-                        (showDelayedLoadingBubble || !!streamingText) && (
-                            <MessageRow
-                                $isUser={false}
-                                aria-label={`${microcopy.ai.copilotLabel} · ${microcopy.ai.streaming}`}
-                                role="group"
-                            >
-                                <AssistantAttribution>
-                                    <AiSparkleIcon aria-hidden />
-                                    <span>{microcopy.ai.copilotLabel}</span>
-                                    {!streamingText && (
-                                        <Text
-                                            style={{
-                                                color: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45))",
-                                                fontSize: fontSize.xs,
-                                                fontWeight: fontWeight.regular,
-                                                marginInlineStart: 4
-                                            }}
-                                            type="secondary"
-                                        >
-                                            {microcopy.ai.thinkingDefault}
-                                        </Text>
-                                    )}
-                                </AssistantAttribution>
-                                <MessageBubble $isUser={false} aria-live="off">
-                                    {streamingText ? (
-                                        <>
-                                            {streamingText}
-                                            <StreamingCursor aria-hidden>
-                                                ▍
-                                            </StreamingCursor>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Skeleton
-                                                active
-                                                aria-label={
-                                                    microcopy.ai.streaming
-                                                }
-                                                paragraph={{
-                                                    rows: 2,
-                                                    width: ["80%", "55%"]
-                                                }}
-                                                title={false}
-                                            />
-                                            {loadingMs >= 3000 && (
-                                                <Text
-                                                    style={{
-                                                        display: "block",
-                                                        fontSize: fontSize.xs,
-                                                        marginTop: 4
-                                                    }}
-                                                    type="secondary"
-                                                >
-                                                    {microcopy.ai.stillThinking}
-                                                </Text>
-                                            )}
-                                        </>
-                                    )}
-                                </MessageBubble>
-                                <AssistantDisclaimer>
-                                    {microcopy.a11y.aiBadge}
-                                </AssistantDisclaimer>
-                            </MessageRow>
+                            )}
+                        {visibleNudges.length > 0 && (
+                            <>
+                                {visibleNudges.map((nudge) => (
+                                    <NudgeCard
+                                        key={nudge.nudge_id}
+                                        nudge={nudge}
+                                        onAction={
+                                            onActionNudge
+                                                ? handleNudgeAction
+                                                : undefined
+                                        }
+                                        onDismiss={handleNudgeDismiss}
+                                    />
+                                ))}
+                            </>
                         )}
+                        {!isLoading && messages.length > 0 && (
+                            <div className="mt-xs flex flex-wrap gap-xs">
+                                {followUpChips.map((prompt) => (
+                                    <SamplePrompt
+                                        aria-label={microcopy.a11y.tryFollowUp.replace(
+                                            "{prompt}",
+                                            prompt
+                                        )}
+                                        checked={false}
+                                        data-testid="chat-follow-up-chip"
+                                        key={prompt}
+                                        onChange={() => {
+                                            setInput(prompt);
+                                            focusComposerEnd();
+                                        }}
+                                    >
+                                        {prompt}
+                                    </SamplePrompt>
+                                ))}
+                            </div>
+                        )}
+                        {isLoading &&
+                            (showDelayedLoadingBubble || !!streamingText) && (
+                                <MessageRow
+                                    $isUser={false}
+                                    aria-label={`${microcopy.ai.copilotLabel} · ${microcopy.ai.streaming}`}
+                                    role="group"
+                                >
+                                    <AssistantAttribution>
+                                        <AiSparkleIcon aria-hidden />
+                                        <span>{microcopy.ai.copilotLabel}</span>
+                                        {!streamingText && (
+                                            <Text
+                                                className="ms-[4px] text-xs font-normal"
+                                                type="secondary"
+                                            >
+                                                {microcopy.ai.thinkingDefault}
+                                            </Text>
+                                        )}
+                                    </AssistantAttribution>
+                                    <MessageBubble
+                                        $isUser={false}
+                                        aria-live="off"
+                                    >
+                                        {streamingText ? (
+                                            <>
+                                                {streamingText}
+                                                <StreamingCursor aria-hidden>
+                                                    ▍
+                                                </StreamingCursor>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div
+                                                    aria-label={
+                                                        microcopy.ai.streaming
+                                                    }
+                                                    className="flex flex-col gap-xs"
+                                                    role="status"
+                                                >
+                                                    <Skeleton className="h-4 w-[80%]" />
+                                                    <Skeleton className="h-4 w-[55%]" />
+                                                </div>
+                                                {loadingMs >= 3000 && (
+                                                    <Text
+                                                        className="mt-[4px] block text-xs"
+                                                        type="secondary"
+                                                    >
+                                                        {
+                                                            microcopy.ai
+                                                                .stillThinking
+                                                        }
+                                                    </Text>
+                                                )}
+                                            </>
+                                        )}
+                                    </MessageBubble>
+                                    <AssistantDisclaimer>
+                                        {microcopy.a11y.aiBadge}
+                                    </AssistantDisclaimer>
+                                </MessageRow>
+                            )}
+                    </div>
+                    {showScrollFab && isLoading && (
+                        <Button
+                            className="absolute bottom-[72px] left-1/2 z-10 -translate-x-1/2"
+                            onClick={() => {
+                                messagesContainerRef.current?.scrollTo({
+                                    top: messagesContainerRef.current
+                                        .scrollHeight,
+                                    behavior: "smooth"
+                                });
+                                setShowScrollFab(false);
+                            }}
+                            size="sm"
+                            variant="default"
+                        >
+                            {`↓ ${microcopy.ai.jumpToLatest}`}
+                        </Button>
+                    )}
                 </div>
-                {showScrollFab && isLoading && (
-                    <Button
-                        onClick={() => {
-                            messagesContainerRef.current?.scrollTo({
-                                top: messagesContainerRef.current.scrollHeight,
-                                behavior: "smooth"
-                            });
-                            setShowScrollFab(false);
-                        }}
-                        size="small"
-                        style={{
-                            bottom: 72,
-                            left: "50%",
-                            position: "absolute",
-                            transform: "translateX(-50%)",
-                            zIndex: 10
-                        }}
-                        type="default"
-                    >
-                        {`↓ ${microcopy.ai.jumpToLatest}`}
-                    </Button>
-                )}
-            </div>
 
-            {errorView && (
-                <Alert
-                    action={
-                        errorView.retryable ? (
-                            <Button
-                                disabled={retryCountdown > 0}
-                                onClick={() => {
+                {errorView && (
+                    <Alert
+                        className="relative mb-xs"
+                        variant={severityVariant(errorView.severity)}
+                    >
+                        <SeverityIcon severity={errorView.severity} />
+                        <AlertTitle>{errorView.heading}</AlertTitle>
+                        {(error instanceof AgentBudgetError
+                            ? microcopy.ai.conversationTooLong
+                            : errorView.body) && (
+                            <AlertDescription>
+                                {error instanceof AgentBudgetError
+                                    ? microcopy.ai.conversationTooLong
+                                    : errorView.body}
+                            </AlertDescription>
+                        )}
+                        {errorView.retryable && (
+                            <AlertDescription>
+                                <Button
+                                    className="h-auto p-0"
+                                    disabled={retryCountdown > 0}
+                                    onClick={() => {
+                                        const lastUser = [...messages]
+                                            .reverse()
+                                            .find((m) => m.role === "user");
+                                        if (lastUser)
+                                            dispatch(lastUser.content);
+                                    }}
+                                    size="sm"
+                                    variant="link"
+                                >
+                                    {retryCountdown > 0
+                                        ? `${microcopy.ai.retryLabel} (${retryCountdown}s)`
+                                        : microcopy.ai.retryLabel}
+                                </Button>
+                            </AlertDescription>
+                        )}
+                        <Button
+                            aria-label={microcopy.actions.close}
+                            className="absolute right-xs top-xs size-6"
+                            onClick={() => {
+                                if (error instanceof AgentBudgetError) {
                                     const lastUser = [...messages]
                                         .reverse()
                                         .find((m) => m.role === "user");
-                                    if (lastUser) dispatch(lastUser.content);
-                                }}
-                                size="small"
-                                type="link"
-                            >
-                                {retryCountdown > 0
-                                    ? `${microcopy.ai.retryLabel} (${retryCountdown}s)`
-                                    : microcopy.ai.retryLabel}
-                            </Button>
-                        ) : null
-                    }
-                    closable
-                    description={
-                        error instanceof AgentBudgetError
-                            ? microcopy.ai.conversationTooLong
-                            : errorView.body || undefined
-                    }
-                    onClose={() => {
-                        if (error instanceof AgentBudgetError) {
-                            const lastUser = [...messages]
-                                .reverse()
-                                .find((m) => m.role === "user");
-                            if (lastUser) setInput(lastUser.content);
-                        }
-                        dismissError();
-                    }}
-                    showIcon
-                    style={{ marginBottom: space.xs }}
-                    title={errorView.heading}
-                    type={errorView.severity}
-                />
-            )}
+                                    if (lastUser) setInput(lastUser.content);
+                                }
+                                dismissError();
+                            }}
+                            size="icon"
+                            variant="ghost"
+                        >
+                            <X aria-hidden />
+                        </Button>
+                    </Alert>
+                )}
 
-            <AiChatComposer
-                healthStatus={healthStatus}
-                input={input}
-                inputRef={inputRef}
-                isLoading={isLoading}
-                onAbort={abort}
-                onSend={handleSend}
-                promptCharHintText={promptCharHintText}
-                promptCharHintWarning={promptCharHintWarning}
-                remoteHealthEnabled={remoteHealthActive}
-                setInput={setInput}
-            />
-        </ChatTabLayout>
+                <AiChatComposer
+                    healthStatus={healthStatus}
+                    input={input}
+                    inputRef={inputRef}
+                    isLoading={isLoading}
+                    onAbort={abort}
+                    onSend={handleSend}
+                    promptCharHintText={promptCharHintText}
+                    promptCharHintWarning={promptCharHintWarning}
+                    remoteHealthEnabled={remoteHealthActive}
+                    setInput={setInput}
+                />
+            </ChatTabLayout>
+        </TooltipProvider>
     );
 };
 

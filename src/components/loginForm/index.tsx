@@ -1,52 +1,63 @@
-import { EyeInvisibleOutlined, EyeOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
 import { QueryClientContext } from "@tanstack/react-query";
-import { Form, Input } from "antd";
-import { useContext, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
+import { forwardRef, useContext, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
+
+import { Form } from "@/components/ui/form";
+import { Input, type InputProps } from "@/components/ui/input";
+import useAppMessage from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 
 import { microcopy } from "../../constants/microcopy";
 import { AuthButton } from "../../layouts/authLayout";
-import { lineHeight, touchTargetCoarse } from "../../theme/tokens";
 import useApi from "../../utils/hooks/useApi";
-import useAppMessage from "../../utils/hooks/useAppMessage";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import { writeAiProxyToken } from "../../utils/tokenStorage";
 
 import AuthErrorSummary from "../authErrorSummary";
 import { AuthTermsAgreement } from "../registerForm/termsAgreement";
 
-const inputSize = "large" as const;
 const userQueryKey = ["users"] as const;
 
 /**
- * Reserves a single line of vertical space for the Caps Lock warning so
- * the Submit button doesn't jump when the warning toggles. The earlier
- * inline `style={{ minHeight: '1.25em', display: 'inline-block' }}` did
- * the same job but spread the magic number across login and register.
+ * Password field with an eye/eye-off adornment — replaces antd's
+ * `Input.Password`. `Form.Item` clones this control and injects
+ * `value` / `onChange` / `onBlur` / `id` / `aria-*`, which spread onto the
+ * inner `<input>`; the toggle is a sibling button so the primitive stays a
+ * plain themed input.
  */
-const CapsLockSlot = styled.span`
-    display: inline-block;
-    line-height: ${lineHeight.snug};
-    min-height: ${lineHeight.snug}em;
-`;
-
-const ForgotPasswordRow = styled.div`
-    margin-block-end: 16px;
-    text-align: right;
-`;
-
-const ForgotPasswordLink = styled(Link)`
-    font-size: 0.875rem;
-
-    /* WCAG 2.5.8 — a bare text link reads ~20px tall; pad the hit area
-     * to the 44px floor on touch without shifting the text baseline. */
-    @media (pointer: coarse) {
-        align-items: center;
-        display: inline-flex;
-        min-height: ${touchTargetCoarse}px;
+const PasswordInput = forwardRef<HTMLInputElement, InputProps>(
+    ({ className, ...props }, ref) => {
+        const [visible, setVisible] = useState(false);
+        return (
+            <div className="relative">
+                <Input
+                    ref={ref}
+                    className={cn("pr-11", className)}
+                    type={visible ? "text" : "password"}
+                    {...props}
+                />
+                <button
+                    aria-label={
+                        visible
+                            ? microcopy.actions.hidePassword
+                            : microcopy.actions.showPassword
+                    }
+                    className="absolute inset-y-0 right-0 flex items-center justify-center rounded-md px-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-[44px] coarse:min-w-[44px]"
+                    onClick={() => setVisible((prev) => !prev)}
+                    type="button"
+                >
+                    {visible ? (
+                        <Eye aria-hidden className="size-4" />
+                    ) : (
+                        <EyeOff aria-hidden className="size-4" />
+                    )}
+                </button>
+            </div>
+        );
     }
-`;
+);
+PasswordInput.displayName = "PasswordInput";
 
 /**
  * Router location state shape forwarded by `RequireAuth` when it
@@ -71,9 +82,6 @@ const LoginForm: React.FC<{
     onError: React.Dispatch<React.SetStateAction<Error | IError | null>>;
     serverError?: Error | IError | null;
 }> = ({ onError, serverError = null }) => {
-    // AntD v6: static `message` import warns about dynamic theme;
-    // `useAppMessage()` returns a theme-aware instance (with a static
-    // fallback for tests that render without `<App>`).
     const message = useAppMessage();
     const navigate = useNavigate();
     const location = useLocation();
@@ -186,22 +194,22 @@ const LoginForm: React.FC<{
                 <Input
                     autoComplete="username webauthn"
                     enterKeyHint="next"
+                    id="email"
                     inputMode="email"
                     placeholder={microcopy.placeholders.emailExample}
-                    size={inputSize}
                     type="email"
-                    id="email"
                 />
             </Form.Item>
             <Form.Item
                 extra={
-                    <CapsLockSlot
+                    <span
                         aria-atomic="true"
                         aria-live="polite"
+                        className="inline-block min-h-[1.4em] leading-snug"
                         role="status"
                     >
                         {capsLockOn ? microcopy.a11y.capsLockOn : ""}
-                    </CapsLockSlot>
+                    </span>
                 }
                 label={microcopy.fields.password}
                 name="password"
@@ -213,41 +221,32 @@ const LoginForm: React.FC<{
                 ]}
                 validateTrigger={["onBlur", "onSubmit"]}
             >
-                <Input.Password
+                <PasswordInput
                     autoComplete="current-password"
                     enterKeyHint="go"
+                    id="password"
                     inputMode="text"
-                    iconRender={(visible) =>
-                        visible ? (
-                            <EyeOutlined
-                                aria-label={microcopy.actions.hidePassword}
-                            />
-                        ) : (
-                            <EyeInvisibleOutlined
-                                aria-label={microcopy.actions.showPassword}
-                            />
-                        )
-                    }
                     onKeyUp={(event) =>
                         setCapsLockOn(
                             "getModifierState" in event &&
                                 event.getModifierState("CapsLock")
                         )
                     }
-                    size={inputSize}
-                    id="password"
                 />
             </Form.Item>
-            <ForgotPasswordRow>
-                <ForgotPasswordLink to="/auth/forgot-password">
+            <div className="mb-md text-right">
+                <Link
+                    className="text-sm text-primary underline-offset-4 hover:underline coarse:inline-flex coarse:min-h-[44px] coarse:items-center"
+                    to="/auth/forgot-password"
+                >
                     {microcopy.auth.forgotPassword}
-                </ForgotPasswordLink>
-            </ForgotPasswordRow>
+                </Link>
+            </div>
             <AuthTermsAgreement variant="login" />
             <Form.Item>
                 <AuthButton
-                    loading={isLoading || isVerifyingSession}
                     htmlType="submit"
+                    loading={isLoading || isVerifyingSession}
                     type="primary"
                 >
                     {isLoading || isVerifyingSession

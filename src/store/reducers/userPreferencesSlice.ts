@@ -178,8 +178,8 @@ export interface UserPreferencesState {
      * blob persisted before this field shipped falls through the
      * `readSlice` guard to the default, mirroring how `glassIntensity`
      * was added. `usePaletteTheme` resolves this to a `Palette` object at
-     * runtime and re-renders the `#pulse-theme-vars` style element +
-     * rebuilds the AntD theme so the whole app re-colors in one shot.
+     * runtime and re-renders the `#pulse-theme-vars` style element so the
+     * whole app re-colors in one shot via the `--pulse-*` vars.
      */
     colorTheme: ColorThemePreference;
 }
@@ -618,11 +618,10 @@ export const userPreferencesSlice = createSlice({
         },
         /**
          * Sets the user's colour-theme choice (palette name).
-         * `usePaletteTheme` reads this on the next layout effect,
+         * `usePaletteTheme` reads this on the next layout effect and
          * re-renders the matching palette's CSS into `#pulse-theme-vars`,
-         * and the AntD theme rebuilds from the resolved palette object —
-         * so both the styled-component surface and the AntD components
-         * re-color in one shot. Persists through the store middleware.
+         * so every surface reading a `--pulse-*` var re-colors in one
+         * shot. Persists through the store middleware.
          */
         setColorTheme(state, action: PayloadAction<ColorThemePreference>) {
             state.colorTheme = action.payload;

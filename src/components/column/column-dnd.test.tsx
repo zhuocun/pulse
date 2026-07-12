@@ -2,7 +2,6 @@ import { configureStore } from "@reduxjs/toolkit";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DragDropContext } from "@hello-pangea/dnd";
-import type { ReactNode } from "react";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
@@ -14,6 +13,44 @@ import { Drag, Drop, DropChild } from "../dragAndDrop";
 import { TaskSearchParam } from "../taskSearchPanel";
 
 import Column from ".";
+
+/*
+ * The column more-actions menu raises an Undo toast via the out-of-Batch-B,
+ * AntD-backed `useUndoToast` / `useAppMessage` hooks. Mock them so this DnD
+ * suite stays free of AntD's global message container.
+ */
+jest.mock("../../utils/hooks/useUndoToast", () => ({
+    __esModule: true,
+    default: () => ({ show: jest.fn(() => ({ dismiss: jest.fn() })) })
+}));
+jest.mock("../../utils/hooks/useAppMessage", () => ({
+    __esModule: true,
+    default: () => ({
+        error: jest.fn(),
+        success: jest.fn(),
+        info: jest.fn(),
+        warning: jest.fn(),
+        loading: jest.fn(),
+        open: jest.fn(),
+        destroy: jest.fn()
+    })
+}));
+
+/*
+ * Radix `DropdownMenu` (the column more-actions menu) drives its surface
+ * with pointer-capture and `scrollIntoView`, neither of which jsdom
+ * implements.
+ */
+Element.prototype.scrollIntoView = jest.fn();
+if (!Element.prototype.hasPointerCapture) {
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+}
+if (!Element.prototype.setPointerCapture) {
+    Element.prototype.setPointerCapture = jest.fn();
+}
+if (!Element.prototype.releasePointerCapture) {
+    Element.prototype.releasePointerCapture = jest.fn();
+}
 
 const makeTestStore = () =>
     configureStore({
@@ -57,18 +94,6 @@ type TaskCreatorMockProps = {
     boardAiOn?: boolean;
 };
 
-type DropdownMenuItem = {
-    key?: string | number;
-    label?: ReactNode;
-};
-
-type DropdownMockProps = {
-    children: ReactNode;
-    menu?: {
-        items?: DropdownMenuItem[];
-    };
-};
-
 jest.mock("../taskCreator", () => ({
     __esModule: true,
     default: ({ columnId, disabled, boardAiOn }: TaskCreatorMockProps) => (
@@ -80,32 +105,6 @@ jest.mock("../taskCreator", () => ({
         />
     )
 }));
-
-jest.mock("antd", () => {
-    const actual = jest.requireActual("antd");
-    const React = jest.requireActual("react");
-
-    return {
-        ...actual,
-        Dropdown: ({ children, menu }: DropdownMockProps) =>
-            React.createElement(
-                "div",
-                null,
-                children,
-                React.createElement(
-                    "div",
-                    { "data-testid": "dropdown-menu" },
-                    menu?.items?.map((item) =>
-                        React.createElement(
-                            "div",
-                            { key: item.key },
-                            item.label
-                        )
-                    )
-                )
-            )
-    };
-});
 
 const mockedUseReactMutation = useReactMutation as jest.Mock;
 const mockedUseTaskModal = useTaskModal as jest.Mock;
@@ -234,7 +233,16 @@ describe("Column DnD affordances (live @hello-pangea/dnd)", () => {
             })
         );
 
-        expect(screen.getByTestId("dropdown-menu")).toBeInTheDocument();
+        // The click reaches the Radix DropdownMenu trigger (the native
+        // button is not event-blocked inside the column Draggable), so the
+        // menu opens and surfaces its edit / delete items.
+        expect(
+            await screen.findByRole("menuitem", {
+                name: formatTemplate(microcopy.a11y.editColumnNamed as string, {
+                    name: "Todo"
+                })
+            })
+        ).toBeInTheDocument();
     });
 
     it("exposes an accessible column drag handle with RFD handle attributes, not on the column surface", () => {

@@ -1,20 +1,89 @@
 /*
- * Global styles. Most typography and spacing live in the AntD theme tokens
- * (see src/theme/antdTheme.ts) so components do not need to redeclare them.
- * This file owns the document-level resets, the page background, the focus
- * ring, and the reduced-motion safety net.
+ * Global styles. This file owns the document-level resets, the page
+ * background, the focus ring, the reduced-motion safety net, and the
+ * accessibility fallbacks (reduced-transparency, forced-colors,
+ * increased-contrast) for the glass surfaces.
  */
 
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+/*
+ * Tailwind layers. Preflight is enabled in `tailwind.config.ts`, so
+ * `@tailwind base` ships Tailwind's element reset (the shadcn/ui primitives
+ * are authored against it). The static rules below layer app-specific resets
+ * on top and sit after the layers so an explicit App.css declaration still
+ * wins a specificity tie.
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * shadcn/ui semantic token layer. The `ui/*` primitives read these through
+ * the Tailwind color utilities wired in `tailwind.config.ts` (bg-primary,
+ * text-muted-foreground, border-border, …). Values are HSL channel triples
+ * so Tailwind can inject `<alpha-value>` for opacity modifiers.
+ *
+ * A light/dark pair keeps the primitives dark-mode-correct on the same
+ * `html[data-color-scheme="dark"]` switch the rest of the app flips on.
+ * They live in the `--ui-*` namespace, independent of the `--pulse-*`
+ * page-chrome tokens.
+ *
+ * With Preflight ON, a bare `border` utility resolves to the theme border
+ * width + color baseline; the primitives still pair width utilities with an
+ * explicit border-color utility (`border-input` / `border-border`) so a
+ * `ui/*` subtree always reads the theme rather than `currentColor`.
+ */
+@layer base {
+    :root,
+    html[data-color-scheme="light"] {
+        --ui-background: 33 80% 98%;
+        --ui-foreground: 222 47% 11%;
+        --ui-card: 0 0% 100%;
+        --ui-card-foreground: 222 47% 11%;
+        --ui-popover: 0 0% 100%;
+        --ui-popover-foreground: 222 47% 11%;
+        --ui-primary: 21 90% 48%;
+        --ui-primary-foreground: 0 0% 100%;
+        --ui-secondary: 210 40% 96%;
+        --ui-secondary-foreground: 222 47% 11%;
+        --ui-muted: 210 40% 96%;
+        --ui-muted-foreground: 215 16% 40%;
+        --ui-destructive: 0 84% 60%;
+        --ui-destructive-foreground: 0 0% 100%;
+        --ui-border: 214 32% 91%;
+        --ui-input: 214 32% 88%;
+        --ui-ring: 21 90% 48%;
+    }
+
+    html[data-color-scheme="dark"] {
+        --ui-background: 19 45% 7%;
+        --ui-foreground: 210 20% 90%;
+        --ui-card: 20 28% 10%;
+        --ui-card-foreground: 210 20% 90%;
+        --ui-popover: 20 28% 10%;
+        --ui-popover-foreground: 210 20% 90%;
+        --ui-primary: 21 90% 48%;
+        --ui-primary-foreground: 0 0% 100%;
+        --ui-secondary: 20 16% 18%;
+        --ui-secondary-foreground: 210 20% 90%;
+        --ui-muted: 20 16% 18%;
+        --ui-muted-foreground: 210 14% 65%;
+        --ui-destructive: 0 72% 51%;
+        --ui-destructive-foreground: 0 0% 100%;
+        --ui-border: 20 14% 22%;
+        --ui-input: 20 14% 22%;
+        --ui-ring: 21 90% 55%;
+    }
+}
 
 /*
  * Page-level theme tokens (`--pulse-*`, `--color-copilot-*`, `--glass-*`,
  * `--aurora-*`) are NOT defined here. They are injected synchronously
  * from `src/theme/palettes/` in `index.tsx` via `paletteToCss(palette)`,
  * so swapping the palette is a one-line edit (in `palettes/index.ts`).
- * This file owns only the static rules — resets, focus, animations,
- * accessibility fallbacks, and AntD glass selectors that consume the
- * runtime CSS vars set by the injected stylesheet.
+ * This file owns only the static rules — resets, focus, animations, and
+ * the accessibility fallbacks that consume those runtime CSS vars.
  *
  * `--page-background` composes the runtime palette vars into the full
  * page-canvas gradient. Defining it once and pointing both `body` and
@@ -74,11 +143,10 @@ body {
 
 /*
  * Suppress horizontal page scroll on small screens when an overflowing
- * element briefly stretches the viewport (an AntD modal mid-open
- * transition, a long token in user content). The board's column
- * container handles its own ``overflow-x: auto`` and still scrolls
- * normally — clipping the document does not interfere with descendant
- * scrollers.
+ * element briefly stretches the viewport (an opening dialog mid-transition,
+ * a long token in user content). The board's column container handles its
+ * own ``overflow-x: auto`` and still scrolls normally — clipping the
+ * document does not interfere with descendant scrollers.
  *
  * ONLY ``html`` carries ``overflow-x: clip`` (not ``hidden``); ``body``
  * must NOT set overflow-x. ``clip`` does not promote a scroll container,
@@ -123,7 +191,7 @@ body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     /* Suppress the default grey tap highlight on iOS; we render our own
-     * hover/active states via AntD tokens. */
+     * hover/active states via the theme tokens. */
     -webkit-tap-highlight-color: transparent;
     /* text-size-adjust is set on html; body inherits it. */
     color: var(--pulse-text-base);
@@ -140,97 +208,6 @@ body {
 #root {
     min-height: 100vh;
     min-height: 100dvh;
-}
-
-/*
- * Modals are opaque. The frosted-glass treatment sits well on the auth
- * card and on side drawers, but it makes a centred dialog feel
- * insubstantial — task editors and project forms are the surfaces where
- * the user spends the most sustained reading and writing time. Modals
- * therefore opt out of `backdrop-filter`, lean on a solid `--ant-color-
- * bg-elevated` (set by AntD's algorithm), and use a softer neutral
- * shadow so the dialog reads as a real card pulled forward from the
- * page rather than a translucent pane.
- */
-.ant-modal-content {
-    background: var(--ant-color-bg-elevated, #ffffff);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    box-shadow:
-        0 12px 40px -8px rgba(15, 23, 42, 0.18),
-        0 0 0 1px rgba(15, 23, 42, 0.06);
-}
-
-html[data-color-scheme="dark"] .ant-modal-content {
-    box-shadow:
-        0 12px 48px -8px rgba(0, 0, 0, 0.5),
-        0 0 0 1px rgba(255, 255, 255, 0.06);
-}
-
-/*
- * Drawers are opaque, like modals. The previous frosted-glass treatment
- * looked nice from a screenshot but in practice the drawer hosts long
- * scrolling content (Ask / Brief / chat transcripts) where the page
- * showing through underneath was visual noise. We now render the drawer
- * as a solid panel pulled in from the side, with a neutral slate shadow
- * for separation from the page.
- */
-.ant-drawer-content {
-    background: var(--ant-color-bg-elevated, #ffffff);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    box-shadow:
-        0 12px 40px -8px rgba(15, 23, 42, 0.18),
-        0 0 0 1px rgba(15, 23, 42, 0.06);
-}
-
-html[data-color-scheme="dark"] .ant-drawer-content {
-    box-shadow:
-        0 12px 48px -8px rgba(0, 0, 0, 0.5),
-        0 0 0 1px rgba(255, 255, 255, 0.06);
-}
-
-/*
- * Toast surfaces (`message` top-center, `notification` top-end) float at
- * fixed offsets from the viewport edge, so in installed-PWA standalone
- * mode on a notched / rounded-corner device they collide with the status
- * bar or the right-edge curvature. Nudge each container inward by the
- * matching safe-area inset so a toast never lands in the unsafe zone.
- */
-.ant-message {
-    margin-top: env(safe-area-inset-top);
-}
-
-.ant-notification {
-    margin-top: env(safe-area-inset-top);
-    margin-inline-end: env(safe-area-inset-right);
-}
-
-/*
- * Modal mask is a flat dim overlay, no blur. The backdrop-filter that used
- * to soften the page behind the modal has been removed — combined with
- * the opaque `.ant-modal-content` above, modals now read as a real card
- * pulled forward from the page over a quiet dim wash, no glass anywhere
- * in the modal stack. The alpha bump (0.45 light / 0.66 dark) compensates
- * for the missing blur so detail behind the dialog stays muted.
- */
-
-/*
- * Numeric columns (badges, story-point chips, tags, table numbers) read
- * better with tabular figures so digits don't shift width as values change.
- * Re-enable proportional figures inside flowing prose so the body stays
- * comfortable to read.
- */
-.ant-badge-count,
-.ant-tag,
-.ant-table {
-    font-variant-numeric: tabular-nums;
-}
-
-.ant-typography p,
-.ant-typography li,
-.ant-typography blockquote {
-    font-variant-numeric: normal;
 }
 
 /*
@@ -272,12 +249,12 @@ select {
 
 /*
  * Visible focus ring for keyboard users on every focusable control.
- * Satisfies WCAG 2.4.7 / 2.4.13. AntD's own controls already render a
- * focus ring through `controlOutline`; this rule covers everything else
- * (custom buttons, links, list items with role="button").
+ * Satisfies WCAG 2.4.7 / 2.4.13. The shadcn/ui primitives render their own
+ * ring through Tailwind `focus-visible:ring-*` utilities; this rule covers
+ * everything else (custom buttons, links, list items with role="button").
  */
 :focus-visible {
-    outline: 2px solid var(--ant-color-primary, #ea580c);
+    outline: 2px solid var(--pulse-brand-primary, #ea580c);
     outline-offset: 2px;
 }
 
@@ -294,126 +271,25 @@ select {
 /*
  * Selection color matches the brand so selected text feels intentional
  * rather than the OS default sky blue. The fallback rgba mirrors
- * `accent.selectionBg` for browsers that don't yet ship the AntD CSS var.
+ * `accent.selectionBg` for the first paint before the palette vars mount.
  */
 ::selection {
-    background: var(--ant-color-primary-bg, rgba(234, 88, 12, 0.22));
+    background: var(--pulse-brand-primary-bg, rgba(234, 88, 12, 0.22));
     color: inherit;
 }
 
 /*
  * Prevent iOS Safari auto-zoom on focused form controls. Mobile Safari
  * forces a viewport zoom whenever a focused input's computed font-size is
- * below 16 px, which makes every form interaction feel "web-y". AntD's
- * `fontSize.base` is 14 px to keep the desktop look dense; this rule lifts
- * controls to 16 px only on coarse pointers (touch devices) so desktop
- * density is preserved.
+ * below 16 px. The desktop body ladder keeps a denser 14 px look; this rule
+ * lifts native controls to 16 px only on coarse pointers (touch devices) so
+ * desktop density is preserved.
  */
 @media (pointer: coarse) {
     input,
     textarea,
-    select,
-    .ant-input,
-    .ant-input-affix-wrapper input,
-    .ant-input-number-input,
-    .ant-select-selection-search-input,
-    .ant-select-selection-item,
-    .ant-picker-input > input {
+    select {
         font-size: 16px;
-    }
-}
-
-@media (pointer: coarse) {
-    .ant-input-affix-wrapper,
-    input.ant-input,
-    textarea.ant-input,
-    .ant-select,
-    .ant-select-single .ant-select-selector,
-    .ant-drawer-close,
-    .ant-tag-checkable[role="button"] {
-        min-height: 44px;
-    }
-
-    /*
-     * The 44px min-height above also matches the <input> nested inside an
-     * affix wrapper (Input.Password, search inputs with a prefix/suffix).
-     * The wrapper itself already owns the 44px tap target and adds its own
-     * large-size vertical padding, so letting the inner input keep
-     * min-height:44px stacks padding on top of a 44px child — rendering the
-     * field visibly taller than a plain <Input> of the same size (the
-     * password box dwarfing the email box on /login). Let the wrapper alone
-     * drive the height; the inner input fills it.
-     */
-    .ant-input-affix-wrapper input.ant-input {
-        min-height: 0;
-    }
-
-    .ant-select-single .ant-select-selector {
-        align-items: center;
-        height: auto !important;
-    }
-
-    .ant-select-input,
-    .ant-select-single .ant-select-selector .ant-select-input,
-    .ant-select-single .ant-select-selector .ant-select-selection-search-input {
-        height: 44px !important;
-        min-height: 44px !important;
-    }
-
-    .ant-drawer-close,
-    .ant-tag-checkable[role="button"] {
-        min-width: 44px;
-    }
-
-    .ant-switch {
-        background: transparent !important;
-        height: 44px;
-        min-height: 44px;
-        min-width: 56px;
-    }
-
-    .ant-switch::before {
-        background: var(--ant-color-fill, rgba(15, 23, 42, 0.15));
-        border-radius: 999px;
-        content: "";
-        height: 24px;
-        inset-block-start: 50%;
-        inset-inline-start: 50%;
-        position: absolute;
-        transform: translate(-50%, -50%);
-        width: 42px;
-    }
-
-    .ant-switch.ant-switch-checked::before {
-        background: var(--ant-color-primary, #ea580c);
-    }
-
-    .ant-switch:hover::before {
-        background: var(--ant-color-fill-secondary, rgba(15, 23, 42, 0.2));
-    }
-
-    .ant-switch:active::before {
-        background: var(--ant-color-fill, rgba(15, 23, 42, 0.24));
-    }
-
-    .ant-switch.ant-switch-checked:hover::before {
-        background: var(--ant-color-primary-hover, #f97316);
-    }
-
-    .ant-switch.ant-switch-checked:active::before {
-        background: var(--ant-color-primary-active, #c2410c);
-    }
-
-    .ant-switch .ant-switch-handle {
-        height: 20px;
-        inset-inline-start: 8px;
-        top: 12px;
-        width: 20px;
-        z-index: 1;
-    }
-
-    .ant-switch.ant-switch-checked .ant-switch-handle {
-        inset-inline-start: calc(100% - 28px);
     }
 }
 
@@ -466,8 +342,8 @@ select {
 
 /*
  * Honor user transparency preference. Drop the body gradient blob to a
- * flat surface. Modals and drawers are already opaque (no blur, solid
- * background) so they need no override here.
+ * flat surface. Dialogs and sheets are already opaque (solid `bg-card`,
+ * no blur) so they need no override here.
  */
 @media (prefers-reduced-transparency: reduce) {
     body {
@@ -495,7 +371,7 @@ select {
  * GlassPanel migration in Wave 1.
  *
  * The chrome surfaces (Header, BottomTabBar, ColumnHeader, FormCard,
- * TopBar) consume `var(--ant-backdrop-filter-glass)`, which the
+ * TopBar) consume `var(--pulse-backdrop-filter-glass)`, which the
  * cssVars renderer already swaps to `none` at this intensity — they
  * don't need a `data-glass-context` marker because the CSS var
  * override handles them directly. The rule below is specifically the
@@ -511,7 +387,7 @@ html[data-glass-intensity="solid"] [data-glass-context="true"] {
 /*
  * Belt-and-suspenders: the OS-level `prefers-reduced-transparency`
  * signal always wins regardless of the user's stored choice. Mirrors
- * the cssVars.ts `--ant-backdrop-filter-glass: none` override on the
+ * the cssVars.ts `--pulse-backdrop-filter-glass: none` override on the
  * same query — the chrome flips via the var, the GlassPanel surfaces
  * flip via this selector, and both together leave no glass
  * unaccounted for. Required because Firefox does not currently ship
@@ -530,22 +406,19 @@ html[data-glass-intensity="solid"] [data-glass-context="true"] {
 }
 
 /*
- * Forced-colors / High-contrast mode (Windows). Ensure interactive
- * surfaces still have visible borders rather than relying on subtle
- * tints that get filtered out. Also collapse glass surfaces to a solid
- * OS canvas so blur/translucency never hides text.
+ * Forced-colors / High-contrast mode (Windows). Native controls
+ * (`button`, `input`, `select`, `textarea`) get their borders from the
+ * UA's forced palette automatically; the risk here is a translucent
+ * glass surface hiding text behind blur, so collapse every
+ * `data-glass-context="true"` surface to a solid OS canvas with a
+ * visible border, and flatten the body wash to Canvas.
  */
 @media (forced-colors: active) {
     body {
         background: Canvas;
     }
 
-    .ant-btn,
-    .ant-input,
-    .ant-select-selector,
-    .ant-card,
-    .ant-modal-content,
-    .ant-drawer-content {
+    [data-glass-context="true"] {
         background: Canvas;
         backdrop-filter: none;
         -webkit-backdrop-filter: none;

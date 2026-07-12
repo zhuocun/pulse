@@ -83,18 +83,17 @@ const INTENSITY_STRONG_REGULAR = { blur: 28, saturation: 180 } as const;
  *     for surface morph and press recovery
  *   - `--easing-spring-soft` / `--easing-spring-snap` — overshoot
  *     curves for materialize and gel-flex
- *   - `--ant-backdrop-filter-glass` — the global intensity lever.
+ *   - `--pulse-backdrop-filter-glass` — the global intensity lever.
  *     Default `blur(20px) saturate(180%)` (regular preset). Wave 2 T4
  *     adds `html[data-glass-intensity="clear" | "solid"]` overrides
  *     that swap the value globally — the user's chosen intensity
  *     re-tunes every chrome surface that consumes
- *     `var(--ant-backdrop-filter-glass)`. The `--ant-` prefix is
- *     intentional: it lives in the AntD CSS-var namespace so AntD-
- *     overriding selectors in App.css can pick it up uniformly.
+ *     `var(--pulse-backdrop-filter-glass)`. App-owned in the `--pulse-`
+ *     namespace so it survives AntD's removal.
  *
  * Phase 5 Wave 2 T4 additions — the user-facing glass-intensity toggle:
  *   - `html[data-glass-intensity="clear"]` block — overrides
- *     `--ant-backdrop-filter-glass` to the Clear preset's recipe.
+ *     `--pulse-backdrop-filter-glass` to the Clear preset's recipe.
  *   - `html[data-glass-intensity="solid"]` block — overrides the var
  *     to `none` (the Solid preset wipes blur entirely).
  *   - `@media (prefers-reduced-transparency: reduce)` block — pins
@@ -110,16 +109,16 @@ const INTENSITY_STRONG_REGULAR = { blur: 28, saturation: 180 } as const;
  * but ship in BOTH palette blocks for symmetry with the rest of the
  * surface — keeps the contract "every var defined for one mode is defined
  * for both" simple to enforce in tests.
- *   - `--ant-chrome-inset-mobile` — outset for floating mobile chrome
+ *   - `--pulse-chrome-inset-mobile` — outset for floating mobile chrome
  *     (BottomTabBar, Sheet). 16 px = iOS 26 ~21pt mapped to web density.
- *   - `--ant-detent-peek` / `--ant-detent-medium` / `--ant-detent-large`
+ *   - `--pulse-detent-peek` / `--pulse-detent-medium` / `--pulse-detent-large`
  *     — Wave 3 Sheet primitive's snap-detent ladder (px peek above safe
  *     area, dvh for medium and large so iOS URL-bar collapse doesn't
  *     mid-gesture snap).
- *   - `--ant-motion-detent-snap` / `--ant-motion-tab-bar-minimize` —
+ *   - `--pulse-motion-detent-snap` / `--pulse-motion-tab-bar-minimize` —
  *     durations for Wave 3 sheet snapping and Wave 2 tab-bar minimize.
- *   - `--ant-easing-detent` — the iOS sheet curve (slow in/out, no
- *     overshoot). Pairs with `--ant-motion-detent-snap` for Wave 3.
+ *   - `--pulse-easing-detent` — the iOS sheet curve (slow in/out, no
+ *     overshoot). Pairs with `--pulse-motion-detent-snap` for Wave 3.
  *
  * Runtime palette switch addition — the brand / accent / aurora /
  * avatar-gradient vars. These let the styled-component / inline-style
@@ -139,7 +138,7 @@ const INTENSITY_STRONG_REGULAR = { blur: 28, saturation: 180 } as const;
  *   - `--pulse-aurora-*` — deep / mid / light / cinematicBase
  *   - `--pulse-avatar-grad-0..5` — the six monogram gradient strings
  *
- * Phase 6 Wave 2 lift addition — `--ant-shadow-glass-lifted`.
+ * Phase 6 Wave 2 lift addition — `--pulse-shadow-glass-lifted`.
  *   - In LIGHT mode the page is `#fffaf5`; a near-white translucent
  *     glass surface (`--glass-surface` rgba(255, 255, 255, 0.68)) with
  *     only the `shadow.lg` token (six-percent inks) was visually
@@ -179,17 +178,6 @@ html[data-color-scheme="light"] {
     --pulse-brand-primary-bg-dark: ${p.brand.primaryBgDark};
     --pulse-brand-primary-dark: ${p.brand.primaryDark};
 
-    /*
-     * Link colour pair. antdTheme.ts sets colorLink / colorLinkHover
-     * from the same palette steps for every mode, which is AA on the
-     * light page but fails on the dark page — the dark block below
-     * overrides both. The light values here mirror antdTheme's output
-     * exactly (no visual change) so the "every var defined for one
-     * mode is defined for both" contract holds.
-     */
-    --ant-color-link: ${p.brand.primaryHover};
-    --ant-color-link-hover: ${p.brand.primaryActive};
-
     --pulse-accent-start: ${p.accent.start};
     --pulse-accent-end: ${p.accent.end};
     --pulse-accent-bg-strong: rgba(${p.accent.rgb}, 0.32);
@@ -197,6 +185,41 @@ html[data-color-scheme="light"] {
     --pulse-accent-bg-medium: rgba(${p.accent.rgb}, 0.16);
     --pulse-accent-bg-subtle: rgba(${p.accent.rgb}, 0.04);
     --pulse-accent-bg-hover: rgba(${p.accent.rgb}, 0.18);
+
+    /*
+     * App-owned equivalents of AntD's --ant-color-* semantic surface
+     * tokens (text ramp, neutral fills, borders, solid surfaces, text-
+     * button overlays). The text/fill/border/bg tokens in tokens.ts
+     * reference these. Light values are the slate-900 ink the page
+     * already uses; the dark block flips fills/overlays to a light ink so
+     * they stay visible on the dark page. Opacities mirror AntD's
+     * light/dark algorithm output so a page repointed off --ant-color-*
+     * lands pixel-for-pixel. Palette-independent (the neutral ink is the
+     * same across every brand palette).
+     */
+    --pulse-text-secondary: rgba(15, 23, 42, 0.65);
+    --pulse-text-tertiary: rgba(15, 23, 42, 0.45);
+    --pulse-fill: rgba(15, 23, 42, 0.15);
+    --pulse-fill-secondary: rgba(15, 23, 42, 0.06);
+    --pulse-fill-tertiary: rgba(15, 23, 42, 0.04);
+    --pulse-fill-quaternary: rgba(15, 23, 42, 0.02);
+    --pulse-border: rgba(15, 23, 42, 0.12);
+    --pulse-border-secondary: rgba(15, 23, 42, 0.06);
+    --pulse-bg-container: #ffffff;
+    --pulse-bg-elevated: #ffffff;
+    --pulse-bg-text-hover: rgba(15, 23, 42, 0.06);
+    --pulse-bg-text-active: rgba(15, 23, 42, 0.15);
+
+    /*
+     * Link + status colours, app-owned equivalents of --ant-color-link /
+     * --ant-color-error / --ant-color-warning. Link tracks the palette
+     * (primaryHover is AA on the light page); the dark block flips it to
+     * primaryDark. Status seeds match AntD's light algorithm; the dark
+     * block steps them to AntD's dark output.
+     */
+    --pulse-link: ${p.brand.primaryHover};
+    --pulse-error: #EF4444;
+    --pulse-warning: #F59E0B;
 
     --pulse-aurora-deep: ${p.aurora.deep};
     --pulse-aurora-mid: ${p.aurora.mid};
@@ -237,7 +260,7 @@ html[data-color-scheme="light"] {
      * the cream page (#fffaf5) drowns out the lighter 6% ink the rest
      * of the card chrome ships. See the cssVars docblock above.
      */
-    --ant-shadow-glass-lifted:
+    --pulse-shadow-glass-lifted:
         0 8px 24px -4px rgba(15, 23, 42, 0.18),
         0 2px 6px rgba(15, 23, 42, 0.08);
     --glass-rim-subtle: rgba(255, 255, 255, 0.18);
@@ -246,21 +269,21 @@ html[data-color-scheme="light"] {
 
     --motion-morph: 450ms;
     --motion-gel-flex: 220ms;
-    --ant-motion-detent-snap: 360ms;
-    --ant-motion-tab-bar-minimize: 280ms;
+    --pulse-motion-detent-snap: 360ms;
+    --pulse-motion-tab-bar-minimize: 280ms;
 
     --easing-spring-soft: cubic-bezier(0.34, 1.56, 0.64, 1);
     --easing-spring-snap: cubic-bezier(0.16, 1.05, 0.36, 1);
-    --ant-easing-detent: cubic-bezier(0.32, 0.72, 0, 1);
+    --pulse-easing-detent: cubic-bezier(0.32, 0.72, 0, 1);
 
-    --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_REGULAR)};
-    --ant-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SUBTLE_REGULAR)};
-    --ant-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_STRONG_REGULAR)};
+    --pulse-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_REGULAR)};
+    --pulse-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SUBTLE_REGULAR)};
+    --pulse-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_STRONG_REGULAR)};
 
-    --ant-chrome-inset-mobile: 16px;
-    --ant-detent-peek: 96px;
-    --ant-detent-medium: 50dvh;
-    --ant-detent-large: 92dvh;
+    --pulse-chrome-inset-mobile: 16px;
+    --pulse-detent-peek: 96px;
+    --pulse-detent-medium: 50dvh;
+    --pulse-detent-large: 92dvh;
 
     --aurora-blob: rgba(${p.accent.rgb}, 0.10);
     --aurora-blob-strong: rgba(${p.accent.rgb}, 0.20);
@@ -294,20 +317,6 @@ html[data-color-scheme="dark"] {
     --pulse-brand-primary-bg-dark: ${p.brand.primaryBgDark};
     --pulse-brand-primary-dark: ${p.brand.primaryDark};
 
-    /*
-     * Dark-mode link pair. antdTheme.ts pins colorLink to primaryHover
-     * for BOTH modes — AA on the light page but ~3:1 on the dark page,
-     * so auth links (Forgot password, Terms) failed contrast. Override
-     * to the bright dark-mode brand step (primaryDark — the same step
-     * the prefers-contrast block uses). Hover steps to the mid brand
-     * shade (aurora.mid) rather than primaryActive: primaryActive is
-     * the DARKEST brand step and reads ≤2.6:1 on the dark page, which
-     * would re-introduce the failure on hover. aurora.mid stays AA
-     * (≥5:1 on each palette's bgDark) across all three palettes.
-     */
-    --ant-color-link: ${p.brand.primaryDark};
-    --ant-color-link-hover: ${p.aurora.mid};
-
     --pulse-accent-start: ${p.accent.start};
     --pulse-accent-end: ${p.accent.end};
     --pulse-accent-bg-strong: rgba(${p.accent.rgb}, 0.32);
@@ -315,6 +324,30 @@ html[data-color-scheme="dark"] {
     --pulse-accent-bg-medium: rgba(${p.accent.rgb}, 0.16);
     --pulse-accent-bg-subtle: rgba(${p.accent.rgb}, 0.04);
     --pulse-accent-bg-hover: rgba(${p.accent.rgb}, 0.18);
+
+    /*
+     * Dark-mode counterpart of the AntD --ant-color-* equivalents. The
+     * text ramp keeps the gray-200 ink --pulse-text-base uses in dark;
+     * fills, overlays and borders flip to a white ink so they read on the
+     * dark page. Opacities and the solid-surface hexes mirror AntD's dark
+     * algorithm output.
+     */
+    --pulse-text-secondary: rgba(229, 231, 235, 0.65);
+    --pulse-text-tertiary: rgba(229, 231, 235, 0.45);
+    --pulse-fill: rgba(255, 255, 255, 0.18);
+    --pulse-fill-secondary: rgba(255, 255, 255, 0.12);
+    --pulse-fill-tertiary: rgba(255, 255, 255, 0.08);
+    --pulse-fill-quaternary: rgba(255, 255, 255, 0.04);
+    --pulse-border: rgba(255, 255, 255, 0.14);
+    --pulse-border-secondary: rgba(255, 255, 255, 0.08);
+    --pulse-bg-container: #141414;
+    --pulse-bg-elevated: #1f1f1f;
+    --pulse-bg-text-hover: rgba(255, 255, 255, 0.12);
+    --pulse-bg-text-active: rgba(255, 255, 255, 0.18);
+
+    --pulse-link: ${p.brand.primaryDark};
+    --pulse-error: #CE3D3D;
+    --pulse-warning: #D3890C;
 
     --pulse-aurora-deep: ${p.aurora.deep};
     --pulse-aurora-mid: ${p.aurora.mid};
@@ -355,7 +388,7 @@ html[data-color-scheme="dark"] {
      * existing two-stack recipe; pushing it higher would over-
      * blacken the surround.
      */
-    --ant-shadow-glass-lifted:
+    --pulse-shadow-glass-lifted:
         0 8px 16px rgba(0, 0, 0, 0.32),
         0 16px 32px rgba(0, 0, 0, 0.38);
     --glass-rim-subtle: rgba(255, 255, 255, 0.06);
@@ -364,21 +397,21 @@ html[data-color-scheme="dark"] {
 
     --motion-morph: 450ms;
     --motion-gel-flex: 220ms;
-    --ant-motion-detent-snap: 360ms;
-    --ant-motion-tab-bar-minimize: 280ms;
+    --pulse-motion-detent-snap: 360ms;
+    --pulse-motion-tab-bar-minimize: 280ms;
 
     --easing-spring-soft: cubic-bezier(0.34, 1.56, 0.64, 1);
     --easing-spring-snap: cubic-bezier(0.16, 1.05, 0.36, 1);
-    --ant-easing-detent: cubic-bezier(0.32, 0.72, 0, 1);
+    --pulse-easing-detent: cubic-bezier(0.32, 0.72, 0, 1);
 
-    --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_REGULAR)};
-    --ant-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SUBTLE_REGULAR)};
-    --ant-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_STRONG_REGULAR)};
+    --pulse-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_REGULAR)};
+    --pulse-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SUBTLE_REGULAR)};
+    --pulse-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_STRONG_REGULAR)};
 
-    --ant-chrome-inset-mobile: 16px;
-    --ant-detent-peek: 96px;
-    --ant-detent-medium: 50dvh;
-    --ant-detent-large: 92dvh;
+    --pulse-chrome-inset-mobile: 16px;
+    --pulse-detent-peek: 96px;
+    --pulse-detent-medium: 50dvh;
+    --pulse-detent-large: 92dvh;
 
     --aurora-blob: rgba(${p.accent.rgbDark}, 0.14);
     --aurora-blob-strong: rgba(${p.accent.rgbDark}, 0.24);
@@ -389,7 +422,7 @@ html[data-color-scheme="dark"] {
  * Phase 5 Wave 2 T4 — user-facing glass intensity toggle. The
  * useGlassIntensity hook writes the resolved intensity to
  * html[data-glass-intensity="…"]; these selectors override
- * --ant-backdrop-filter-glass so every chrome surface that consumes
+ * --pulse-backdrop-filter-glass so every chrome surface that consumes
  * the var flips in one shot. "regular" inherits the :root default
  * above — no override needed.
  *
@@ -401,15 +434,15 @@ html[data-color-scheme="dark"] {
  * than :where() ever produces.
  */
 html[data-glass-intensity="clear"] {
-    --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_CLEAR)};
-    --ant-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SUBTLE_CLEAR)};
-    --ant-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_STRONG_CLEAR)};
+    --pulse-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_CLEAR)};
+    --pulse-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SUBTLE_CLEAR)};
+    --pulse-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_STRONG_CLEAR)};
 }
 
 html[data-glass-intensity="solid"] {
-    --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_SOLID)};
-    --ant-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SOLID)};
-    --ant-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_SOLID)};
+    --pulse-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_SOLID)};
+    --pulse-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SOLID)};
+    --pulse-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_SOLID)};
 }
 
 /*
@@ -426,9 +459,9 @@ html[data-glass-intensity="solid"] {
     :root,
     html[data-color-scheme="light"],
     html[data-color-scheme="dark"] {
-        --ant-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_SOLID)};
-        --ant-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SOLID)};
-        --ant-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_SOLID)};
+        --pulse-backdrop-filter-glass: ${composeBackdropFilter(INTENSITY_SOLID)};
+        --pulse-backdrop-filter-glass-subtle: ${composeBackdropFilter(INTENSITY_SOLID)};
+        --pulse-backdrop-filter-glass-strong: ${composeBackdropFilter(INTENSITY_SOLID)};
     }
 }
 
@@ -440,7 +473,7 @@ html[data-glass-intensity="solid"] {
  * toward opaque (so text over the surface keeps its contrast), and steps
  * the link/text colour to the darker brand step (primaryActive light /
  * primaryDark on dark). Writing on the html[data-color-scheme] selectors
- * outbeats AntD's :where()-scoped colour vars without !important. App.css
+ * keeps the override at high specificity without !important. App.css
  * ships the matching [data-glass-context="true"] override for GlassPanel
  * surfaces on the same query.
  */
@@ -455,8 +488,8 @@ html[data-glass-intensity="solid"] {
         --glass-rim: rgba(255, 255, 255, 0.70);
         --glass-rim-strong: rgba(255, 255, 255, 0.85);
 
-        --ant-color-link: ${p.brand.primaryActive};
-        --ant-color-primary: ${p.brand.primaryActive};
+        --pulse-link: ${p.brand.primaryActive};
+        --pulse-brand-primary: ${p.brand.primaryActive};
     }
 
     html[data-color-scheme="dark"] {
@@ -468,8 +501,8 @@ html[data-glass-intensity="solid"] {
         --glass-rim: rgba(255, 255, 255, 0.45);
         --glass-rim-strong: rgba(255, 255, 255, 0.60);
 
-        --ant-color-link: ${p.brand.primaryDark};
-        --ant-color-primary: ${p.brand.primaryDark};
+        --pulse-link: ${p.brand.primaryDark};
+        --pulse-brand-primary: ${p.brand.primaryDark};
     }
 }
 `;

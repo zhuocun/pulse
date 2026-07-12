@@ -540,6 +540,7 @@ const zhCN: Dictionary = {
         logoLabel: "Pulse 首页"
     },
     breadcrumb: {
+        ariaLabel: "面包屑导航",
         projects: "项目",
         reports: "报告"
     },

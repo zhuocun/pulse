@@ -118,12 +118,11 @@ export const fontWeight = {
 
 /**
  * Body/label copy set at `fontSize.sm` (13 px) reads below the 14 px mobile
- * floor once `buildAntdTheme` lifts the coarse AntD base to 16 px — a 13 px
- * paragraph next to 16 px system copy looks like a shrunk afterthought on a
- * phone. Drop this snippet into a styled block in place of a bare
+ * floor next to the 16 px native controls App.css lifts on coarse pointers —
+ * a 13 px paragraph next to 16 px system copy looks like a shrunk afterthought
+ * on a phone. Drop this snippet into a styled block in place of a bare
  * `font-size: ${fontSize.sm}px` so the copy keeps the dense 13 px on fine
- * pointers but lifts to `fontSize.base` (14 px) on coarse pointers, matching
- * the AntD `fontSizeSM` step in `antdTheme.ts`.
+ * pointers but lifts to `fontSize.base` (14 px) on coarse pointers.
  *
  * This is ONLY for genuine body/label copy. Intentional micro-captions
  * (badges, pills, chips, timestamps, meta rows) stay at their `fontSize.xs`
@@ -160,18 +159,21 @@ export const letterSpacing = {
  * paint — and any environment where the palette CSS is absent (SSR / a
  * stripped test DOM) — keeps the historical brand. AA contrast on white
  * is enforced at the palette level, not here.
- *
- * NOTE: AntD's `buildAntdTheme` does NOT read these — it takes the active
- * Palette OBJECT and uses real hexes (AntD derives shades algorithmically
- * and cannot consume `var()` here). These tokens feed the emotion /
- * styled-component surface only.
  */
 export const brand = {
     primary: `var(--pulse-brand-primary, ${palette.brand.primary})`,
     primaryHover: `var(--pulse-brand-primary-hover, ${palette.brand.primaryHover})`,
     primaryActive: `var(--pulse-brand-primary-active, ${palette.brand.primaryActive})`,
     primaryBg: `var(--pulse-brand-primary-bg, ${palette.brand.primaryBg})`,
-    primaryBgDark: `var(--pulse-brand-primary-bg-dark, ${palette.brand.primaryBgDark})`
+    primaryBgDark: `var(--pulse-brand-primary-bg-dark, ${palette.brand.primaryBgDark})`,
+    /*
+     * Link colour. Unlike the other brand steps this one FLIPS per mode:
+     * `primaryHover` (AA on the light page) in light, `primaryDark` (AA on
+     * the dark page) in dark — the cssVars renderer emits the pair. The
+     * literal fallback is the light step so a stripped DOM keeps a readable
+     * link. App-owned equivalent of AntD's `--ant-color-link`.
+     */
+    link: `var(--pulse-link, ${palette.brand.primaryHover})`
 } as const;
 
 /**
@@ -353,7 +355,7 @@ export const glass = {
     /*
      * Intensity presets — three discrete configs Wave 2's user-intensity
      * toggle picks from. Components consume them via the
-     * `--ant-backdrop-filter-glass` CSS var; Wave 2 will swap the var
+     * `--pulse-backdrop-filter-glass` CSS var; the toggle swaps the var
      * value globally so every glass surface flips in one shot.
      *
      * `clear`    — most translucent (lowest surface opacity, modest blur)
@@ -374,7 +376,7 @@ export const glass = {
          * than oversaturated when paired with the lower surface
          * opacity. The cssVars renderer composes
          * `blur(${blur}px) saturate(${saturation}%)` for the
-         * `--ant-backdrop-filter-glass` var override at this intensity.
+         * `--pulse-backdrop-filter-glass` var override at this intensity.
          */
         saturation: 170,
         border: "rgba(15, 23, 42, 0.04)",
@@ -418,9 +420,9 @@ export const blur = {
 
 /**
  * Semantic palette aligned with the new brand. We expose explicit hexes here
- * because AntD's defaults (e.g. red-5 = #ff4d4f) are too saturated for the
- * refined neutral surface treatment. Components reading `--ant-color-*`
- * still pick up AntD's auto-derived variants.
+ * because the stock defaults (e.g. red-5 = #ff4d4f) are too saturated for the
+ * refined neutral surface treatment. The app-owned `status` tokens below
+ * expose the mode-flipping `--pulse-*` equivalents consumers should read.
  */
 export const semantic = {
     success: "#10B981",
@@ -432,6 +434,62 @@ export const semantic = {
     info: "#3B82F6",
     infoBg: "#EFF6FF",
     favorite: "#F43F5E"
+} as const;
+
+/**
+ * App-owned equivalents of the AntD `--ant-color-*` semantic surface tokens
+ * that the emotion-styled pages/layouts read. Each is a
+ * `var(--pulse-*, <light literal>)` reference so a page repointed off the
+ * `--ant-color-*` namespace keeps flipping light/dark (via `useColorScheme`,
+ * which sets `html[data-color-scheme]`) and stays readable in a stripped DOM
+ * — and, crucially, survives AntD's removal because the cssVars renderer
+ * owns the `--pulse-*` var, not AntD's runtime `cssVar` layer.
+ *
+ * The neutral ramps (`text`, `fill`, `border`, `bg`) are palette-independent:
+ * the light literals are the slate-900 ink the page text already uses
+ * (`--pulse-text-base`), the dark values flip to a light ink so overlays stay
+ * visible on the dark page. Values mirror AntD's own light/dark algorithm
+ * output at the opacities the chrome actually renders, so a page repointed
+ * from `--ant-color-*` to these lands pixel-for-pixel (the pre-existing page
+ * fallbacks were approximations that never fired — AntD always defined the
+ * var).
+ */
+export const text = {
+    base: `var(--pulse-text-base, ${palette.page.textLight})`,
+    secondary: "var(--pulse-text-secondary, rgba(15, 23, 42, 0.65))",
+    tertiary: "var(--pulse-text-tertiary, rgba(15, 23, 42, 0.45))"
+} as const;
+
+export const fill = {
+    base: "var(--pulse-fill, rgba(15, 23, 42, 0.15))",
+    secondary: "var(--pulse-fill-secondary, rgba(15, 23, 42, 0.06))",
+    tertiary: "var(--pulse-fill-tertiary, rgba(15, 23, 42, 0.04))",
+    quaternary: "var(--pulse-fill-quaternary, rgba(15, 23, 42, 0.02))"
+} as const;
+
+export const border = {
+    base: "var(--pulse-border, rgba(15, 23, 42, 0.12))",
+    secondary: "var(--pulse-border-secondary, rgba(15, 23, 42, 0.06))"
+} as const;
+
+export const bg = {
+    container: "var(--pulse-bg-container, #ffffff)",
+    elevated: "var(--pulse-bg-elevated, #ffffff)",
+    textHover: "var(--pulse-bg-text-hover, rgba(15, 23, 42, 0.06))",
+    textActive: "var(--pulse-bg-text-active, rgba(15, 23, 42, 0.15))"
+} as const;
+
+/**
+ * Status colours (`error` / `warning`) that flip per mode — the light value
+ * is the semantic seed AntD is fed, the dark value is AntD's dark-algorithm
+ * step (emitted by the cssVars renderer). App-owned equivalents of
+ * `--ant-color-error` / `--ant-color-warning`. `info` is intentionally NOT
+ * here: AntD defines `colorInfo` as the brand primary, so its app-owned
+ * equivalent is `brand.primary` (`--pulse-brand-primary`).
+ */
+export const status = {
+    error: `var(--pulse-error, ${semantic.error})`,
+    warning: `var(--pulse-warning, ${semantic.warning})`
 } as const;
 
 /**

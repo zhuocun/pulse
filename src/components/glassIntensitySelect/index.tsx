@@ -1,6 +1,7 @@
-import styled from "@emotion/styled";
-import { Segmented, Typography } from "antd";
 import { useCallback } from "react";
+
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Typography } from "@/components/ui/typography";
 
 import { microcopy } from "../../constants/microcopy";
 import type { ReduxDispatch, RootState } from "../../store";
@@ -8,51 +9,29 @@ import {
     userPreferencesActions,
     type GlassIntensityPreference
 } from "../../store/reducers/userPreferencesSlice";
-import { space } from "../../theme/tokens";
 import { useReduxDispatch, useReduxSelector } from "../../utils/hooks/useRedux";
 
 /**
  * Phase 5 "Liquid Glass" Wave 2 T4 — the user-facing glass intensity
  * picker. Surfaces the four options from the slice's
- * `GlassIntensityPreference` enum as a Segmented control, modeled
- * after the existing `LanguageSwitcher` so the account-dropdown
- * settings rows feel cut from the same cloth.
+ * `GlassIntensityPreference` enum as a ToggleGroup (single-select),
+ * modeled after `LanguageSwitcher` so the account-dropdown settings rows
+ * feel cut from the same cloth.
  *
- *   - Auto    — defer to the runtime ladder in `useGlassIntensity`
- *               (Phase 6 Wave 1 ladder: `forced-colors: active` → solid,
- *               `prefers-reduced-transparency: reduce` → solid,
- *               `pointer: coarse` → regular, fine pointer → regular).
- *               The default for new users; existing pre-Phase-6 users
- *               are migrated to explicit "solid" via
- *               `glassIntensityVersion` so the flip doesn't surprise
- *               them.
+ *   - Auto    — defer to the runtime ladder in `useGlassIntensity`.
  *   - Clear   — maximum show-through, modest blur.
  *   - Regular — balanced default (the shipping recipe).
  *   - Solid   — opt out of glass entirely. Critical for accessibility
- *               (reduced-transparency users on Firefox, which lacks
- *               OS-level `prefers-reduced-transparency` today) and
- *               for users who prefer the higher-contrast / lower-GPU
+ *               and for users who prefer higher-contrast / lower-GPU
  *               opaque rendering.
  *
  * Reads from `userPreferences.glassIntensity` and writes via
- * `setGlassIntensity`. The slice persists through the store
- * middleware on every dispatch, so the choice round-trips through
- * localStorage automatically.
+ * `setGlassIntensity`. The slice persists through the store middleware on
+ * every dispatch, so the choice round-trips through localStorage.
  *
- * The Segmented options are derived from the same enum the slice
- * uses, so adding a new intensity (or renaming one) is a single edit
- * to the type and the i18n labels — the picker stays in sync without
- * a manual update.
+ * The options are derived from the same enum the slice uses, so adding a
+ * new intensity is a single edit to the type and the i18n labels.
  */
-
-const Row = styled.div`
-    align-items: center;
-    display: flex;
-    gap: ${space.sm}px;
-    justify-content: space-between;
-    min-width: 240px;
-    padding: ${space.xxs}px ${space.xs}px;
-`;
 
 interface OptionDescriptor {
     value: GlassIntensityPreference;
@@ -60,10 +39,9 @@ interface OptionDescriptor {
 }
 
 /*
- * Source of truth for the order options render in. "Auto" leads
- * because it's the default + the recommended choice; the other three
- * descend by translucency so the slider-feel matches the visual
- * progression on screen.
+ * Source of truth for the order options render in. "Auto" leads because
+ * it's the default + recommended choice; the other three descend by
+ * translucency so the slider-feel matches the on-screen progression.
  */
 const OPTIONS: readonly OptionDescriptor[] = [
     { value: "auto", labelKey: "glassIntensityAuto" },
@@ -79,35 +57,43 @@ const GlassIntensitySelect = () => {
     );
 
     const handleChange = useCallback(
-        (value: string | number) => {
-            // Narrow the Segmented onChange signature (string|number)
-            // back to the slice's union. The descriptor table above
-            // pins every emitted value to a `GlassIntensityPreference`
-            // member, so this narrowing is total in practice.
-            const next = value as GlassIntensityPreference;
-            dispatch(userPreferencesActions.setGlassIntensity(next));
+        (value: string) => {
+            // Radix single-select emits "" when the active item is
+            // re-pressed; Segmented never deselects, so ignore an empty
+            // value to keep exactly one intensity selected.
+            if (!value) return;
+            dispatch(
+                userPreferencesActions.setGlassIntensity(
+                    value as GlassIntensityPreference
+                )
+            );
         },
         [dispatch]
     );
 
-    const options = OPTIONS.map((entry) => ({
-        label: microcopy.settings[entry.labelKey] as string,
-        value: entry.value
-    }));
-
     return (
-        <Row role="group" aria-label={microcopy.settings.changeGlassIntensity}>
+        <div
+            aria-label={microcopy.settings.changeGlassIntensity}
+            className="flex min-w-[240px] items-center justify-between gap-sm px-xs py-xxs"
+            role="group"
+        >
             <Typography.Text>
                 {microcopy.settings.glassIntensity}
             </Typography.Text>
-            <Segmented
+            <ToggleGroup
                 aria-label={microcopy.settings.changeGlassIntensity}
-                options={options}
-                size="small"
+                onValueChange={handleChange}
+                size="sm"
+                type="single"
                 value={intensity}
-                onChange={handleChange}
-            />
-        </Row>
+            >
+                {OPTIONS.map((entry) => (
+                    <ToggleGroupItem key={entry.value} value={entry.value}>
+                        {microcopy.settings[entry.labelKey] as string}
+                    </ToggleGroupItem>
+                ))}
+            </ToggleGroup>
+        </div>
     );
 };
 

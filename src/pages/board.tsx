@@ -1,29 +1,44 @@
-import {
-    CloseOutlined,
-    DeleteOutlined,
-    FileTextOutlined,
-    InboxOutlined,
-    MessageOutlined,
-    MoreOutlined,
-    ReloadOutlined,
-    SettingOutlined,
-    UnorderedListOutlined
-} from "@ant-design/icons";
-import styled from "@emotion/styled";
-import {
-    Alert,
-    Button,
-    Dropdown,
-    Popover,
-    Skeleton,
-    Space,
-    Switch,
-    Typography
-} from "antd";
 import { DragDropContext } from "@hello-pangea/dnd";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+    CircleAlert,
+    FileText,
+    Inbox,
+    List,
+    MessageSquare,
+    MoreHorizontal,
+    RotateCw,
+    Settings,
+    Trash2,
+    X
+} from "lucide-react";
+import {
+    forwardRef,
+    type HTMLAttributes,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState
+} from "react";
 import { useParams } from "react-router-dom";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger
+} from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Typography } from "@/components/ui/typography";
+import { cn } from "@/lib/utils";
 import AiSearchInput from "../components/aiSearchInput";
 import ArchiveDrawer from "../components/archiveDrawer";
 import BoardMinimap from "../components/boardMinimap";
@@ -45,12 +60,8 @@ import TrashDrawer from "../components/trashDrawer";
 import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 import {
-    breakpoints,
     columnMinWidthRem,
     fontSize,
-    fontWeight,
-    letterSpacing,
-    lineHeight,
     radius,
     space as themeSpace
 } from "../theme/tokens";
@@ -81,72 +92,45 @@ import { isOptimisticPlaceholderId } from "../utils/optimisticClientId";
  * Kanban columns flow horizontally and benefit from the full viewport on
  * ultra-wide monitors. We keep our own padding here.
  */
-const BoardShell = styled.div`
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    min-height: 0;
-    padding: ${themeSpace.lg}px ${themeSpace.md}px ${themeSpace.md}px;
-    padding-block-end: max(${themeSpace.lg}px, env(safe-area-inset-bottom));
-    padding-inline-start: max(${themeSpace.md}px, env(safe-area-inset-left));
-    padding-inline-end: max(${themeSpace.md}px, env(safe-area-inset-right));
-    width: 100%;
+const BOARD_SHELL_CLASS = cn(
+    "flex flex-1 flex-col min-h-0 w-full",
+    "pt-lg",
+    "pb-[max(var(--pulse-space-lg),env(safe-area-inset-bottom))]",
+    "pl-[max(var(--pulse-space-md),env(safe-area-inset-left))]",
+    "pr-[max(var(--pulse-space-md),env(safe-area-inset-right))]",
+    "md:pt-xl md:pb-xl",
+    "md:pl-[max(var(--pulse-space-xl),env(safe-area-inset-left))]",
+    "md:pr-[max(var(--pulse-space-xl),env(safe-area-inset-right))]"
+);
 
-    @media (min-width: ${breakpoints.md}px) {
-        padding: ${themeSpace.xl}px ${themeSpace.xl}px ${themeSpace.xl}px;
-        padding-inline-start: max(
-            ${themeSpace.xl}px,
-            env(safe-area-inset-left)
-        );
-        padding-inline-end: max(${themeSpace.xl}px, env(safe-area-inset-right));
-    }
-`;
+/*
+ * Horizontally scrolling Kanban rail. The subtle scrollbar (Firefox /
+ * desktop Linux / older Edge) and the phone-only scroll-snap keep the
+ * flick UX intact; the DnD library still catches long-press drags. The
+ * scrollbar tints thread the app-owned `--pulse-fill-*` tokens (formerly
+ * AntD's `--ant-color-fill-*`).
+ */
+const COLUMN_CONTAINER_CLASS = cn(
+    "flex flex-1 min-w-0 [min-height:75%] overflow-x-auto [overscroll-behavior-x:contain] pb-xs",
+    "[-webkit-overflow-scrolling:touch] [scroll-padding-inline:var(--pulse-space-md)]",
+    "[scrollbar-width:thin] [scrollbar-color:var(--pulse-fill-secondary)_transparent]",
+    "[&::-webkit-scrollbar]:h-[8px]",
+    "[&::-webkit-scrollbar-thumb]:rounded-pill [&::-webkit-scrollbar-thumb]:bg-[var(--pulse-fill-secondary)]",
+    "[&::-webkit-scrollbar-thumb:hover]:bg-[var(--pulse-fill-tertiary)]",
+    "max-[767px]:[scroll-snap-type:x_mandatory] max-[767px]:[&>*]:[scroll-snap-align:start]"
+);
 
-export const ColumnContainer = styled.div`
-    display: flex;
-    flex: 1;
-    min-height: 75%;
-    min-width: 0;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    padding-bottom: ${themeSpace.xs}px;
-    /* Native, momentum-based scrolling on iOS so swiping between columns feels
-     * fluid; the DnD library still catches long-press gestures separately. */
-    -webkit-overflow-scrolling: touch;
-    scroll-padding-inline: ${themeSpace.md}px;
-
-    /* Subtle scrollbar on platforms that paint one (Firefox, desktop Linux,
-     * older Edge). Keeps the visual rhythm calm without going to a hidden
-     * scrollbar (which would remove the affordance entirely). */
-    scrollbar-width: thin;
-    scrollbar-color: var(--ant-color-fill-secondary, rgba(15, 23, 42, 0.08))
-        transparent;
-
-    &::-webkit-scrollbar {
-        height: 8px;
-    }
-    &::-webkit-scrollbar-thumb {
-        background: var(--ant-color-fill-secondary, rgba(15, 23, 42, 0.08));
-        border-radius: ${radius.pill}px;
-    }
-    &::-webkit-scrollbar-thumb:hover {
-        background: var(--ant-color-fill-tertiary, rgba(15, 23, 42, 0.16));
-    }
-
-    /*
-     * On phone-sized viewports we show roughly one column at a time, so
-     * snap horizontal swipes to each column for a Trello-style flick UX.
-     * The DnD library still controls drag-and-drop; native scrolling only
-     * kicks in on swipes that don't engage the drag handle.
-     */
-    @media (max-width: ${breakpoints.md - 1}px) {
-        scroll-snap-type: x mandatory;
-
-        > * {
-            scroll-snap-align: start;
-        }
-    }
-`;
+export const ColumnContainer = forwardRef<
+    HTMLDivElement,
+    HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+    <div
+        ref={ref}
+        className={cn(COLUMN_CONTAINER_CLASS, className)}
+        {...props}
+    />
+));
+ColumnContainer.displayName = "ColumnContainer";
 
 /**
  * Wrapper that paints subtle gradient fades at the left and right edges so
@@ -154,48 +138,16 @@ export const ColumnContainer = styled.div`
  * viewport. The fades use `pointer-events: none` so they never block clicks
  * or drag-and-drop on the columns underneath.
  */
-const ColumnsViewport = styled.div`
-    flex: 1;
-    isolation: isolate;
-    min-height: 0;
-    min-width: 0;
-    overflow: hidden;
-    position: relative;
-
-    &::before,
-    &::after {
-        content: "";
-        bottom: 0;
-        pointer-events: none;
-        position: absolute;
-        top: 0;
-        width: ${themeSpace.lg}px;
-        z-index: 1;
-    }
-
-    &::before {
-        background: linear-gradient(
-            to right,
-            var(--pulse-bg-page),
-            transparent
-        );
-        left: 0;
-    }
-
-    &::after {
-        background: linear-gradient(to left, var(--pulse-bg-page), transparent);
-        right: 0;
-    }
-
-    /* Hide the fades in forced-colors / high-contrast mode where gradients
-     * are filtered out and would just paint as solid blocks. */
-    @media (forced-colors: active) {
-        &::before,
-        &::after {
-            display: none;
-        }
-    }
-`;
+const COLUMNS_VIEWPORT_CLASS = cn(
+    "relative isolate flex-1 min-h-0 min-w-0 overflow-hidden",
+    "before:content-[''] before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:z-[1] before:w-lg",
+    "before:[background:linear-gradient(to_right,var(--pulse-bg-page),transparent)]",
+    "after:content-[''] after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:z-[1] after:w-lg",
+    "after:[background:linear-gradient(to_left,var(--pulse-bg-page),transparent)]",
+    // Hide the fades in forced-colors / high-contrast mode where gradients
+    // are filtered out and would just paint as solid blocks.
+    "forced-colors:before:hidden forced-colors:after:hidden"
+);
 
 /**
  * Hint shown on phone-sized viewports the first time the board is loaded
@@ -205,53 +157,24 @@ const ColumnsViewport = styled.div`
  * localStorage so a user who has acknowledged it once is not nagged on
  * every fresh tab or app reopen.
  */
-const SwipeHint = styled.div`
-    align-items: center;
-    background: var(--ant-color-fill-quaternary, rgba(15, 23, 42, 0.04));
-    border-radius: ${radius.pill}px;
-    color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.55));
-    display: none;
-    font-size: ${fontSize.xs}px;
-    gap: ${themeSpace.xs}px;
-    justify-content: center;
-    margin-bottom: ${themeSpace.xs}px;
-    padding: ${themeSpace.xxs}px ${themeSpace.sm}px;
-    text-align: center;
+const SWIPE_HINT_CLASS = cn(
+    "hidden items-center justify-center gap-xs text-center text-xs",
+    "rounded-pill mb-xs px-sm py-xxs",
+    "[background:var(--pulse-fill-quaternary)] [color:var(--pulse-text-tertiary)]",
+    "max-[767px]:flex"
+);
 
-    @media (max-width: ${breakpoints.md - 1}px) {
-        display: flex;
-    }
-`;
-
-const SwipeHintClose = styled.button`
-    align-items: center;
-    background: transparent;
-    border: none;
-    border-radius: ${radius.pill}px;
-    color: inherit;
-    cursor: pointer;
-    display: inline-flex;
-    height: 24px;
-    justify-content: center;
-    padding: 0;
-    width: 24px;
-
-    &:hover,
-    &:focus-visible {
-        background: var(--ant-color-bg-text-hover, rgba(15, 23, 42, 0.06));
-    }
-
-    /*
-     * The hint itself is only rendered on coarse-pointer / phone-sized
-     * viewports, so a finger has to land this dismiss target. Lift to
-     * the 44 px WCAG 2.5.5 touch floor on coarse pointers; the icon
-     * glyph stays visually small (10 px) so the chrome doesn't grow.
-     */
-    @media (pointer: coarse) {
-        height: 44px;
-        width: 44px;
-    }
-`;
+/*
+ * The hint itself is only rendered on coarse-pointer / phone-sized
+ * viewports, so a finger has to land this dismiss target. Lift to the
+ * 44 px WCAG 2.5.5 touch floor on coarse pointers; the icon glyph stays
+ * visually small (10 px) so the chrome doesn't grow.
+ */
+const SWIPE_HINT_CLOSE_CLASS = cn(
+    "inline-flex h-6 w-6 items-center justify-center rounded-pill border-none bg-transparent p-0 cursor-pointer [color:inherit]",
+    "hover:[background:var(--pulse-bg-text-hover)] focus-visible:[background:var(--pulse-bg-text-hover)]",
+    "coarse:h-[44px] coarse:w-[44px]"
+);
 
 const BoardLoadingSkeleton = () => (
     <ColumnContainer aria-busy="true" aria-label={microcopy.a11y.loadingBoard}>
@@ -259,92 +182,53 @@ const BoardLoadingSkeleton = () => (
             <div
                 key={i}
                 style={{
-                    background: "var(--ant-color-fill-quaternary, #f4f5f7)",
+                    background: "var(--pulse-fill-quaternary, #f4f5f7)",
                     borderRadius: radius.lg,
                     marginRight: themeSpace.md,
                     minWidth: `${columnMinWidthRem}rem`,
                     padding: themeSpace.md
                 }}
             >
-                <Skeleton active paragraph={{ rows: 4 }} title />
+                <Skeleton
+                    className="mb-md h-6 w-1/2"
+                    data-testid="board-skeleton-title"
+                />
+                {[0, 1, 2, 3].map((row) => (
+                    <Skeleton key={row} className="mb-sm h-4 w-full" />
+                ))}
             </div>
         ))}
     </ColumnContainer>
 );
 
-const BoardHeader = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: ${themeSpace.xs}px;
-    margin-bottom: ${themeSpace.lg}px;
+const BOARD_HEADER_CLASS = cn(
+    "flex flex-col gap-xs mb-lg",
+    "coarse:gap-0 coarse:mb-sm"
+);
 
-    @media (pointer: coarse) {
-        gap: 0;
-        margin-bottom: ${themeSpace.sm}px;
-    }
-`;
+/*
+ * Board H1. `break-word` prefers natural word boundaries and only splits a
+ * run mid-character when the run truly does not fit; the two-line clamp caps
+ * a pathologically long single-token project name so it can't push the whole
+ * board down.
+ */
+const BOARD_TITLE_CLASS = cn(
+    "flex-[1_1_auto] min-w-0 m-0 text-xl font-semibold tracking-tight leading-tight",
+    "[overflow-wrap:break-word] [display:-webkit-box] overflow-hidden [-webkit-box-orient:vertical] [-webkit-line-clamp:2]",
+    "md:text-xxl"
+);
 
-const BoardTitle = styled(Typography.Title)`
-    && {
-        flex: 1 1 auto;
-        font-size: ${fontSize.xl}px;
-        font-weight: ${fontWeight.semibold};
-        letter-spacing: ${letterSpacing.tight};
-        line-height: ${lineHeight.tight};
-        margin: 0;
-        min-width: 0;
-        /* break-word prefers natural word boundaries and only splits a
-         * run mid-character when the run truly does not fit (e.g. a
-         * 30+ char single token). The previous "anywhere" value happily
-         * split "Roadmap" into "Roadma|p" on iPhone SE widths. */
-        overflow-wrap: break-word;
-        /* Cap a pathologically long single-token project name (e.g. a
-         * 200-char paste) at two lines so it doesn't grow the heading to
-         * 4+ lines and push the entire board down. The clamp only kicks
-         * in once break-word has wrapped past two lines. */
-        display: -webkit-box;
-        overflow: hidden;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-    }
+const PHONE_BOARD_TITLE_CLASS = "flex flex-[1_1_auto] flex-col min-w-0";
 
-    @media (min-width: ${breakpoints.md}px) {
-        && {
-            font-size: ${fontSize.xxl}px;
-        }
-    }
-`;
+const PHONE_BOARD_TITLE_EYEBROW_CLASS = cn(
+    "text-xs font-medium leading-tight uppercase tracking-[0.04em]",
+    "[color:var(--pulse-text-secondary)]"
+);
 
-const PhoneBoardTitle = styled.div`
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    min-width: 0;
-`;
-
-const PhoneBoardTitleEyebrow = styled(Typography.Text)`
-    && {
-        color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-        font-size: ${fontSize.xs}px;
-        font-weight: ${fontWeight.medium};
-        letter-spacing: ${letterSpacing.wide};
-        line-height: ${lineHeight.tight};
-        text-transform: uppercase;
-    }
-`;
-
-const PhoneBoardTitleText = styled(Typography.Text)`
-    && {
-        color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
-        display: block;
-        font-size: ${fontSize.lg}px;
-        font-weight: ${fontWeight.semibold};
-        line-height: ${lineHeight.tight};
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-`;
+const PHONE_BOARD_TITLE_TEXT_CLASS = cn(
+    "block text-lg font-semibold leading-tight overflow-hidden text-ellipsis whitespace-nowrap",
+    "[color:var(--pulse-text-base)]"
+);
 
 /**
  * Action cluster on the board header. Wraps the CopilotMenu launcher and the
@@ -353,69 +237,35 @@ const PhoneBoardTitleText = styled(Typography.Text)`
  * does not crowd the project name. From md upwards the cluster shrinks to
  * its natural width and aligns to the right of the title row.
  *
- * `flex-wrap: nowrap` keeps the settings cog inline with the launcher on
- * every viewport so a long launcher label does not orphan the cog onto a
- * second row.
+ * `flex-nowrap` keeps the settings cog inline with the launcher on every
+ * viewport so a long launcher label does not orphan the cog onto a second
+ * row.
  */
-const BoardActions = styled.div`
-    align-items: center;
-    display: flex;
-    flex: 1 1 100%;
-    flex-wrap: nowrap;
-    gap: ${themeSpace.xs}px;
-    min-width: 0;
-
-    @media (min-width: ${breakpoints.md}px) {
-        flex: 0 0 auto;
-        justify-content: flex-end;
-    }
-`;
+const BOARD_ACTIONS_CLASS = cn(
+    "flex flex-[1_1_100%] flex-nowrap items-center gap-xs min-w-0",
+    "md:flex-[0_0_auto] md:justify-end"
+);
 
 /**
  * Bottom tier of the two-tier board header. Holds the search/filter rail
  * and the Copilot action launcher. On narrow viewports the launcher stacks
  * below the search rail (column direction); from md upwards they share a
  * row with the search rail growing to fill and the launcher hugging the
- * trailing edge. No fixed min-widths so the row reflows cleanly below the
- * 1024px breakpoint where the old single-row header used to wrap
- * unpredictably.
+ * trailing edge.
  */
-const BoardBottomTier = styled.div`
-    align-items: stretch;
-    display: flex;
-    flex-direction: column;
-    gap: ${themeSpace.sm}px;
+const BOARD_BOTTOM_TIER_CLASS = cn(
+    "flex flex-col items-stretch gap-sm",
+    "md:flex-row md:items-start"
+);
 
-    @media (min-width: ${breakpoints.md}px) {
-        align-items: flex-start;
-        flex-direction: row;
-    }
-`;
-
-const BoardSearchSlot = styled.div`
-    flex: 1 1 auto;
-    min-width: 0;
-`;
-
-const LensToggleRow = styled.div`
-    margin-bottom: ${themeSpace.xs}px;
-`;
-
-const LensPanel = styled.div<{ $open: boolean }>`
-    display: ${({ $open }) => ($open ? "block" : "none")};
-`;
+const BOARD_SEARCH_SLOT_CLASS = "flex-[1_1_auto] min-w-0";
 
 /**
  * Trailing slot in the bottom tier that carries the desktop Copilot
  * launcher. Hidden on phone chrome, where the launcher lives inside the
  * top-tier Liquid Glass capsule instead (iOS 26 toolbar idiom).
  */
-const BoardCopilotSlot = styled.div`
-    align-items: center;
-    display: flex;
-    flex: 0 0 auto;
-    gap: ${themeSpace.xs}px;
-`;
+const BOARD_COPILOT_SLOT_CLASS = "flex flex-[0_0_auto] items-center gap-xs";
 
 const SWIPE_HINT_DISMISSED_KEY = "board.swipeHintDismissed";
 
@@ -572,8 +422,8 @@ const BoardPage = () => {
      * minimap reads `scrollLeft + clientWidth` from this ref to
      * compute which columns are currently in the viewport and writes
      * `scrollLeft` (via `Element.scrollTo`) to bring a column into
-     * view on click. Lives on the `ColumnContainer` styled-div, which
-     * is the actual `overflow-x: auto` element; threading the ref
+     * view on click. Lives on the `ColumnContainer`, which forwards the
+     * ref to the actual `overflow-x: auto` element; threading the ref
      * directly (rather than putting scroll state in Redux) keeps
      * scroll position out of the React tree and avoids a re-render
      * every frame while the user scrubs.
@@ -769,7 +619,7 @@ const BoardPage = () => {
     return (
         <DragDropContext onDragEnd={onDragEnd}>
             <BulkSelectionProvider>
-                <BoardShell>
+                <div className={BOARD_SHELL_CLASS}>
                     {copilotLaunchersOn && !isPhone && <CopilotWelcomeBanner />}
                     {(() => {
                         /*
@@ -797,12 +647,30 @@ const BoardPage = () => {
                         ) : null;
 
                         const projectAiSwitch = aiEnabled ? (
-                            <Popover
-                                content={
-                                    <Space
-                                        direction="vertical"
-                                        size={themeSpace.xs}
-                                        style={{ maxWidth: 280, width: "100%" }}
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        aria-label={
+                                            microcopy.a11y.boardCopilotSettings
+                                        }
+                                        size="icon"
+                                        variant="ghost"
+                                    >
+                                        <Settings aria-hidden />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                    align="end"
+                                    aria-label={
+                                        microcopy.a11y.boardCopilotSettings
+                                    }
+                                >
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: themeSpace.xs
+                                        }}
                                     >
                                         <Typography.Text type="secondary">
                                             {microcopy.ai.copilotLabel}
@@ -827,12 +695,11 @@ const BoardPage = () => {
                                                         .boardCopilotProjectToggle
                                                 }
                                                 checked={!aiDisabledForProject}
-                                                onChange={(checked) =>
+                                                onCheckedChange={(checked) =>
                                                     setProjectAiDisabled(
                                                         !checked
                                                     )
                                                 }
-                                                size="small"
                                             />
                                         </div>
                                         <Typography.Text
@@ -844,18 +711,8 @@ const BoardPage = () => {
                                                     .copilotProjectDisabledDescription
                                             }
                                         </Typography.Text>
-                                    </Space>
-                                }
-                                placement="bottomRight"
-                                trigger={["click"]}
-                            >
-                                <Button
-                                    aria-label={
-                                        microcopy.a11y.boardCopilotSettings
-                                    }
-                                    icon={<SettingOutlined aria-hidden />}
-                                    type="text"
-                                />
+                                    </div>
+                                </PopoverContent>
                             </Popover>
                         ) : null;
 
@@ -867,94 +724,84 @@ const BoardPage = () => {
                          * the bottom tier beside the search rail.
                          */
                         const phoneOverflowMenu = isPhone ? (
-                            <Dropdown
-                                menu={{
-                                    items: [
-                                        /*
-                                         * Copilot Ask / Brief — the phone
-                                         * capsule has no desktop bottom-tier
-                                         * CopilotMenu slot, so the overflow
-                                         * menu is the phone's launcher. Same
-                                         * gate (copilotLaunchersOn) and same
-                                         * drawer callbacks as the desktop
-                                         * split control.
-                                         */
-                                        ...(copilotLaunchersOn
-                                            ? [
-                                                  {
-                                                      key: "copilot-ask",
-                                                      label: microcopy.board
-                                                          .copilotMenuAsk,
-                                                      icon: (
-                                                          <MessageOutlined
-                                                              aria-hidden
-                                                          />
-                                                      ),
-                                                      onClick: () =>
-                                                          openChatDrawer()
-                                                  },
-                                                  {
-                                                      key: "copilot-brief",
-                                                      label: microcopy.board
-                                                          .copilotMenuBrief,
-                                                      icon: (
-                                                          <FileTextOutlined
-                                                              aria-hidden
-                                                          />
-                                                      ),
-                                                      onClick: () =>
-                                                          openBriefDrawer()
-                                                  }
-                                              ]
-                                            : []),
-                                        ...(aiEnabled
-                                            ? [
-                                                  {
-                                                      key: "project-ai",
-                                                      label: aiDisabledForProject
-                                                          ? microcopy.board
-                                                                .enableCopilotOnBoard
-                                                          : microcopy.board
-                                                                .copilotMenuProjectOff,
-                                                      icon: (
-                                                          <SettingOutlined
-                                                              aria-hidden
-                                                          />
-                                                      ),
-                                                      onClick: () =>
-                                                          setProjectAiDisabled(
-                                                              !aiDisabledForProject
-                                                          )
-                                                  }
-                                              ]
-                                            : []),
-                                        {
-                                            key: "trash",
-                                            label: microcopy.trashDrawer
-                                                .triggerAriaLabel,
-                                            icon: (
-                                                <DeleteOutlined aria-hidden />
-                                            ),
-                                            onClick: () => openTrashDrawer()
-                                        },
-                                        {
-                                            key: "archive",
-                                            label: microcopy.archiveDrawer
-                                                .triggerAriaLabel,
-                                            icon: <InboxOutlined aria-hidden />,
-                                            onClick: () => openArchiveDrawer()
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        aria-label={
+                                            microcopy.board.moreActionsAria
                                         }
-                                    ]
-                                }}
-                                trigger={["click"]}
-                            >
-                                <Button
-                                    aria-label={microcopy.board.moreActionsAria}
-                                    data-testid="board-more-actions"
-                                    icon={<MoreOutlined aria-hidden />}
-                                    type="text"
-                                />
-                            </Dropdown>
+                                        data-testid="board-more-actions"
+                                        size="icon"
+                                        variant="ghost"
+                                    >
+                                        <MoreHorizontal aria-hidden />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    {/*
+                                     * Copilot Ask / Brief — the phone capsule
+                                     * has no desktop bottom-tier CopilotMenu
+                                     * slot, so the overflow menu is the
+                                     * phone's launcher. Same gate
+                                     * (copilotLaunchersOn) and drawer
+                                     * callbacks as the desktop split control.
+                                     */}
+                                    {copilotLaunchersOn ? (
+                                        <>
+                                            <DropdownMenuItem
+                                                onSelect={() =>
+                                                    openChatDrawer()
+                                                }
+                                            >
+                                                <MessageSquare aria-hidden />
+                                                {microcopy.board.copilotMenuAsk}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onSelect={() =>
+                                                    openBriefDrawer()
+                                                }
+                                            >
+                                                <FileText aria-hidden />
+                                                {
+                                                    microcopy.board
+                                                        .copilotMenuBrief
+                                                }
+                                            </DropdownMenuItem>
+                                        </>
+                                    ) : null}
+                                    {aiEnabled ? (
+                                        <DropdownMenuItem
+                                            onSelect={() =>
+                                                setProjectAiDisabled(
+                                                    !aiDisabledForProject
+                                                )
+                                            }
+                                        >
+                                            <Settings aria-hidden />
+                                            {aiDisabledForProject
+                                                ? microcopy.board
+                                                      .enableCopilotOnBoard
+                                                : microcopy.board
+                                                      .copilotMenuProjectOff}
+                                        </DropdownMenuItem>
+                                    ) : null}
+                                    <DropdownMenuItem
+                                        onSelect={() => openTrashDrawer()}
+                                    >
+                                        <Trash2 aria-hidden />
+                                        {microcopy.trashDrawer.triggerAriaLabel}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onSelect={() => openArchiveDrawer()}
+                                    >
+                                        <Inbox aria-hidden />
+                                        {
+                                            microcopy.archiveDrawer
+                                                .triggerAriaLabel
+                                        }
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         ) : null;
 
                         const topTierControls = (
@@ -963,11 +810,15 @@ const BoardPage = () => {
                                     <Button
                                         aria-label={microcopy.actions.refresh}
                                         data-testid="board-refresh"
-                                        icon={<ReloadOutlined aria-hidden />}
                                         loading={boardRefreshing}
                                         onClick={handleRefresh}
-                                        type="text"
-                                    />
+                                        size="icon"
+                                        variant="ghost"
+                                    >
+                                        {!boardRefreshing && (
+                                            <RotateCw aria-hidden />
+                                        )}
+                                    </Button>
                                 )}
                                 <MemberPopover />
                                 {!isPhone && (
@@ -978,22 +829,24 @@ const BoardPage = () => {
                                                     .triggerAriaLabel
                                             }
                                             data-testid="board-trash"
-                                            icon={
-                                                <DeleteOutlined aria-hidden />
-                                            }
                                             onClick={() => openTrashDrawer()}
-                                            type="text"
-                                        />
+                                            size="icon"
+                                            variant="ghost"
+                                        >
+                                            <Trash2 aria-hidden />
+                                        </Button>
                                         <Button
                                             aria-label={
                                                 microcopy.archiveDrawer
                                                     .triggerAriaLabel
                                             }
                                             data-testid="board-archive"
-                                            icon={<InboxOutlined aria-hidden />}
                                             onClick={() => openArchiveDrawer()}
-                                            type="text"
-                                        />
+                                            size="icon"
+                                            variant="ghost"
+                                        >
+                                            <Inbox aria-hidden />
+                                        </Button>
                                     </>
                                 )}
                                 {isPhone && phoneOverflowMenu}
@@ -1003,7 +856,7 @@ const BoardPage = () => {
 
                         return (
                             <>
-                                <BoardHeader>
+                                <div className={BOARD_HEADER_CLASS}>
                                     <Row
                                         between
                                         style={{
@@ -1015,7 +868,10 @@ const BoardPage = () => {
                                     >
                                         {isPhone ? (
                                             <>
-                                                <BoardTitle
+                                                <Typography.Title
+                                                    className={
+                                                        BOARD_TITLE_CLASS
+                                                    }
                                                     level={1}
                                                     style={
                                                         srOnlyLiveRegionStyle
@@ -1026,23 +882,34 @@ const BoardPage = () => {
                                                         : boardTitle(
                                                               currentProject?.projectName
                                                           )}
-                                                </BoardTitle>
-                                                <PhoneBoardTitle
+                                                </Typography.Title>
+                                                <div
+                                                    className={
+                                                        PHONE_BOARD_TITLE_CLASS
+                                                    }
                                                     aria-hidden="true"
                                                     data-testid="phone-board-title"
                                                 >
-                                                    <PhoneBoardTitleEyebrow>
+                                                    <Typography.Text
+                                                        className={
+                                                            PHONE_BOARD_TITLE_EYEBROW_CLASS
+                                                        }
+                                                    >
                                                         {microcopy.labels.board}
-                                                    </PhoneBoardTitleEyebrow>
-                                                    <PhoneBoardTitleText>
+                                                    </Typography.Text>
+                                                    <Typography.Text
+                                                        className={
+                                                            PHONE_BOARD_TITLE_TEXT_CLASS
+                                                        }
+                                                    >
                                                         {pLoading
                                                             ? microcopy.a11y
                                                                   .loadingProjectName
                                                             : (currentProject?.projectName ??
                                                               microcopy.labels
                                                                   .project)}
-                                                    </PhoneBoardTitleText>
-                                                </PhoneBoardTitle>
+                                                    </Typography.Text>
+                                                </div>
                                             </>
                                         ) : pLoading ? (
                                             <span
@@ -1056,23 +923,25 @@ const BoardPage = () => {
                                                     minWidth: 0
                                                 }}
                                             >
-                                                <Skeleton.Input
-                                                    active
-                                                    size="large"
+                                                <Skeleton
                                                     style={{
+                                                        height: 32,
                                                         maxWidth: "100%",
                                                         width: 240
                                                     }}
                                                 />
                                             </span>
                                         ) : (
-                                            <BoardTitle level={1}>
+                                            <Typography.Title
+                                                className={BOARD_TITLE_CLASS}
+                                                level={1}
+                                            >
                                                 {boardTitle(
                                                     currentProject?.projectName
                                                 )}
-                                            </BoardTitle>
+                                            </Typography.Title>
                                         )}
-                                        <BoardActions>
+                                        <div className={BOARD_ACTIONS_CLASS}>
                                             {isPhone ? (
                                                 <GlassActionCluster
                                                     data-testid="board-actions-cluster"
@@ -1085,12 +954,12 @@ const BoardPage = () => {
                                             ) : (
                                                 topTierControls
                                             )}
-                                        </BoardActions>
+                                        </div>
                                     </Row>
-                                </BoardHeader>
-                                <BoardBottomTier>
-                                    <BoardSearchSlot>
-                                        <LensToggleRow>
+                                </div>
+                                <div className={BOARD_BOTTOM_TIER_CLASS}>
+                                    <div className={BOARD_SEARCH_SLOT_CLASS}>
+                                        <div className="mb-xs">
                                             <Button
                                                 aria-expanded={
                                                     lensesOpen ||
@@ -1101,29 +970,27 @@ const BoardPage = () => {
                                                         .lensesToggleAria
                                                 }
                                                 data-testid="board-lenses-toggle"
-                                                icon={
-                                                    <UnorderedListOutlined
-                                                        aria-hidden
-                                                    />
-                                                }
                                                 onClick={() =>
                                                     setLensesOpen(
                                                         (open) => !open
                                                     )
                                                 }
-                                                type={
+                                                variant={
                                                     lensesOpen || activeLens
                                                         ? "primary"
                                                         : "default"
                                                 }
                                             >
+                                                <List aria-hidden />
                                                 {microcopy.board.lensesToggle}
                                             </Button>
-                                        </LensToggleRow>
-                                        <LensPanel
-                                            $open={
-                                                lensesOpen ||
-                                                Boolean(activeLens)
+                                        </div>
+                                        <div
+                                            hidden={
+                                                !(
+                                                    lensesOpen ||
+                                                    Boolean(activeLens)
+                                                )
                                             }
                                         >
                                             <LensChips
@@ -1141,7 +1008,7 @@ const BoardPage = () => {
                                                     )
                                                 }
                                             />
-                                        </LensPanel>
+                                        </div>
                                         <TaskSearchPanel
                                             tasks={visibleTasks}
                                             param={param}
@@ -1179,36 +1046,43 @@ const BoardPage = () => {
                                                 ) : undefined
                                             }
                                         />
-                                    </BoardSearchSlot>
+                                    </div>
                                     {!isPhone && copilotMenuEl && (
-                                        <BoardCopilotSlot>
+                                        <div
+                                            className={BOARD_COPILOT_SLOT_CLASS}
+                                        >
                                             {copilotMenuEl}
-                                        </BoardCopilotSlot>
+                                        </div>
                                     )}
-                                </BoardBottomTier>
+                                </div>
                             </>
                         );
                     })()}
                     {bError || tError ? (
                         <Alert
-                            action={
+                            variant="destructive"
+                            style={{ marginBottom: themeSpace.md }}
+                        >
+                            <CircleAlert aria-hidden />
+                            <AlertTitle>
+                                {microcopy.feedback.loadFailed}
+                            </AlertTitle>
+                            <AlertDescription>
+                                {microcopy.feedback.retryHint}
+                            </AlertDescription>
+                            <div style={{ marginTop: themeSpace.sm }}>
                                 <Button
                                     onClick={() => {
                                         if (bError) refetchBoard();
                                         if (tError) refetchTasks();
                                     }}
-                                    size="small"
-                                    type="primary"
+                                    size="sm"
+                                    variant="primary"
                                 >
                                     {microcopy.actions.retry}
                                 </Button>
-                            }
-                            description={microcopy.feedback.retryHint}
-                            title={microcopy.feedback.loadFailed}
-                            showIcon
-                            style={{ marginBottom: themeSpace.md }}
-                            type="error"
-                        />
+                            </div>
+                        </Alert>
                     ) : null}
                     <SrOnlyLive>{filterStatusMessage}</SrOnlyLive>
                     {!(bLoading || tLoading) ? (
@@ -1222,7 +1096,7 @@ const BoardPage = () => {
                                     cta={
                                         <Button
                                             onClick={handleCreateFirstColumn}
-                                            type="primary"
+                                            variant="primary"
                                         >
                                             {microcopy.empty.board.cta}
                                         </Button>
@@ -1236,13 +1110,19 @@ const BoardPage = () => {
                             <>
                                 {(board?.length ?? 0) > 1 &&
                                     !swipeHintDismissed && (
-                                        <SwipeHint role="status">
+                                        <div
+                                            className={SWIPE_HINT_CLASS}
+                                            role="status"
+                                        >
                                             <span aria-hidden>←</span>
                                             <span>
                                                 {microcopy.board.swipeHint}
                                             </span>
                                             <span aria-hidden>→</span>
-                                            <SwipeHintClose
+                                            <button
+                                                className={
+                                                    SWIPE_HINT_CLOSE_CLASS
+                                                }
                                                 aria-label={
                                                     microcopy.a11y
                                                         .dismissSwipeHint
@@ -1250,12 +1130,9 @@ const BoardPage = () => {
                                                 onClick={dismissSwipeHint}
                                                 type="button"
                                             >
-                                                <CloseOutlined
-                                                    aria-hidden
-                                                    style={{ fontSize: 10 }}
-                                                />
-                                            </SwipeHintClose>
-                                        </SwipeHint>
+                                                <X aria-hidden size={10} />
+                                            </button>
+                                        </div>
                                     )}
                                 {environment.boardMinimapEnabled && (
                                     <BoardMinimap
@@ -1263,7 +1140,7 @@ const BoardPage = () => {
                                         scrollContainerRef={boardScrollRef}
                                     />
                                 )}
-                                <ColumnsViewport>
+                                <div className={COLUMNS_VIEWPORT_CLASS}>
                                     <ColumnContainer ref={boardScrollRef}>
                                         <Drop
                                             droppableId="column"
@@ -1330,7 +1207,7 @@ const BoardPage = () => {
                                         </Drop>
                                         <ColumnCreator />
                                     </ColumnContainer>
-                                </ColumnsViewport>
+                                </div>
                             </>
                         )
                     ) : (
@@ -1378,7 +1255,7 @@ const BoardPage = () => {
                      * navigations (R-A M1). The board page only triggers it via
                      * the launcher callsites above — it mounts no AI drawer.
                      */}
-                </BoardShell>
+                </div>
             </BulkSelectionProvider>
         </DragDropContext>
     );

@@ -1,15 +1,33 @@
-import { CloseOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
-import { Button, Select, Tooltip } from "antd";
+import { X } from "lucide-react";
 import React from "react";
 import { useParams } from "react-router-dom";
 
 import { microcopy } from "../../constants/microcopy";
-import { breakpoints, radius, shadow, space, zIndex } from "../../theme/tokens";
-import useAppMessage from "../../utils/hooks/useAppMessage";
+import { shadow } from "../../theme/tokens";
+import useAppMessage from "../../components/ui/toast";
 import useBulkSelection from "../../utils/hooks/useBulkSelection";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import bulkUpdateTasksCallback from "../../utils/optimisticUpdate/bulkUpdateTasks";
+import { Button } from "../ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuTrigger
+} from "../ui/dropdown-menu";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from "../ui/select";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger
+} from "../ui/tooltip";
 
 /**
  * Floating bulk-edit toolbar (PRD-GAP-008). Appears once ≥1 task card is
@@ -20,47 +38,9 @@ import bulkUpdateTasksCallback from "../../utils/optimisticUpdate/bulkUpdateTask
  * path deliberately can't make.
  *
  * The bar is `position: fixed` bottom-centre (the Gmail / Linear idiom) so
- * it never shifts the board layout; it sits below AntD overlays
- * (`zIndex.navBar`) so an open modal/drawer still covers it.
+ * it never shifts the board layout; it sits below overlays (`zIndex.navBar`)
+ * so an open modal/drawer still covers it.
  */
-const Bar = styled.div`
-    align-items: center;
-    background: var(--ant-color-bg-elevated, #ffffff);
-    border: 1px solid var(--ant-color-border-secondary, rgba(15, 23, 42, 0.1));
-    border-radius: ${radius.pill}px;
-    bottom: max(${space.md}px, env(safe-area-inset-bottom));
-    box-shadow: ${shadow.lift};
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.sm}px;
-    justify-content: center;
-    left: 50%;
-    max-width: calc(100vw - ${space.lg * 2}px);
-    padding: ${space.sm}px ${space.md}px;
-    position: fixed;
-    transform: translateX(-50%);
-    z-index: ${zIndex.navBar};
-
-    @media (max-width: ${breakpoints.md - 1}px) {
-        border-radius: ${radius.lg}px;
-        left: ${space.md}px;
-        right: ${space.md}px;
-        transform: none;
-    }
-`;
-
-const Count = styled.span`
-    font-weight: 600;
-    white-space: nowrap;
-`;
-
-const Controls = styled.div`
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xs}px;
-`;
-
 const PRIORITY_VALUES: TaskPriorityLevel[] = [
     "none",
     "low",
@@ -153,76 +133,140 @@ const BulkEditToolbar: React.FC<BulkEditToolbarProps> = ({
             : microcopy.bulkEdit.selectedCount.other
     ).replace("{count}", String(count));
 
+    const toggleLabel = (labelId: string, checked: boolean) => {
+        setLabelIds((prev) => {
+            const current = prev ?? [];
+            return checked
+                ? [...current, labelId]
+                : current.filter((id) => id !== labelId);
+        });
+    };
+
+    const selectedLabelCount = labelIds?.length ?? 0;
+
     return (
-        <Bar
-            aria-label={microcopy.bulkEdit.toolbarAriaLabel}
-            data-testid="bulk-edit-toolbar"
-            role="toolbar"
-        >
-            <Count aria-live="polite">{countLabel}</Count>
-            <Controls>
-                <Select<TaskPriorityLevel>
-                    allowClear
-                    aria-label={microcopy.bulkEdit.setPriority}
-                    onChange={(value) => setPriority(value ?? undefined)}
-                    options={PRIORITY_VALUES.map((value) => ({
-                        label: microcopy.options.priorities[value],
-                        value
-                    }))}
-                    placeholder={microcopy.bulkEdit.setPriority}
-                    style={{ minWidth: 150 }}
-                    value={priority}
-                />
-                <Select<string>
-                    allowClear
-                    aria-label={microcopy.bulkEdit.setCoordinator}
-                    optionFilterProp="label"
-                    onChange={(value) => setCoordinatorId(value ?? undefined)}
-                    options={members.map((member) => ({
-                        label: member.username,
-                        value: member._id
-                    }))}
-                    placeholder={microcopy.bulkEdit.setCoordinator}
-                    showSearch
-                    style={{ minWidth: 170 }}
-                    value={coordinatorId}
-                />
-                <Select<string[]>
-                    allowClear
-                    aria-label={microcopy.bulkEdit.setLabels}
-                    mode="multiple"
-                    optionFilterProp="label"
-                    onChange={(value) => setLabelIds(value)}
-                    options={labels.map((label) => ({
-                        label: label.name,
-                        value: label._id
-                    }))}
-                    placeholder={microcopy.bulkEdit.setLabels}
-                    style={{ minWidth: 190 }}
-                    value={labelIds}
-                />
-            </Controls>
-            <Button
-                aria-label={microcopy.bulkEdit.applyAriaLabel}
-                disabled={!hasChange}
-                loading={isLoading}
-                onClick={onApply}
-                type="primary"
+        <TooltipProvider>
+            <div
+                aria-label={microcopy.bulkEdit.toolbarAriaLabel}
+                className="fixed left-1/2 z-[15] flex max-w-[calc(100vw-48px)] -translate-x-1/2 flex-wrap items-center justify-center gap-sm rounded-full border border-border bg-popover px-md py-sm max-md:left-md max-md:right-md max-md:translate-x-0 max-md:rounded-lg"
+                data-testid="bulk-edit-toolbar"
+                role="toolbar"
+                style={{
+                    bottom: "max(16px, env(safe-area-inset-bottom))",
+                    boxShadow: shadow.lift
+                }}
             >
-                {microcopy.actions.apply}
-            </Button>
-            <Tooltip title={microcopy.bulkEdit.clearSelection}>
+                <span
+                    className="whitespace-nowrap font-semibold"
+                    aria-live="polite"
+                >
+                    {countLabel}
+                </span>
+                <div className="flex flex-wrap items-center gap-xs">
+                    <Select
+                        onValueChange={(value) =>
+                            setPriority(value as TaskPriorityLevel)
+                        }
+                        value={priority}
+                    >
+                        <SelectTrigger
+                            aria-label={microcopy.bulkEdit.setPriority}
+                            className="min-w-[150px]"
+                        >
+                            <SelectValue
+                                placeholder={microcopy.bulkEdit.setPriority}
+                            />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {PRIORITY_VALUES.map((value) => (
+                                <SelectItem key={value} value={value}>
+                                    {microcopy.options.priorities[value]}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Select
+                        onValueChange={(value) => setCoordinatorId(value)}
+                        value={coordinatorId}
+                    >
+                        <SelectTrigger
+                            aria-label={microcopy.bulkEdit.setCoordinator}
+                            className="min-w-[170px]"
+                        >
+                            <SelectValue
+                                placeholder={microcopy.bulkEdit.setCoordinator}
+                            />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {members.map((member) => (
+                                <SelectItem key={member._id} value={member._id}>
+                                    {member.username}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                aria-label={microcopy.bulkEdit.setLabels}
+                                className="min-w-[190px] justify-between font-normal"
+                                variant="default"
+                            >
+                                {selectedLabelCount > 0
+                                    ? microcopy.bulkEdit.selectedCount.other.replace(
+                                          "{count}",
+                                          String(selectedLabelCount)
+                                      )
+                                    : microcopy.bulkEdit.setLabels}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            {labels.map((label) => (
+                                <DropdownMenuCheckboxItem
+                                    checked={
+                                        labelIds?.includes(label._id) ?? false
+                                    }
+                                    key={label._id}
+                                    onCheckedChange={(checked) =>
+                                        toggleLabel(label._id, checked)
+                                    }
+                                    onSelect={(event) => event.preventDefault()}
+                                >
+                                    {label.name}
+                                </DropdownMenuCheckboxItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
                 <Button
-                    aria-label={microcopy.bulkEdit.clearSelection}
-                    icon={<CloseOutlined aria-hidden />}
-                    onClick={() => {
-                        reset();
-                        clear();
-                    }}
-                    type="text"
-                />
-            </Tooltip>
-        </Bar>
+                    aria-label={microcopy.bulkEdit.applyAriaLabel}
+                    disabled={!hasChange}
+                    loading={isLoading}
+                    onClick={onApply}
+                    variant="primary"
+                >
+                    {microcopy.actions.apply}
+                </Button>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            aria-label={microcopy.bulkEdit.clearSelection}
+                            onClick={() => {
+                                reset();
+                                clear();
+                            }}
+                            size="icon"
+                            variant="ghost"
+                        >
+                            <X aria-hidden />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        {microcopy.bulkEdit.clearSelection}
+                    </TooltipContent>
+                </Tooltip>
+            </div>
+        </TooltipProvider>
     );
 };
 

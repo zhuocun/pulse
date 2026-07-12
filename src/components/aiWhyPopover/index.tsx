@@ -1,16 +1,22 @@
-import { QuestionCircleOutlined } from "@ant-design/icons";
-import { Button, Popover, Typography } from "antd";
+import { HelpCircle } from "lucide-react";
 import React from "react";
 
+import { Button } from "@/components/ui/button";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger
+} from "@/components/ui/popover";
+import { Typography } from "@/components/ui/typography";
+
 import { microcopy, microcopyString } from "../../constants/microcopy";
-import { fontSize, space } from "../../theme/tokens";
 
 /**
  * "Why?" rationale affordance for AI suggestions (B3 — AI provenance &
  * transparency, ui-todo §2.A.8).
  *
  * Renders a small, keyboard-operable "Why?" link next to an AI suggestion.
- * Activating it (click / Enter / Space — AntD `Button` handles all three)
+ * Activating it (click / Enter / Space — the `Button` handles all three)
  * opens a Popover that reveals the engine's *existing* rationale text,
  * turning a "magic" suggestion into "the machine followed these rules".
  *
@@ -21,7 +27,7 @@ import { fontSize, space } from "../../theme/tokens";
  *
  * Accessibility
  * -------------
- * The trigger is a real `<button>` (AntD `type="link"`) with an explicit
+ * The trigger is a real `<button>` (`variant="link"`) with an explicit
  * `aria-label`, so it has an accessible name and is reachable by keyboard.
  * The popover title gives the disclosed text a heading for context.
  */
@@ -52,35 +58,32 @@ const AiWhyPopover: React.FC<AiWhyPopoverProps> = ({
         ? `${baseLabel} — ${ariaContext}`
         : baseLabel;
 
-    const content = (
-        <Typography.Paragraph
-            style={{ marginBottom: 0, maxWidth: "18rem" }}
-            type="secondary"
-        >
-            {text}
-        </Typography.Paragraph>
-    );
-
     return (
-        <Popover
-            content={content}
-            title={title ?? microcopy.ai.whyPopoverTitle}
-            trigger={["hover", "click"]}
-        >
-            <Button
-                aria-label={accessibleName}
-                icon={<QuestionCircleOutlined aria-hidden />}
-                size="small"
-                style={{
-                    fontSize: fontSize.xs,
-                    height: "auto",
-                    paddingInline: space.xxs,
-                    ...style
-                }}
-                type="link"
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button
+                    aria-label={accessibleName}
+                    className="h-auto gap-xxs px-xxs py-0 text-xs"
+                    style={style}
+                    variant="link"
+                >
+                    <HelpCircle aria-hidden />
+                    {baseLabel}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent
+                aria-label={microcopyString(microcopy.ai.whyPopoverTitle)}
             >
-                {baseLabel}
-            </Button>
+                <Typography.Text className="mb-sm block font-semibold">
+                    {title ?? microcopy.ai.whyPopoverTitle}
+                </Typography.Text>
+                <Typography.Paragraph
+                    className="mb-0 max-w-[18rem]"
+                    type="secondary"
+                >
+                    {text}
+                </Typography.Paragraph>
+            </PopoverContent>
         </Popover>
     );
 };

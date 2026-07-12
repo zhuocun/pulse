@@ -118,7 +118,8 @@ the whole backlog without folder-hopping.
   `mobile-ux-best-practices.md`.
 - [`design/modal-routing-policy.md`](design/modal-routing-policy.md) —
   adopted policy: new detail surfaces are routed (URL-addressable) by
-  default; AntD `Modal` is reserved for ephemeral yes/no/cancel prompts.
+  default; the `Dialog` primitive is reserved for ephemeral
+  yes/no/cancel prompts.
 - [`design/ui-ux-comprehensive-review-2026-05.md`](design/ui-ux-comprehensive-review-2026-05.md)
   — consolidated 2026-05 UI/UX audit (124 findings across six surface
   reports, 30 screenshots). The per-surface source reports under

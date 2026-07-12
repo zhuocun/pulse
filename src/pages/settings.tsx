@@ -1,36 +1,25 @@
 import {
-    BgColorsOutlined,
-    DesktopOutlined,
-    GlobalOutlined,
-    LogoutOutlined,
-    MoonOutlined,
-    RobotOutlined,
-    SunOutlined
-} from "@ant-design/icons";
-import styled from "@emotion/styled";
-import {
-    Button,
-    Card,
-    Collapse,
-    Segmented,
-    Space,
-    Switch,
-    Typography
-} from "antd";
+    Bot,
+    ChevronRight,
+    Globe,
+    LogOut,
+    Monitor,
+    Moon,
+    Palette,
+    Sun
+} from "lucide-react";
+import { type ReactNode } from "react";
 
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Typography } from "@/components/ui/typography";
 import ColorThemeSelect from "../components/colorThemeSelect";
 import PageContainer from "../components/pageContainer";
 import SettingsSection, { SettingsRow } from "../components/settingsSection";
 import { microcopy } from "../constants/microcopy";
 import { useLocale, type LocaleCode } from "../i18n";
-import {
-    breakpoints,
-    fontSize,
-    fontWeight,
-    lineHeight,
-    radius,
-    space
-} from "../theme/tokens";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useAuth from "../utils/hooks/useAuth";
 import useColorScheme from "../utils/hooks/useColorScheme";
@@ -61,82 +50,38 @@ import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
  * `aria-label`s) are identical regardless of chassis.
  */
 
-const PageHeading = styled(Typography.Title)`
-    && {
-        font-size: ${fontSize.xxl}px;
-        font-weight: ${fontWeight.semibold};
-        line-height: ${lineHeight.tight};
-        margin-bottom: ${space.xs}px;
-    }
-`;
-
-const PageSubtitle = styled(Typography.Paragraph)`
-    && {
-        color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-        font-size: ${fontSize.md}px;
-        margin-bottom: ${space.xl}px;
-    }
-`;
-
-const SettingsList = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.md}px;
-    margin-inline: auto;
-    max-width: 48rem;
-    width: 100%;
-`;
-
 /*
- * Settings row layout follows the iOS 26 "grouped table view" idiom:
- * on roomy viewports (>=sm) the label sits inline with the control on
- * the right, separated by `space-between`. Below `sm` the row stacks
- * — label on top, control stretched full-width below — because at
- * iPhone-width (393 px) the Theme row's 3-state Segmented (and to a
- * lesser extent the Language row's Segmented) couldn't fit alongside
- * the label and was forcing the label ("Them\ne") and the option
- * pills ("Li…", "D…", "Syst…") to ellipsize. Stacking is applied
- * uniformly to every row so the four controls feel cut from the same
- * cloth on phone, not three-cards-aligned-one-stacked. The inner
- * `RowLabel` keeps `flex: 1 1 auto` so the desktop branch still
- * pushes the control to the trailing edge; the stacked branch
- * stretches both children full-width via `align-items: stretch`.
+ * Desktop settings row. Follows the iOS 26 "grouped table view" idiom:
+ * on roomy viewports (>=480px) the label sits inline with the control on
+ * the right, separated by space-between. Below 480px the row stacks —
+ * label on top, control stretched full-width below — because at
+ * iPhone-width (393 px) the Theme row's 3-state toggle group couldn't fit
+ * alongside the label and forced both to ellipsize.
  */
-const Row = styled(Card)`
-    && {
-        border-radius: ${radius.lg}px;
-    }
-    && .ant-card-body {
-        align-items: stretch;
-        display: flex;
-        flex-direction: column;
-        gap: ${space.sm}px;
-        padding: ${space.md}px ${space.lg}px;
-    }
-    @media (min-width: ${breakpoints.sm}px) {
-        && .ant-card-body {
-            align-items: center;
-            flex-direction: row;
-            gap: ${space.md}px;
-            justify-content: space-between;
-        }
-    }
-`;
-
-const RowLabel = styled.div`
-    align-items: center;
-    display: flex;
-    flex: 1 1 auto;
-    gap: ${space.sm}px;
-    min-width: 0;
-`;
-
-const RowText = styled(Typography.Text)`
-    && {
-        font-size: ${fontSize.md}px;
-        font-weight: ${fontWeight.medium};
-    }
-`;
+const SettingsRowCard = ({
+    icon,
+    label,
+    control,
+    "data-testid": dataTestid
+}: {
+    icon: ReactNode;
+    label: ReactNode;
+    control: ReactNode;
+    "data-testid"?: string;
+}) => (
+    <Card
+        className="flex flex-col items-stretch gap-sm px-lg py-md min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between min-[480px]:gap-md"
+        data-testid={dataTestid}
+    >
+        <div className="flex min-w-0 flex-auto items-center gap-xs">
+            {icon}
+            <Typography.Text className="text-md font-medium">
+                {label}
+            </Typography.Text>
+        </div>
+        {control}
+    </Card>
+);
 
 const SettingsPage = () => {
     useTitle(composeBrandedTitle(microcopy.pageTitle.settings), false);
@@ -161,17 +106,17 @@ const SettingsPage = () => {
      */
     const themeIcon =
         scheme === "dark" ? (
-            <MoonOutlined aria-hidden />
+            <Moon aria-hidden className="size-4" />
         ) : (
-            <SunOutlined aria-hidden />
+            <Sun aria-hidden className="size-4" />
         );
-    const languageIcon = <GlobalOutlined aria-hidden />;
-    const colorThemeIcon = <BgColorsOutlined aria-hidden />;
-    const logoutIcon = <LogoutOutlined aria-hidden />;
-    const copilotIcon = <RobotOutlined aria-hidden />;
+    const languageIcon = <Globe aria-hidden className="size-4" />;
+    const colorThemeIcon = <Palette aria-hidden className="size-4" />;
+    const logoutIcon = <LogOut aria-hidden className="size-4" />;
+    const copilotIcon = <Bot aria-hidden className="size-4" />;
 
     /*
-     * 3-state Segmented preserves the underlying `useColorScheme()`
+     * 3-state toggle group preserves the underlying `useColorScheme()`
      * contract (light / dark / system). The previous 2-state Switch
      * collapsed `system` to either light or dark on toggle and left the
      * user no way back to "follow OS" once they touched it. Aria-label
@@ -179,70 +124,75 @@ const SettingsPage = () => {
      * purpose; each item carries its own visible label + icon.
      */
     const themeControl = (
-        <Segmented
+        <ToggleGroup
             aria-label={microcopy.settings.theme}
-            options={[
-                {
-                    label: microcopy.settings.themeLight,
-                    value: "light",
-                    icon: <SunOutlined aria-hidden />
-                },
-                {
-                    label: microcopy.settings.themeDark,
-                    value: "dark",
-                    icon: <MoonOutlined aria-hidden />
-                },
-                {
-                    label: microcopy.settings.themeSystem,
-                    value: "system",
-                    icon: <DesktopOutlined aria-hidden />
-                }
-            ]}
-            onChange={(value) =>
-                setPreference(value as "light" | "dark" | "system")
-            }
+            onValueChange={(value) => {
+                if (value) setPreference(value as "light" | "dark" | "system");
+            }}
+            type="single"
             value={themePreference}
-        />
+        >
+            <ToggleGroupItem value="light">
+                <Sun aria-hidden />
+                {microcopy.settings.themeLight}
+            </ToggleGroupItem>
+            <ToggleGroupItem value="dark">
+                <Moon aria-hidden />
+                {microcopy.settings.themeDark}
+            </ToggleGroupItem>
+            <ToggleGroupItem value="system">
+                <Monitor aria-hidden />
+                {microcopy.settings.themeSystem}
+            </ToggleGroupItem>
+        </ToggleGroup>
     );
 
     /* The colour-theme picker owns its own slice read/dispatch +
-     * Segmented (six palette swatches), so the page just slots the
+     * toggle group (palette swatches), so the page just slots the
      * element into both chassis branches like any other control. */
     const colorThemeControl = <ColorThemeSelect />;
 
     /* Native names ("English", "中文") so the option you want is always
      * readable in its own script. */
     const languageControl = (
-        <Segmented
+        <ToggleGroup
             aria-label={microcopy.settings.changeLanguage}
-            options={availableLocales.map((entry) => ({
-                label: entry.nativeName,
-                value: entry.code,
-                title: entry.englishName
-            }))}
-            onChange={(value) => setLocale(value as LocaleCode)}
+            onValueChange={(value) => {
+                if (value) setLocale(value as LocaleCode);
+            }}
+            type="single"
             value={locale}
-        />
+        >
+            {availableLocales.map((entry) => (
+                <ToggleGroupItem
+                    key={entry.code}
+                    title={entry.englishName}
+                    value={entry.code}
+                >
+                    {entry.nativeName}
+                </ToggleGroupItem>
+            ))}
+        </ToggleGroup>
     );
 
     const aiControl = (
         <Switch
             aria-label={microcopy.settings.toggleBoardCopilot}
             checked={aiEnabled}
-            onChange={setAiEnabled}
+            onCheckedChange={setAiEnabled}
         />
     );
 
     const logoutControl = (
         <Button
             aria-label={microcopy.actions.logOut}
-            danger
-            icon={<LogoutOutlined aria-hidden />}
+            className="text-destructive hover:text-destructive"
             onClick={() => {
                 logout();
             }}
-            type="text"
+            variant="ghost"
         >
+            <LogOut aria-hidden />
             {microcopy.actions.logOut}
         </Button>
     );
@@ -250,10 +200,15 @@ const SettingsPage = () => {
     if (isPhone) {
         return (
             <PageContainer>
-                <PageHeading level={1}>
+                <Typography.Title
+                    className="mb-xs text-xxl font-semibold leading-tight"
+                    level={1}
+                >
                     {microcopy.settings.pageTitle}
-                </PageHeading>
-                <PageSubtitle>{microcopy.settings.pageSubtitle}</PageSubtitle>
+                </Typography.Title>
+                <Typography.Paragraph className="mb-xl text-md text-[color:var(--pulse-text-secondary)]">
+                    {microcopy.settings.pageSubtitle}
+                </Typography.Paragraph>
                 <SettingsSection
                     data-testid="settings-section-appearance"
                     footer={microcopy.settings.sections.appearance.footer}
@@ -271,18 +226,27 @@ const SettingsPage = () => {
                         icon={languageIcon}
                         label={microcopy.settings.language}
                     />
-                    <Collapse
-                        bordered={false}
+                    {/*
+                     * Phone-only disclosure for the colour-theme picker. A
+                     * native `<details>`/`<summary>` gives keyboard +
+                     * screen-reader-correct expand/collapse for free; the
+                     * default marker is hidden in favour of a trailing
+                     * chevron that rotates open, matching the grouped-table
+                     * idiom of the surrounding rows.
+                     */}
+                    <details
+                        className="group"
                         data-testid="settings-color-theme-collapse"
-                        ghost
-                        items={[
-                            {
-                                key: "color-theme",
-                                label: microcopy.settings.colorTheme,
-                                children: colorThemeControl
-                            }
-                        ]}
-                    />
+                    >
+                        <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between gap-xs py-sm [&::-webkit-details-marker]:hidden">
+                            <span>{microcopy.settings.colorTheme}</span>
+                            <ChevronRight
+                                aria-hidden
+                                className="size-4 text-[color:var(--pulse-text-secondary)] transition-transform duration-short ease-standard group-open:rotate-90"
+                            />
+                        </summary>
+                        <div className="pb-sm">{colorThemeControl}</div>
+                    </details>
                 </SettingsSection>
                 {aiAvailable ? (
                     <SettingsSection
@@ -318,59 +282,49 @@ const SettingsPage = () => {
 
     return (
         <PageContainer>
-            <PageHeading level={1}>{microcopy.settings.pageTitle}</PageHeading>
-            <PageSubtitle>{microcopy.settings.pageSubtitle}</PageSubtitle>
-            <SettingsList>
-                <Row data-testid="settings-row-theme">
-                    <RowLabel>
-                        <Space size={space.xs}>
-                            {themeIcon}
-                            <RowText>{microcopy.settings.theme}</RowText>
-                        </Space>
-                    </RowLabel>
-                    {themeControl}
-                </Row>
-                <Row data-testid="settings-row-language">
-                    <RowLabel>
-                        <Space size={space.xs}>
-                            {languageIcon}
-                            <RowText>{microcopy.settings.language}</RowText>
-                        </Space>
-                    </RowLabel>
-                    {languageControl}
-                </Row>
-                <Row data-testid="settings-row-color-theme">
-                    <RowLabel>
-                        <Space size={space.xs}>
-                            {colorThemeIcon}
-                            <RowText>{microcopy.settings.colorTheme}</RowText>
-                        </Space>
-                    </RowLabel>
-                    {colorThemeControl}
-                </Row>
+            <Typography.Title
+                className="mb-xs text-xxl font-semibold leading-tight"
+                level={1}
+            >
+                {microcopy.settings.pageTitle}
+            </Typography.Title>
+            <Typography.Paragraph className="mb-xl text-md text-[color:var(--pulse-text-secondary)]">
+                {microcopy.settings.pageSubtitle}
+            </Typography.Paragraph>
+            <div className="mx-auto flex w-full max-w-[48rem] flex-col gap-md">
+                <SettingsRowCard
+                    control={themeControl}
+                    data-testid="settings-row-theme"
+                    icon={themeIcon}
+                    label={microcopy.settings.theme}
+                />
+                <SettingsRowCard
+                    control={languageControl}
+                    data-testid="settings-row-language"
+                    icon={languageIcon}
+                    label={microcopy.settings.language}
+                />
+                <SettingsRowCard
+                    control={colorThemeControl}
+                    data-testid="settings-row-color-theme"
+                    icon={colorThemeIcon}
+                    label={microcopy.settings.colorTheme}
+                />
                 {aiAvailable ? (
-                    <Row data-testid="settings-row-ai">
-                        <RowLabel>
-                            <Space size={space.xs}>
-                                {copilotIcon}
-                                <RowText>
-                                    {microcopy.settings.aiEnabled}
-                                </RowText>
-                            </Space>
-                        </RowLabel>
-                        {aiControl}
-                    </Row>
+                    <SettingsRowCard
+                        control={aiControl}
+                        data-testid="settings-row-ai"
+                        icon={copilotIcon}
+                        label={microcopy.settings.aiEnabled}
+                    />
                 ) : null}
-                <Row data-testid="settings-row-logout">
-                    <RowLabel>
-                        <Space size={space.xs}>
-                            {logoutIcon}
-                            <RowText>{microcopy.actions.logOut}</RowText>
-                        </Space>
-                    </RowLabel>
-                    {logoutControl}
-                </Row>
-            </SettingsList>
+                <SettingsRowCard
+                    control={logoutControl}
+                    data-testid="settings-row-logout"
+                    icon={logoutIcon}
+                    label={microcopy.actions.logOut}
+                />
+            </div>
         </PageContainer>
     );
 };

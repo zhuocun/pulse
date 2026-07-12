@@ -252,9 +252,7 @@ describe("AiTaskAssistPanel — remote agent path", () => {
         expect(
             screen.getByText(/Add acceptance criteria before implementation\./)
         ).toBeInTheDocument();
-        expect(
-            container.querySelector(".ant-alert-warning")
-        ).toBeInTheDocument();
+        expect(container.querySelector(".text-warning")).toBeInTheDocument();
 
         act(() => {
             screen
@@ -287,9 +285,7 @@ describe("AiTaskAssistPanel — remote agent path", () => {
         expect(
             screen.getByText(/Add concrete acceptance criteria\./)
         ).toBeInTheDocument();
-        expect(
-            container.querySelector(".ant-alert-warning")
-        ).toBeInTheDocument();
+        expect(container.querySelector(".text-warning")).toBeInTheDocument();
 
         act(() => {
             screen
@@ -314,9 +310,9 @@ describe("AiTaskAssistPanel — remote agent path", () => {
             jest.advanceTimersByTime(300);
         });
 
-        // Antd Skeleton renders .ant-skeleton; the aria-label prop on <Skeleton>
-        // is not forwarded to a DOM attribute, so we assert on the CSS class.
-        expect(container.querySelector(".ant-skeleton")).toBeInTheDocument();
+        // The ui Skeleton renders `.animate-pulse` placeholder blocks inside
+        // a `role="status"` region while the estimate is still streaming.
+        expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
     });
 
     it("does not show skeleton once a suggestion has arrived", async () => {
@@ -335,7 +331,7 @@ describe("AiTaskAssistPanel — remote agent path", () => {
         );
         // With isStreaming: false the delayed flag never fires — no skeleton.
         expect(
-            container.querySelector(".ant-skeleton-active")
+            container.querySelector(".animate-pulse")
         ).not.toBeInTheDocument();
     });
 

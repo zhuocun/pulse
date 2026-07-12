@@ -13,8 +13,6 @@ describe("PageContainer", () => {
         expect(
             screen.getByRole("heading", { name: "Projects" })
         ).toBeInTheDocument();
-        expect(screen.getByTestId("page-container")).toHaveStyle({
-            width: "100%"
-        });
+        expect(screen.getByTestId("page-container")).toHaveClass("w-full");
     });
 });

@@ -1,40 +1,27 @@
-import { CloseOutlined } from "@ant-design/icons";
-import {
-    Alert,
-    Button,
-    DatePicker,
-    Form,
-    Grid,
-    Input,
-    Modal,
-    Select,
-    Space,
-    Spin,
-    Tag,
-    Typography
-} from "antd";
-import { useForm } from "antd/lib/form/Form";
-import dayjs, { type Dayjs } from "dayjs";
-import {
-    cloneElement,
-    isValidElement,
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState
-} from "react";
+import { AlertTriangle, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useBlocker, useNavigate } from "react-router";
 
-import { microcopy } from "../../constants/microcopy";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-    breakpoints,
-    fontSize,
-    fontWeight,
-    radius,
-    space
-} from "../../theme/tokens";
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog";
+import { Form, useForm } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import { Text } from "@/components/ui/typography";
+import { cn } from "@/lib/utils";
+
+import { microcopy } from "../../constants/microcopy";
+import { fontSize, fontWeight, space } from "../../theme/tokens";
 import filterRequest from "../../utils/filterRequest";
 import normalizeTaskType from "../../utils/normalizeTaskType";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
@@ -56,6 +43,13 @@ import AiTaskAssistPanel from "../aiTaskAssistPanel";
 import CommentsThread from "../commentsThread";
 import ErrorBox from "../errorBox";
 import Sheet from "../sheet";
+import {
+    DateField,
+    MultiSelectField,
+    SelectField,
+    type SelectFieldOption,
+    useResponsiveScreens
+} from "../taskModal/formControls";
 
 /*
  * Routed inline task panel — Phase 3 A2. Mirrors the form body of
@@ -65,7 +59,7 @@ import Sheet from "../sheet";
  * `environment.taskPanelRouted` until validated; once flipped, a
  * follow-up PR migrates the remaining callsites and removes the modal
  * surface. The form body is intentionally a copy-paste of
- * `TaskModal`'s body — the chrome diverges (Drawer vs Modal, dirty-
+ * `TaskModal`'s body — the chrome diverges (Sheet vs Dialog, dirty-
  * state guard via `useBlocker`, no portal mount cost on every paint)
  * and trying to share fragments now would couple two surfaces that
  * are about to merge anyway.
@@ -74,7 +68,7 @@ import Sheet from "../sheet";
  *   - Phone (coarse pointer): animated multi-detent bottom Sheet via
  *     the shared `<Sheet>` primitive (Phase 6 Wave 3 Phase 2).
  *   - Tablet (md/lg-but-fine-pointer): right-overlay via Sheet's
- *     AntD `<Drawer>` fallback (`desktopPlacement="right"`).
+ *     shadcn `<Sheet>` fallback (`desktopPlacement="right"`).
  *   - Desktop (>= lg + fine pointer): docked 480px right rail with no
  *     mask, no overlay, no Drawer chrome. The kanban columns reflow
  *     because `BoardRouteShell` (`src/routes/index.tsx`) renders this
@@ -139,87 +133,50 @@ function shallowEqual<T>(a: T, b: T): boolean {
 
 /*
  * `startDate` / `dueDate` persist as date-only ISO strings (`YYYY-MM-DD`).
- * AntD's `DatePicker` works in `Dayjs`, so we convert at the form
- * boundary — same contract as `TaskModal`: `taskToFormValues` maps the
- * stored string → a `Dayjs` for the control, and `normalizeDateFields`
- * maps the `Dayjs` back to a `YYYY-MM-DD` string for the submit payload
- * (and the `shallowEqual` dirty-check).
+ * The native `<input type="date">` in `DateField` binds directly to that
+ * string, so the form state carries the stored value verbatim — no
+ * `Dayjs` round-trip. A cleared picker emits `undefined`, which the
+ * cleared-scalar coercion in `buildMergedTask` then maps to an explicit
+ * `null` so the (opt-in `preserveNullKeys`) PUT clears the field.
  */
-const ISO_DATE_FORMAT = "YYYY-MM-DD";
-
-const DATE_FIELDS = ["startDate", "dueDate"] as const;
-
-const toDayjsOrUndefined = (value: unknown): Dayjs | undefined => {
-    if (!value) return undefined;
-    const parsed = dayjs(value as string);
-    return parsed.isValid() ? parsed : undefined;
-};
-
 type TaskFormValues = Omit<ITask, "startDate" | "dueDate"> & {
-    startDate?: Dayjs;
-    dueDate?: Dayjs;
+    startDate?: string | null;
+    dueDate?: string | null;
 };
 
 /**
- * Map an `ITask` into the shape AntD `Form` expects for this panel —
- * every field passes through unchanged except the two date fields, which
- * become `Dayjs` instances (or `undefined` when unset / unparsable) so the
- * `DatePicker` controls bind correctly. `labelIds` / `assigneeIds` /
- * `parentTaskId` are seeded by the spread (an absent value stays
- * `undefined`, which `filterRequest` strips on both sides of the dirty-
- * check so an untouched task fires no needless PUT).
+ * Map an `ITask` into the shape the form expects for this panel — every
+ * field passes through unchanged except `type`, which is normalized at the
+ * form boundary so an out-of-vocabulary value (e.g. "feature") binds as
+ * "Task" — matching how the board card and the title tag render it —
+ * instead of leaking the raw string into the control. Date fields stay as
+ * their stored `YYYY-MM-DD` strings for the native date input. `labelIds` /
+ * `assigneeIds` / `parentTaskId` are seeded by the spread (an absent value
+ * stays `undefined`, which `filterRequest` strips on both sides of the
+ * dirty-check so an untouched task fires no needless PUT).
  */
 const taskToFormValues = (task: ITask): TaskFormValues => ({
     ...task,
-    // The wire `type` is an open string; the select only knows the
-    // canonical Task/Bug vocabulary. Normalize at the form boundary so
-    // an out-of-vocabulary value (e.g. "feature") binds as "Task" —
-    // matching how the board card and the title tag render it —
-    // instead of leaking the raw string into the control.
-    type: normalizeTaskType(task.type),
-    startDate: toDayjsOrUndefined(task.startDate),
-    dueDate: toDayjsOrUndefined(task.dueDate)
+    type: normalizeTaskType(task.type)
 });
 
 /**
- * Convert any `Dayjs` date-field values in a raw form payload back to
- * date-only ISO strings, leaving every other field untouched. A cleared
- * picker stays falsy (`undefined` / `null`), which the cleared-scalar
- * normalisation in `onSubmit` then maps to an explicit `null` so the
- * `preserveNullKeys` PUT clears the field.
- */
-const normalizeDateFields = (
-    values: Record<string, unknown>
-): Record<string, unknown> => {
-    const next = { ...values };
-    DATE_FIELDS.forEach((field) => {
-        const value = next[field];
-        if (value && dayjs.isDayjs(value)) {
-            next[field] = value.format(ISO_DATE_FORMAT);
-        }
-    });
-    return next;
-};
-
-/**
  * Merge a raw form payload onto the persisted task into the exact `ITask`
- * shape the PUT (and the dirty-check) need: date `Dayjs` values become
- * ISO strings, the name is trimmed, and the clearable FK/date fields
- * coerce a cleared `undefined` to an explicit `null` so the
- * `preserveNullKeys` PUT clears them. Shared by `onSubmit` and the
- * `onValuesChange` dirty signal so both read the same boundary.
+ * shape the PUT (and the dirty-check) need: the name is trimmed and the
+ * clearable FK/date fields coerce a cleared `undefined` to an explicit
+ * `null` so the `preserveNullKeys` PUT clears them. Shared by `onSubmit`
+ * and the dirty signal so both read the same boundary.
  */
 const buildMergedTask = (
     base: ITask,
     rawValues: Record<string, unknown>
 ): ITask => {
-    const fieldValues = normalizeDateFields(rawValues);
-    const rawName = fieldValues.taskName;
+    const rawName = rawValues.taskName;
     const trimmedName =
         typeof rawName === "string" ? rawName.trim() : base.taskName;
     const merged = {
         ...base,
-        ...fieldValues,
+        ...rawValues,
         taskName: trimmedName
     } as ITask;
     merged.parentTaskId = merged.parentTaskId ?? null;
@@ -240,15 +197,17 @@ const toDirtyCheckBaseline = (task: ITask): ITask => ({
     type: normalizeTaskType(task.type)
 });
 
-const TASK_TYPE_OPTIONS = [
+const TASK_TYPE_OPTIONS: SelectFieldOption[] = [
     { label: microcopy.options.taskTypes.task, value: "Task" },
     { label: microcopy.options.taskTypes.bug, value: "Bug" }
 ];
 
-const STORY_POINT_OPTIONS = [1, 2, 3, 5, 8, 13].map((value) => ({
-    label: `${value}`,
-    value
-}));
+const STORY_POINT_OPTIONS: SelectFieldOption[] = [1, 2, 3, 5, 8, 13].map(
+    (value) => ({
+        label: `${value}`,
+        value: `${value}`
+    })
+);
 
 type TaskPanelField =
     | "coordinatorId"
@@ -281,25 +240,22 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     taskId,
     boardAiOn = true
 }) => {
-    // AntD v6: static `message` warns about dynamic theme;
-    // `useAppMessage()` returns a theme-aware instance (with a static
-    // fallback for tests that render without `<App>`).
     const message = useAppMessage();
-    const [form] = useForm();
+    const [form] = useForm<TaskFormValues>();
     const navigate = useNavigate();
     const { enabled: aiEnabled } = useAiEnabled();
     const isPhone = useIsPhoneChrome();
-    const screens = Grid.useBreakpoint();
+    const screens = useResponsiveScreens();
     /*
      * Three chassis modes — see the file header. Desktop docked rail
      * only fires when (a) the user is on a fine pointer (NOT phone)
-     * AND (b) the viewport is >= lg per AntD's breakpoint hook. Phone
+     * AND (b) the viewport is >= lg per the breakpoint hook. Phone
      * always wins regardless of width because a touchscreen laptop
      * still wants the bottom-sheet (B-H1).
      */
     const isDesktopRail = !isPhone && screens.lg === true;
     /*
-     * Rail focus management (R-B H1). The AntD Drawer used by the
+     * Rail focus management (R-B H1). The Sheet used by the
      * phone/tablet chassis handles focus trap + restore on its own; the
      * desktop rail is a plain `<aside>` so we wire equivalent SR/keyboard
      * affordances by hand. On mount we capture the previously-focused
@@ -312,7 +268,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     /*
      * Deep-link hydration guard (W2-01). On the very first render —
      * before effects run — the phone chassis forces Sheet's static
-     * AntD Drawer fallback instead of the framer-motion animated
+     * shadcn `<Sheet>` fallback instead of the animated
      * branch. A deep-linked (or freshly-hydrated) mount otherwise
      * kicks off the enter animation while the surrounding lazy chunk
      * is still settling, which can wedge the sheet mid-transition.
@@ -433,7 +389,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         () => (Array.isArray(projectMembersData) ? projectMembersData : []),
         [projectMembersData]
     );
-    const labelOptions = useMemo(
+    const labelOptions = useMemo<SelectFieldOption[]>(
         () =>
             labels.map((label) => ({
                 label: label.name,
@@ -442,7 +398,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             })),
         [labels]
     );
-    const assigneeOptions = useMemo(
+    const assigneeOptions = useMemo<SelectFieldOption[]>(
         () =>
             projectMembers.map((member) => ({
                 label: member.username,
@@ -452,7 +408,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     );
     // Parent-task options: every OTHER task in the project (a task can't be
     // its own parent). Clearable + optional — mirrors `TaskModal`.
-    const parentTaskOptions = useMemo(
+    const parentTaskOptions = useMemo<SelectFieldOption[]>(
         () =>
             (tasks ?? [])
                 .filter((candidate) => candidate._id !== taskId)
@@ -461,6 +417,14 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                     value: candidate._id
                 })),
         [tasks, taskId]
+    );
+    const memberOptions = useMemo<SelectFieldOption[]>(
+        () =>
+            members.map((member) => ({
+                label: member.username,
+                value: member._id
+            })),
+        [members]
     );
 
     /*
@@ -490,7 +454,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
      * The state flips:
      *   - false → true on any user-driven `onValuesChange` whose
      *     merged result diverges from `editingTask`.
-     *   - true → false when the user discards (Modal.confirm OK,
+     *   - true → false when the user discards (discard dialog OK,
      *     `form.resetFields()`), saves successfully, or the task
      *     deletes.
      *
@@ -532,7 +496,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
      * back, AND the swipe-between-tasks gesture (which routes through
      * `goToNext` / `goToPrev`, i.e. the same `navigate(...)`).
      * The mask-click path is handled separately by `requestClose`
-     * below; both surfaces converge on the same `Modal.confirm`.
+     * below; both surfaces converge on the same discard dialog.
      */
     const blocker = useBlocker(({ currentLocation, nextLocation }) => {
         // Don't block self-navigation (StrictMode re-renders, or the
@@ -586,13 +550,39 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         []
     );
 
+    /*
+     * Replaces antd `Form`'s `onValuesChange` — the `ui/form` primitive does
+     * not port it, so each control reports its own user-driven change here.
+     * The control's injected trigger sets the field value BEFORE calling this
+     * handler, so `form.getFieldsValue()` already reflects the edit. We then
+     * recompute the dirty flag off the FILTERED merged payload (mirroring
+     * `onSubmit`) and clear any Copilot provenance for the manually-edited
+     * field. Programmatic `setFieldsValue` (task seed, AI Apply) never routes
+     * through a control's change handler, so the provenance tag survives an
+     * Apply exactly as it did under antd.
+     */
+    const handleUserEdit = (changed: Record<string, unknown>) => {
+        setFormTick((tick) => tick + 1);
+        if (saveError) setSaveError(null);
+        clearOriginOnManualEdits(changed);
+        if (!editingTask) return;
+        const merged = buildMergedTask(editingTask, form.getFieldsValue());
+        const baseline = toDirtyCheckBaseline(editingTask);
+        const nextDirty = !shallowEqual(
+            filterRequest(merged as unknown as Record<string, unknown>),
+            filterRequest(baseline as unknown as Record<string, unknown>)
+        );
+        setIsFormDirty(nextDirty);
+        isFormDirtyRef.current = nextDirty;
+    };
+
     const onSubmit = async () => {
         if (!editingTask) return;
         try {
             await form.validateFields();
         } catch {
-            // AntD has surfaced inline errors on the failing fields;
-            // bail so we never persist a half-validated payload.
+            // Inline errors have surfaced on the failing fields; bail so we
+            // never persist a half-validated payload.
             return;
         }
         const merged = buildMergedTask(editingTask, form.getFieldsValue());
@@ -652,8 +642,8 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         // closure can re-POST it. After the optimistic prune the cache no
         // longer carries it.
         const beforeState: ITask = { ...editingTask };
-        // §2.A.4 — task delete is reversible, so it skips Modal.confirm
-        // and goes straight to an optimistic delete + Undo toast.
+        // §2.A.4 — task delete is reversible, so it skips a confirm
+        // dialog and goes straight to an optimistic delete + Undo toast.
         // Clear dirty state synchronously so the blocker won't intercept
         // the close-during-delete navigation (B-C1).
         isFormDirtyRef.current = false;
@@ -682,8 +672,8 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     // taskId, fresh fetch). Mirrors the modal's effect.
     useEffect(() => {
         if (!editingTask) return;
-        // Convert the stored ISO date strings into `Dayjs` so the
-        // `DatePicker` controls bind (they reject bare strings).
+        // Date fields stay as their stored `YYYY-MM-DD` strings — the native
+        // date input binds directly to them.
         form.setFieldsValue(taskToFormValues(editingTask));
     }, [form, editingTask]);
 
@@ -715,9 +705,9 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
      * remember whatever was focused (typically the column card the user
      * activated), then move focus to the aside so screen readers
      * announce the new landmark; on unmount, restore focus so keyboard
-     * users land back on the trigger. The drawer chassis (phone/tablet)
-     * gets focus trap + restore from AntD's Drawer, so this only fires
-     * for the bare `<aside>`.
+     * users land back on the trigger. The sheet chassis (phone/tablet)
+     * gets focus trap + restore from the Sheet primitive, so this only
+     * fires for the bare `<aside>`.
      */
     useEffect(() => {
         if (!isDesktopRail) return;
@@ -791,7 +781,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             pointerId: event.pointerId
         };
         // Capture so the gesture survives the pointer leaving this
-        // element (sliding onto the drawer mask, the AntD Select
+        // element (sliding onto the sheet scrim, a popover
         // dropdown layer, etc.). jsdom doesn't implement
         // `setPointerCapture` so we guard with a feature check; real
         // browsers (including iOS Safari 13+) ship it.
@@ -881,6 +871,9 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     const titleText = editingTask?.taskName
         ? `${microcopy.actions.editTask} · ${editingTask.taskName}`
         : microcopy.actions.editTask;
+    const titleIsBug =
+        Boolean(editingTask) &&
+        normalizeTaskType(editingTask?.type ?? "Task") === "Bug";
     const titleNode = (
         <div
             style={{
@@ -892,21 +885,20 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             }}
         >
             {editingTask ? (
-                <Tag
-                    variant="filled"
-                    color={
-                        normalizeTaskType(editingTask.type) === "Bug"
-                            ? "magenta"
-                            : "geekblue"
-                    }
-                    style={{ fontWeight: 500, marginInlineEnd: 0 }}
+                <Badge
+                    className={cn(
+                        "border-transparent font-medium",
+                        titleIsBug
+                            ? "bg-[#eb2f96]/12 text-[#c41d7f]"
+                            : "bg-[#2f54eb]/12 text-[#1d39c4]"
+                    )}
                 >
-                    {normalizeTaskType(editingTask.type) === "Bug"
+                    {titleIsBug
                         ? microcopy.options.taskTypes.bug
                         : microcopy.options.taskTypes.task}
-                </Tag>
+                </Badge>
             ) : null}
-            <Typography.Text
+            <Text
                 style={{
                     fontSize: fontSize.lg,
                     fontWeight: fontWeight.semibold,
@@ -915,7 +907,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                 }}
             >
                 {titleText}
-            </Typography.Text>
+            </Text>
         </div>
     );
 
@@ -937,21 +929,16 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                     : microcopy.actions.delete
             }
             block={isPhone || !screens.sm}
-            danger
             disabled={deleteDisabled}
             onClick={onDelete}
-            type="text"
+            variant="ghost"
         >
-            {microcopy.actions.delete}
+            <span className="text-destructive">{microcopy.actions.delete}</span>
         </Button>
     );
 
     const cancelButton = (
-        <Button
-            block={isPhone || !screens.sm}
-            onClick={requestClose}
-            size="large"
-        >
+        <Button block={isPhone || !screens.sm} onClick={requestClose} size="lg">
             {microcopy.actions.cancel}
         </Button>
     );
@@ -962,8 +949,8 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             disabled={!editingTask || uLoading}
             loading={uLoading}
             onClick={onSubmit}
-            size="large"
-            type="primary"
+            size="lg"
+            variant="primary"
         >
             {microcopy.actions.save}
         </Button>
@@ -1001,10 +988,18 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             }}
         >
             {deleteButton}
-            <Space size={space.xs}>
+            <div
+                style={{
+                    display: "flex",
+                    flex: "0 0 auto",
+                    flexWrap: "wrap",
+                    gap: space.xs,
+                    justifyContent: "flex-end"
+                }}
+            >
                 {cancelButton}
                 {okButton}
-            </Space>
+            </div>
         </div>
     );
 
@@ -1025,32 +1020,31 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             // "Task details" string didn't describe the widget itself.
             <nav
                 aria-label={microcopy.taskDetailPanel.siblingNavAriaLabel}
+                className="text-muted-foreground"
                 style={{
                     alignItems: "center",
-                    color: "var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.55))",
                     display: "flex",
                     fontSize: fontSize.xs,
                     gap: space.sm,
                     justifyContent: "space-between",
                     marginBlockStart: space.md,
                     paddingBlockStart: space.sm,
-                    borderBlockStart:
-                        "1px solid var(--ant-color-split, rgba(15, 23, 42, 0.06))"
+                    borderBlockStart: "1px solid hsl(var(--ui-border) / 1)"
                 }}
             >
                 <Button
                     disabled={!prevTaskId}
                     onClick={() => goToPrev()}
-                    size="small"
-                    type="text"
+                    size="sm"
+                    variant="ghost"
                 >
                     {`← ${microcopy.taskDetailPanel.siblingPrevLabel}`}
                 </Button>
                 <Button
                     disabled={!nextTaskId}
                     onClick={() => goToNext()}
-                    size="small"
-                    type="text"
+                    size="sm"
+                    variant="ghost"
                 >
                     {`${microcopy.taskDetailPanel.siblingNextLabel} →`}
                 </Button>
@@ -1077,77 +1071,49 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                         width: "100%"
                     }}
                 >
-                    <Spin
+                    <Spinner
                         aria-label={microcopy.a11y.loadingBoard}
-                        size="large"
+                        size="lg"
                     />
                 </div>
             ) : null}
             <div hidden={awaitingTaskResolution}>
                 {taskMissingAfterLoad ? (
                     <Alert
-                        action={
+                        role="alert"
+                        style={{ marginBlockEnd: space.md }}
+                        variant="warning"
+                    >
+                        <AlertTriangle aria-hidden />
+                        <AlertTitle>
+                            {microcopy.taskModal.removedByOthersTitle}
+                        </AlertTitle>
+                        <AlertDescription>
+                            {microcopy.taskModal.removedByOthersBody}
+                        </AlertDescription>
+                        <div style={{ marginBlockStart: space.sm }}>
                             <Button
-                                danger
                                 onClick={() => {
                                     // Bypass the dirty-guard — the
                                     // user just told us to discard.
                                     form.resetFields();
                                     closePanel();
                                 }}
-                                size="small"
-                                type="text"
+                                size="sm"
+                                variant="ghost"
                             >
-                                {microcopy.taskModal.discardEdits}
+                                <span className="text-destructive">
+                                    {microcopy.taskModal.discardEdits}
+                                </span>
                             </Button>
-                        }
-                        description={microcopy.taskModal.removedByOthersBody}
-                        message={microcopy.taskModal.removedByOthersTitle}
-                        role="alert"
-                        showIcon
-                        style={{ marginBlockEnd: space.md }}
-                        type="warning"
-                    />
+                        </div>
+                    </Alert>
                 ) : null}
                 {/* Save-as-new follow-up tracked in the doc — see
                  * TaskModal's mirror comment. Discard above is the
                  * minimum viable recovery; same logic applies. */}
                 <ErrorBox error={saveError} />
-                <Form
-                    form={form}
-                    initialValues={
-                        editingTask ? taskToFormValues(editingTask) : undefined
-                    }
-                    layout="vertical"
-                    onValuesChange={(changedValues, allValues) => {
-                        setFormTick((tick) => tick + 1);
-                        if (saveError) setSaveError(null);
-                        clearOriginOnManualEdits(changedValues);
-                        /*
-                         * Flip the dirty flag iff the current form
-                         * contents diverge from the persisted task.
-                         * `buildMergedTask` applies the same name-trim,
-                         * date normalisation, and cleared-scalar coercion
-                         * that `onSubmit` does, and the comparison runs
-                         * over the FILTERED payloads so a registered-but-
-                         * unset optional richness field doesn't read as a
-                         * spurious edit.
-                         */
-                        if (!editingTask) return;
-                        const merged = buildMergedTask(editingTask, allValues);
-                        const baseline = toDirtyCheckBaseline(editingTask);
-                        const nextDirty = !shallowEqual(
-                            filterRequest(
-                                merged as unknown as Record<string, unknown>
-                            ),
-                            filterRequest(
-                                baseline as unknown as Record<string, unknown>
-                            )
-                        );
-                        setIsFormDirty(nextDirty);
-                        isFormDirtyRef.current = nextDirty;
-                    }}
-                >
+                <Form form={form} layout="vertical">
                     <Form.Item
                         label={microcopy.fields.taskName}
                         name="taskName"
@@ -1165,6 +1131,9 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                             autoComplete="off"
                             enterKeyHint="next"
                             inputMode="text"
+                            onChange={(event) =>
+                                handleUserEdit({ taskName: event.target.value })
+                            }
                         />
                     </Form.Item>
                     <Form.Item
@@ -1180,14 +1149,15 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                         ]}
                         validateTrigger={["onBlur", "onSubmit"]}
                     >
-                        <Select
-                            options={members.map((m) => ({
-                                label: m.username,
-                                value: m._id
-                            }))}
+                        <SelectField
+                            onChange={(value) =>
+                                handleUserEdit({ coordinatorId: value })
+                            }
+                            options={memberOptions}
                             placeholder={
                                 microcopy.placeholders.selectCoordinator
                             }
+                            showSearch
                         />
                     </Form.Item>
                     <Form.Item
@@ -1202,7 +1172,10 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                         ]}
                         validateTrigger={["onBlur", "onSubmit"]}
                     >
-                        <Select
+                        <SelectField
+                            onChange={(value) =>
+                                handleUserEdit({ type: value })
+                            }
                             options={TASK_TYPE_OPTIONS}
                             placeholder={microcopy.placeholders.selectType}
                         />
@@ -1212,40 +1185,32 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                             autoComplete="off"
                             enterKeyHint="next"
                             inputMode="text"
+                            onChange={(event) =>
+                                handleUserEdit({ epic: event.target.value })
+                            }
                         />
                     </Form.Item>
                     <Form.Item
+                        getValueFromEvent={(value) =>
+                            value === undefined ? undefined : Number(value)
+                        }
                         label={
-                            <span
-                                style={{
-                                    alignItems: "center",
-                                    display: "inline-flex",
-                                    gap: space.xs
-                                }}
-                            >
+                            <span className="inline-flex items-center gap-xs">
                                 {microcopy.fields.storyPoints}
                                 {appliedFieldOrigin.storyPoints ===
                                 "copilot" ? (
-                                    <Tag
-                                        color="purple"
-                                        style={{ marginInlineEnd: 0 }}
-                                    >
+                                    <Badge className="border-transparent bg-[#722ed1]/12 text-[#722ed1]">
                                         {microcopy.ai.suggestedByCopilot}
-                                    </Tag>
+                                    </Badge>
                                 ) : null}
                             </span>
                         }
                         name="storyPoints"
                     >
-                        <Select
-                            onChange={() => {
-                                setAppliedFieldOrigin((prev) => {
-                                    if (!prev.storyPoints) return prev;
-                                    const next = { ...prev };
-                                    delete next.storyPoints;
-                                    return next;
-                                });
-                            }}
+                        <SelectField
+                            onChange={(value) =>
+                                handleUserEdit({ storyPoints: value })
+                            }
                             options={STORY_POINT_OPTIONS}
                             placeholder={
                                 microcopy.placeholders.selectStoryPoints
@@ -1256,81 +1221,38 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                         label={microcopy.fields.startDate}
                         name="startDate"
                     >
-                        <DatePicker
-                            allowClear
-                            format={ISO_DATE_FORMAT}
+                        <DateField
+                            onChange={(value) =>
+                                handleUserEdit({ startDate: value })
+                            }
                             placeholder={microcopy.placeholders.selectStartDate}
-                            style={{ width: "100%" }}
                         />
                     </Form.Item>
                     <Form.Item label={microcopy.fields.dueDate} name="dueDate">
-                        <DatePicker
-                            allowClear
-                            format={ISO_DATE_FORMAT}
+                        <DateField
+                            onChange={(value) =>
+                                handleUserEdit({ dueDate: value })
+                            }
                             placeholder={microcopy.placeholders.selectDueDate}
-                            style={{ width: "100%" }}
                         />
                     </Form.Item>
                     <Form.Item label={microcopy.fields.labels} name="labelIds">
-                        <Select
-                            allowClear
-                            mode="multiple"
-                            optionFilterProp="label"
+                        <MultiSelectField
+                            onChange={(value) =>
+                                handleUserEdit({ labelIds: value })
+                            }
                             options={labelOptions}
-                            optionRender={(option) => (
-                                <span
-                                    style={{
-                                        alignItems: "center",
-                                        display: "inline-flex",
-                                        gap: space.xs
-                                    }}
-                                >
-                                    <span
-                                        aria-hidden
-                                        style={{
-                                            background:
-                                                (
-                                                    option.data as {
-                                                        color?: string;
-                                                    }
-                                                ).color ||
-                                                "var(--ant-color-border, #d9d9d9)",
-                                            borderRadius: "50%",
-                                            display: "inline-block",
-                                            flex: "0 0 auto",
-                                            height: 10,
-                                            width: 10
-                                        }}
-                                    />
-                                    {option.label}
-                                </span>
-                            )}
                             placeholder={microcopy.placeholders.selectLabels}
-                            tagRender={(tagProps) => {
-                                const color = labels.find(
-                                    (item) => item._id === tagProps.value
-                                )?.color;
-                                return (
-                                    <Tag
-                                        closable={tagProps.closable}
-                                        color={color}
-                                        onClose={tagProps.onClose}
-                                        style={{ marginInlineEnd: space.xxs }}
-                                    >
-                                        {tagProps.label}
-                                    </Tag>
-                                );
-                            }}
                         />
                     </Form.Item>
                     <Form.Item
                         label={microcopy.fields.assignees}
                         name="assigneeIds"
                     >
-                        <Select
-                            allowClear
-                            mode="multiple"
-                            optionFilterProp="label"
+                        <MultiSelectField
+                            onChange={(value) =>
+                                handleUserEdit({ assigneeIds: value })
+                            }
                             options={assigneeOptions}
                             placeholder={microcopy.placeholders.selectAssignees}
                         />
@@ -1339,9 +1261,11 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                         label={microcopy.fields.parentTask}
                         name="parentTaskId"
                     >
-                        <Select
+                        <SelectField
                             allowClear
-                            optionFilterProp="label"
+                            onChange={(value) =>
+                                handleUserEdit({ parentTaskId: value })
+                            }
                             options={parentTaskOptions}
                             placeholder={
                                 microcopy.placeholders.selectParentTask
@@ -1350,46 +1274,38 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                         />
                     </Form.Item>
                     {aiEnabled && boardAiOn && editingTask ? (
-                        <Form.Item label={null}>
-                            <AiRewritePanel
-                                note={liveValues.note ?? ""}
-                                onAccept={(text) => {
-                                    markFieldAsCopilotApplied("note");
-                                    form.setFieldsValue({ note: text });
-                                    setFormTick((tick) => tick + 1);
-                                    setIsFormDirty(true);
-                                    isFormDirtyRef.current = true;
-                                }}
-                                projectId={projectId}
-                            />
-                        </Form.Item>
+                        <AiRewritePanel
+                            note={liveValues.note ?? ""}
+                            onAccept={(text) => {
+                                markFieldAsCopilotApplied("note");
+                                form.setFieldsValue({ note: text });
+                                setFormTick((tick) => tick + 1);
+                                setIsFormDirty(true);
+                                isFormDirtyRef.current = true;
+                            }}
+                            projectId={projectId}
+                        />
                     ) : null}
                     <Form.Item
                         label={
-                            <span
-                                style={{
-                                    alignItems: "center",
-                                    display: "inline-flex",
-                                    gap: space.xs
-                                }}
-                            >
+                            <span className="inline-flex items-center gap-xs">
                                 {microcopy.fields.notes}
                                 {appliedFieldOrigin.note === "copilot" ? (
-                                    <Tag
-                                        color="purple"
-                                        style={{ marginInlineEnd: 0 }}
-                                    >
+                                    <Badge className="border-transparent bg-[#722ed1]/12 text-[#722ed1]">
                                         {microcopy.ai.suggestedByCopilot}
-                                    </Tag>
+                                    </Badge>
                                 ) : null}
                             </span>
                         }
                         name="note"
                     >
-                        <Input.TextArea
+                        <Textarea
                             autoComplete="off"
                             enterKeyHint="done"
                             inputMode="text"
+                            onChange={(event) =>
+                                handleUserEdit({ note: event.target.value })
+                            }
                             placeholder={
                                 microcopy.placeholders.notesAcceptanceCriteria
                             }
@@ -1472,61 +1388,64 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
      * "blocked"`). Both surfaces share the same buttons so the user
      * gets one consistent UX no matter how they tried to leave.
      */
+    const keepEditing = () => {
+        setPendingClose(false);
+        // "Keep editing" — cancel the navigation if the blocker fired,
+        // otherwise just dismiss the dialog and leave the panel open.
+        if (blocker.state === "blocked") {
+            blocker.reset?.();
+        }
+    };
+
     const discardConfirm = (
-        <Modal
-            centered
-            cancelText={microcopy.taskDetailPanel.confirmDiscardCancel}
-            okText={microcopy.taskDetailPanel.confirmDiscardOk}
-            okButtonProps={{ danger: true }}
-            onCancel={() => {
-                setPendingClose(false);
-                // "Keep editing" — cancel the navigation if the
-                // blocker fired, otherwise just dismiss the
-                // dialog and leave the panel open.
-                if (blocker.state === "blocked") {
-                    blocker.reset?.();
-                }
-            }}
-            onOk={() => {
-                setPendingClose(false);
-                // "Discard" — clear the form first so the
-                // blocker re-reads `isFormDirty` as false and
-                // doesn't intercept the proceed-or-close call.
-                form.resetFields();
-                setIsFormDirty(false);
-                isFormDirtyRef.current = false;
-                if (blocker.state === "blocked") {
-                    blocker.proceed?.();
-                } else {
-                    closePanel();
-                }
+        <Dialog
+            onOpenChange={(next) => {
+                // Any dismissal (Esc, scrim, close button) is "Keep editing".
+                if (!next) keepEditing();
             }}
             open={pendingClose || blocker.state === "blocked"}
-            title={microcopy.taskDetailPanel.confirmDiscardTitle}
-            width={Math.min(420, breakpoints.sm)}
-            // Link the body to the dialog via aria-describedby so SR
-            // users hear the description right after the title (B-M4).
-            // rc-dialog renders the dialog div with hardcoded
-            // aria-labelledby only; modalRender wraps the inner
-            // container and lets us inject the aria attribute there.
-            modalRender={(node) =>
-                isValidElement(node)
-                    ? cloneElement(
-                          node as React.ReactElement<{
-                              "aria-describedby"?: string;
-                          }>,
-                          {
-                              "aria-describedby":
-                                  "task-detail-panel-discard-body"
-                          }
-                      )
-                    : node
-            }
         >
-            <div id="task-detail-panel-discard-body">
-                {microcopy.taskDetailPanel.confirmDiscardBody}
-            </div>
-        </Modal>
+            <DialogContent
+                // Link the body to the dialog via aria-describedby so SR
+                // users hear the description right after the title (B-M4).
+                aria-describedby="task-detail-panel-discard-body"
+                className="max-w-[420px]"
+            >
+                <DialogHeader>
+                    <DialogTitle>
+                        {microcopy.taskDetailPanel.confirmDiscardTitle}
+                    </DialogTitle>
+                </DialogHeader>
+                <div id="task-detail-panel-discard-body">
+                    {microcopy.taskDetailPanel.confirmDiscardBody}
+                </div>
+                <DialogFooter>
+                    <Button onClick={keepEditing} size="lg">
+                        {microcopy.taskDetailPanel.confirmDiscardCancel}
+                    </Button>
+                    <Button
+                        onClick={() => {
+                            setPendingClose(false);
+                            // "Discard" — clear the form first so the
+                            // blocker re-reads `isFormDirty` as false and
+                            // doesn't intercept the proceed-or-close call.
+                            form.resetFields();
+                            setIsFormDirty(false);
+                            isFormDirtyRef.current = false;
+                            if (blocker.state === "blocked") {
+                                blocker.proceed?.();
+                            } else {
+                                closePanel();
+                            }
+                        }}
+                        size="lg"
+                        variant="destructive"
+                    >
+                        {microcopy.taskDetailPanel.confirmDiscardOk}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 
     /*
@@ -1561,10 +1480,8 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                     // landmark for screen-reader announcement (R-B H1).
                     tabIndex={-1}
                     style={{
-                        background:
-                            "var(--ant-color-bg-container, var(--pulse-bg-surface, #ffffff))",
-                        borderInlineStart:
-                            "1px solid var(--ant-color-split, rgba(15, 23, 42, 0.06))",
+                        background: "hsl(var(--ui-card))",
+                        borderInlineStart: "1px solid hsl(var(--ui-border))",
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
@@ -1578,16 +1495,15 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                         right: 0,
                         top: 0,
                         // Above the columns scroller's edge fades, below
-                        // any AntD overlays (popovers, dropdowns) which
-                        // run at z-index >= 1050.
+                        // any overlays (popovers, dropdowns, dialogs)
+                        // which run at z-index >= 1000.
                         zIndex: 100
                     }}
                 >
                     <header
                         style={{
                             alignItems: "center",
-                            borderBlockEnd:
-                                "1px solid var(--ant-color-split, rgba(15, 23, 42, 0.06))",
+                            borderBlockEnd: "1px solid hsl(var(--ui-border))",
                             display: "flex",
                             flex: "0 0 auto",
                             gap: space.sm,
@@ -1600,12 +1516,13 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                         </div>
                         <Button
                             aria-label={microcopy.actions.close}
-                            icon={<CloseOutlined aria-hidden />}
+                            className="rounded-full"
                             onClick={requestClose}
-                            size="small"
-                            type="text"
-                            style={{ borderRadius: radius.pill }}
-                        />
+                            size="icon"
+                            variant="ghost"
+                        >
+                            <X aria-hidden />
+                        </Button>
                     </header>
                     <div
                         style={{
@@ -1620,8 +1537,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                     </div>
                     <footer
                         style={{
-                            borderBlockStart:
-                                "1px solid var(--ant-color-split, rgba(15, 23, 42, 0.06))",
+                            borderBlockStart: "1px solid hsl(var(--ui-border))",
                             flex: "0 0 auto",
                             padding: `${space.md}px ${space.lg}px`,
                             paddingBlockEnd: `max(${space.md}px, env(safe-area-inset-bottom))`
@@ -1644,7 +1560,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
      *     with `medium ↔ large` detents, grabber drag-to-dismiss, and
      *     glass-tinted scrim.
      *   - Anything else (mouse, narrow-desktop, reduced-motion) →
-     *     AntD `<Drawer>` at `desktopPlacement="right"` / `size="large"`.
+     *     shadcn `<Sheet>` at `desktopPlacement="right"` / `size="large"`.
      *
      * Sheet also owns the `prefers-reduced-motion` gating, so this
      * branch does not gate motion itself.

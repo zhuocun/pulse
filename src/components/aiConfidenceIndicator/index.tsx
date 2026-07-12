@@ -1,5 +1,11 @@
-import { Tooltip } from "antd";
 import React from "react";
+
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger
+} from "@/components/ui/tooltip";
 
 import { microcopy, microcopyString } from "../../constants/microcopy";
 import {
@@ -85,7 +91,14 @@ const AiConfidenceIndicator: React.FC<AiConfidenceIndicatorProps> = ({
         </CopilotChip>
     );
     if (!tooltip) return node;
-    return <Tooltip title={tooltip}>{node}</Tooltip>;
+    return (
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>{node}</TooltipTrigger>
+                <TooltipContent>{tooltip}</TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    );
 };
 
 export default AiConfidenceIndicator;

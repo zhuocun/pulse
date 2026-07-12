@@ -1,20 +1,30 @@
-import { PlusOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
-import { Button, Modal, Pagination, Select } from "antd";
+import { Plus } from "lucide-react";
+import * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from "@/components/ui/select";
+import useAppMessage from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 
 import { microcopy, microcopyString } from "../../constants/microcopy";
 import { getActiveLocaleCode } from "../../i18n";
 import type { ProjectListSort } from "../../store/reducers/userPreferencesSlice";
-import {
-    breakpoints,
-    fontSize,
-    fontWeight,
-    letterSpacing,
-    space
-} from "../../theme/tokens";
 import useActivityFeed from "../../utils/hooks/useActivityFeed";
-import useAppMessage from "../../utils/hooks/useAppMessage";
 import useAuth from "../../utils/hooks/useAuth";
 import useProjectModal from "../../utils/hooks/useProjectModal";
 import useReactMutation from "../../utils/hooks/useReactMutation";
@@ -37,104 +47,87 @@ interface Props {
      * Phase 4.2 — sort order is now URL-state (owned by the project
      * page) so the page can apply the user's saved default on first
      * load. Both props are optional so the legacy callers that only
-     * mount the list (project-detail, etc.) keep working — the
-     * component falls back to an internal `useState` then. New
-     * callers should always supply both so back/forward navigation
-     * preserves the sort.
+     * mount the list keep working — the component falls back to an
+     * internal `useState` then.
      */
     sortOrder?: ProjectListSort;
     onSortOrderChange?: (next: ProjectListSort) => void;
 }
 
 /**
- * Re-exported for older call sites (header, login, register, popovers)
- * that still expect the project list module to expose this primitive.
- * It exists here for backwards compatibility — new code should prefer a
- * locally-styled `<Button>` instead of importing this.
+ * antd-free `Button`-like affordance re-exported for older call sites
+ * (`header`, `column`, popovers) that still expect the project list module
+ * to expose this primitive. It is a zero-padding, text-styled button that
+ * accepts the antd `Button` prop subset those callers pass (`type`,
+ * `danger`, `icon`, `size`). New code should prefer a locally-styled
+ * `<Button>` from `@/components/ui/button` instead.
  */
-export const NoPaddingButton = styled(Button)`
-    padding: 0;
-`;
+export interface NoPaddingButtonProps extends Omit<
+    React.ButtonHTMLAttributes<HTMLButtonElement>,
+    "type"
+> {
+    type?: "default" | "primary" | "text" | "link" | "dashed" | "ghost";
+    htmlType?: "button" | "submit" | "reset";
+    danger?: boolean;
+    icon?: React.ReactNode;
+    size?: "small" | "middle" | "large";
+    block?: boolean;
+    loading?: boolean;
+}
 
-const ListSurface = styled.section`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.md}px;
-`;
+export const NoPaddingButton = React.forwardRef<
+    HTMLButtonElement,
+    NoPaddingButtonProps
+>(
+    (
+        {
+            className,
+            type = "default",
+            htmlType,
+            danger,
+            icon,
+            size: _size,
+            block,
+            loading,
+            children,
+            disabled,
+            ...rest
+        },
+        ref
+    ) => (
+        <button
+            ref={ref}
+            type={htmlType ?? "button"}
+            disabled={disabled ?? loading}
+            className={cn(
+                "inline-flex cursor-pointer items-center justify-center gap-xs border-0 bg-transparent p-0 font-medium",
+                "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+                "[&_svg]:size-4 [&_svg]:shrink-0",
+                danger
+                    ? "text-destructive hover:text-destructive/80"
+                    : type === "link" || type === "primary"
+                      ? "text-primary hover:text-primary/80"
+                      : "text-foreground hover:text-primary",
+                type === "link" && "hover:underline",
+                block && "w-full",
+                className
+            )}
+            {...rest}
+        >
+            {icon}
+            {children}
+        </button>
+    )
+);
+NoPaddingButton.displayName = "NoPaddingButton";
 
-const Toolbar = styled.div`
-    align-items: center;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-    display: flex;
-    flex-wrap: wrap;
-    font-size: ${fontSize.sm}px;
-    gap: ${space.sm}px;
-    justify-content: space-between;
-
-    > * {
-        min-width: 0;
-    }
-`;
-
-const ResultCount = styled.span`
-    font-weight: ${fontWeight.medium};
-    letter-spacing: ${letterSpacing.tight};
-`;
-
-/*
- * Was previously `styled.label` so the visible "Sort" caption read as
- * the field label. AntD's `<Select>` renders a `<div role="combobox">`
- * rather than a labelable form element, so the implicit label
- * association never fires — screen readers only get the explicit
- * `aria-label={microcopy.a11y.sortProjects}` on the Select itself, which
- * already covers the labelling contract. Render as a plain inline group
- * so we don't ship a `<label>` that has no labellable target.
- */
-const SortRow = styled.span`
-    align-items: center;
-    color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.5));
-    display: inline-flex;
-    font-size: ${fontSize.xs}px;
-    font-weight: ${fontWeight.medium};
-    gap: ${space.xs}px;
-`;
-
-const Grid = styled.div`
-    display: grid;
-    gap: ${space.md}px;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
-
-    @media (min-width: ${breakpoints.sm}px) {
-        gap: ${space.lg}px;
-        grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
-    }
-`;
-
-/*
- * Pagination footer pinned below the grid. Centred on phones (where the
- * compact AntD pagination would otherwise sit hard against the left
- * edge) and right-aligned from sm up so it reads as a footer control
- * rather than competing with the cards for the leading edge.
- */
-const PaginationRow = styled.div`
-    display: flex;
-    justify-content: center;
-    margin-top: ${space.xs}px;
-
-    @media (min-width: ${breakpoints.sm}px) {
-        justify-content: flex-end;
-    }
-`;
-
-const SKELETON_KEY_PREFIX = "__skeleton__";
 const SKELETON_COUNT = 6;
 
 /*
- * Client-side pagination (Phase 2.2 §1.2 item 6). The grid renders an
- * unbounded number of cards otherwise, so a workspace with hundreds of
- * projects paints every card on first load. Twelve fills three to four
- * grid rows on desktop without crowding; the size-changer lets power
- * users widen the page to 24 / 48 when they want a denser scan.
+ * Client-side pagination (Phase 2.2 §1.2 item 6). Twelve fills three to four
+ * grid rows on desktop without crowding; the size-changer lets power users
+ * widen the page to 24 / 48.
  */
 const DEFAULT_PAGE_SIZE = 12;
 const PAGE_SIZE_OPTIONS = [12, 24, 48];
@@ -194,10 +187,6 @@ const sortProjects = (
             );
             break;
         case "favorited-first":
-            // Favorited projects float to the top; tie-broken by name
-            // ascending (locale-aware) so the favorited slice is itself
-            // ordered, and the unfavorited tail keeps the same name-asc
-            // arrangement as the default surface.
             out.sort((a, b) => {
                 const aLiked = likedSet.has(a._id);
                 const bLiked = likedSet.has(b._id);
@@ -216,6 +205,12 @@ const sortProjects = (
     return out;
 };
 
+interface PendingDelete {
+    projectId: string;
+    projectName: string;
+    beforeState?: IProject;
+}
+
 const ProjectList: React.FC<Props> = ({
     dataSource,
     members,
@@ -224,24 +219,9 @@ const ProjectList: React.FC<Props> = ({
     sortOrder: sortOrderProp,
     onSortOrderChange
 }) => {
-    // AntD v6: static `message` warns about dynamic theme;
-    // `useAppMessage()` returns a theme-aware instance (with a static
-    // fallback for tests that render without `<App>`).
     const message = useAppMessage();
     const { user } = useAuth();
     const [pendingLikeId, setPendingLikeId] = useState("");
-    /*
-     * Phase 4.2 — `sortOrder` is now URL-state when the page wires the
-     * controlled prop pair. Falling back to local state keeps the legacy
-     * mount surfaces (e.g. project-detail summaries) working without
-     * forcing them to plumb the URL hook.
-     *
-     * The fallback default is `createdAt-desc` (newest first) to match
-     * the page-level `PROJECT_LIST_DEFAULTS_FALLBACK`. The legacy local
-     * default used to be `name-asc`; we updated it to keep the two
-     * code paths in lock-step so a refactor that drops the props won't
-     * silently change the visible order.
-     */
     const [internalSort, setInternalSort] =
         useState<ProjectListSort>("createdAt-desc");
     const sortOrder = sortOrderProp ?? internalSort;
@@ -264,14 +244,9 @@ const ProjectList: React.FC<Props> = ({
         ["projects"],
         deleteProjectCallback,
         // Suppress useReactMutation's auto-revert toast; we surface a
-        // dedicated success/failure toast below so the user sees the
-        // outcome of the explicit confirm-to-delete.
+        // dedicated success/failure toast below.
         () => {}
     );
-    // Companion POST mutation used purely as the undo closure for
-    // the activity-feed Undo button. Re-creates the deleted project
-    // with the captured before-state so the user can recover from an
-    // accidental delete. Fire-and-forget — errors are swallowed.
     const { mutateAsync: undoDelete } = useReactMutation(
         "projects",
         "POST",
@@ -282,6 +257,10 @@ const ProjectList: React.FC<Props> = ({
     const { record: recordActivity } = useActivityFeed();
     const { startEditing, openModal } = useProjectModal();
 
+    const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(
+        null
+    );
+
     const likedSet = useMemo(
         () => new Set(user?.likedProjects ?? []),
         [user?.likedProjects]
@@ -291,39 +270,15 @@ const ProjectList: React.FC<Props> = ({
         [dataSource, sortOrder, likedSet]
     );
 
-    /*
-     * Client-side pagination. `page` is 1-based to match AntD's
-     * `<Pagination current>` contract. We keep both page + pageSize in
-     * local state because they're view-only concerns — they never need
-     * to round-trip the URL or the server.
-     */
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
     const total = sortedProjects.length;
 
-    /*
-     * Reset to the first page whenever the underlying result set changes
-     * shape — a new filter, a search keystroke, or a sort that reorders
-     * the list. We key the effect on the ordered list of IDs so that a
-     * pure re-fetch returning the same projects in the same order does
-     * NOT yank the user back to page 1, but any add / remove / reorder /
-     * filter does. (Sorting is the deliberate edge case: reordering
-     * within the same set still resets, which matches the "I changed how
-     * I'm looking at this" mental model.)
-     */
     const resultSignature = sortedProjects.map((p) => p._id).join("|");
     useEffect(() => {
         setPage(1);
     }, [resultSignature]);
 
-    /*
-     * Clamp the current page if the total shrank below it (e.g. a delete
-     * emptied the last page, or the user grew the page size). Derived in
-     * render so the slice below is always in-range even on the render
-     * where `total` just dropped — the reset effect above only fires on
-     * a signature change, which a same-set deletion may not trigger
-     * before this paints.
-     */
     const pageCount = Math.max(1, Math.ceil(total / pageSize));
     const safePage = Math.min(page, pageCount);
     const pagedProjects = useMemo(
@@ -340,9 +295,6 @@ const ProjectList: React.FC<Props> = ({
             setPendingLikeId(projectId);
             update({ projectId })
                 .catch(() => {
-                    // Without this catch the heart icon stays stuck in its
-                    // optimistic flipped state because `pendingLikeId` is
-                    // never cleared on rejection.
                     message.error(microcopy.feedback.likeFailed);
                 })
                 .finally(() => {
@@ -352,66 +304,51 @@ const ProjectList: React.FC<Props> = ({
         [message, update]
     );
 
-    const onDelete = useCallback(
+    const requestDelete = useCallback(
         (projectId: string) => {
-            // Capture the full project payload BEFORE removal so the
-            // activity-feed undo closure can POST it back if the user
-            // changes their mind. After the mutation the dataSource has
-            // been pruned and the lookup would return undefined.
             const beforeState = dataSource?.find(
                 (project) => project._id === projectId
             );
-            const projectName = beforeState?.projectName ?? "";
-            Modal.confirm({
-                centered: true,
-                okText: microcopy.confirm.deleteProject.confirmLabel,
-                cancelText: microcopy.actions.cancel,
-                okButtonProps: { danger: true },
-                title: microcopy.confirm.deleteProject.title,
-                content: microcopy.confirm.deleteProject.description,
-                onOk() {
-                    remove(
-                        { projectId },
-                        {
-                            onSuccess: () => {
-                                message.success(
-                                    microcopy.feedback.projectDeleted
-                                );
-                                // Phase 4.3 — record the delete into the
-                                // activity feed only after the server
-                                // confirms the deletion, so a 5xx leaves
-                                // the feed clean. The 10s-window Undo
-                                // closure re-POSTs the captured project so
-                                // the user can recover from an accidental
-                                // delete.
-                                recordActivity({
-                                    kind: "project",
-                                    action: "delete",
-                                    summary: microcopyString(
-                                        microcopy.activityFeed.descriptions
-                                            .projectDeleted
-                                    ).replace("{name}", projectName),
-                                    undo: beforeState
-                                        ? () => {
-                                              void undoDelete(
-                                                  beforeState as unknown as Record<
-                                                      string,
-                                                      unknown
-                                                  >
-                                              );
-                                          }
-                                        : undefined
-                                });
-                            },
-                            onError: () =>
-                                message.error(microcopy.feedback.saveFailed)
-                        }
-                    );
-                }
+            setPendingDelete({
+                projectId,
+                projectName: beforeState?.projectName ?? "",
+                beforeState
             });
         },
-        [dataSource, message, recordActivity, remove, undoDelete]
+        [dataSource]
     );
+
+    const confirmDelete = useCallback(() => {
+        if (!pendingDelete) return;
+        const { projectId, projectName, beforeState } = pendingDelete;
+        setPendingDelete(null);
+        remove(
+            { projectId },
+            {
+                onSuccess: () => {
+                    message.success(microcopy.feedback.projectDeleted);
+                    recordActivity({
+                        kind: "project",
+                        action: "delete",
+                        summary: microcopyString(
+                            microcopy.activityFeed.descriptions.projectDeleted
+                        ).replace("{name}", projectName),
+                        undo: beforeState
+                            ? () => {
+                                  void undoDelete(
+                                      beforeState as unknown as Record<
+                                          string,
+                                          unknown
+                                      >
+                                  );
+                              }
+                            : undefined
+                    });
+                },
+                onError: () => message.error(microcopy.feedback.saveFailed)
+            }
+        );
+    }, [message, pendingDelete, recordActivity, remove, undoDelete]);
 
     const isLiked = (projectId: string): boolean => {
         const baseLiked = Boolean(user?.likedProjects?.includes(projectId));
@@ -420,18 +357,10 @@ const ProjectList: React.FC<Props> = ({
     };
 
     /*
-     * Stable per-project handler cache. `ProjectCard` is `React.memo`'d,
-     * so passing a freshly-allocated `() => onLike(p._id)` arrow on every
-     * render (the old pattern) would change the prop identity on each
-     * keystroke in the search input and re-render every card — defeating
-     * the memo entirely. We bind each card's id-less callbacks once and
-     * reuse the same function refs across renders. The cache is keyed by
-     * project id and held in a ref so it survives re-renders; the bound
-     * closures only capture the (stable) `onLike` / `onDelete` /
-     * `startEditing` callbacks, never render-scoped state, so they never
-     * go stale. Cleaning up entries for deleted projects is unnecessary —
-     * the working set is bounded by the number of projects a session
-     * touches, and the cache dies with the component.
+     * Stable per-project handler cache. `ProjectCard` is `React.memo`'d, so a
+     * freshly-allocated arrow on every render would change the prop identity
+     * on each keystroke and re-render every card. We bind each card's
+     * id-less callbacks once and reuse the same refs across renders.
      */
     const getCardHandlers = useMemo(() => {
         const cache = new Map<
@@ -444,40 +373,73 @@ const ProjectList: React.FC<Props> = ({
             const handlers = {
                 onLike: () => onLike(projectId),
                 onEdit: () => startEditing(projectId),
-                onDelete: () => onDelete(projectId)
+                onDelete: () => requestDelete(projectId)
             };
             cache.set(projectId, handlers);
             return handlers;
         };
-    }, [onLike, onDelete, startEditing]);
+    }, [onLike, requestDelete, startEditing]);
+
+    const deleteDialog = (
+        <Dialog
+            open={pendingDelete !== null}
+            onOpenChange={(open) => {
+                if (!open) setPendingDelete(null);
+            }}
+        >
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>
+                        {microcopy.confirm.deleteProject.title}
+                    </DialogTitle>
+                    <DialogDescription>
+                        {microcopy.confirm.deleteProject.description}
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <Button
+                        onClick={() => setPendingDelete(null)}
+                        variant="default"
+                    >
+                        {microcopy.actions.cancel}
+                    </Button>
+                    <Button onClick={confirmDelete} variant="destructive">
+                        {microcopy.confirm.deleteProject.confirmLabel}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
 
     if (showSkeleton) {
         return (
-            <ListSurface aria-busy>
-                <Grid role="list" aria-label={microcopy.a11y.loadingProjects}>
+            <section aria-busy className="flex flex-col gap-md">
+                <div
+                    role="list"
+                    aria-label={microcopy.a11y.loadingProjects}
+                    className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,16rem),1fr))] gap-md sm:grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] sm:gap-lg"
+                >
                     {Array.from({ length: SKELETON_COUNT }, (_, idx) => (
                         <div
-                            key={`${SKELETON_KEY_PREFIX}${idx}`}
+                            key={`__skeleton__${idx}`}
                             role="listitem"
-                            className="ant-skeleton"
+                            data-testid="project-skeleton"
                         >
                             <ProjectCardSkeleton />
                         </div>
                     ))}
-                </Grid>
-            </ListSurface>
+                </div>
+            </section>
         );
     }
 
     if (error) {
-        // Page-level <Alert> is rendered by the calling page; render
-        // nothing here so the user does not see a misleading empty state.
-        return <ListSurface />;
+        return <section className="flex flex-col gap-md" />;
     }
 
     if (sortedProjects.length === 0) {
         return (
-            <ListSurface>
+            <section className="flex flex-col gap-md">
                 <EmptyState
                     variant="projects"
                     title={microcopy.empty.projects.title}
@@ -485,15 +447,15 @@ const ProjectList: React.FC<Props> = ({
                     cta={
                         <Button
                             aria-label={microcopy.actions.createProject}
-                            icon={<PlusOutlined aria-hidden />}
                             onClick={openModal}
-                            type="primary"
+                            variant="primary"
                         >
+                            <Plus aria-hidden />
                             {microcopy.actions.createProject}
                         </Button>
                     }
                 />
-            </ListSurface>
+            </section>
         );
     }
 
@@ -504,25 +466,44 @@ const ProjectList: React.FC<Props> = ({
     ).replace("{count}", String(sortedProjects.length));
 
     return (
-        <ListSurface>
-            <Toolbar>
-                <ResultCount aria-live="polite">
+        <section className="flex flex-col gap-md">
+            {deleteDialog}
+            <div className="flex flex-wrap items-center justify-between gap-sm text-sm text-muted-foreground">
+                <span aria-live="polite" className="font-medium tracking-tight">
                     {projectCountLabel}
-                </ResultCount>
-                <SortRow>
+                </span>
+                <span className="inline-flex items-center gap-xs text-xs font-medium text-muted-foreground">
                     {microcopy.actions.sort}
-                    <Select<ProjectListSort>
-                        aria-label={microcopy.a11y.sortProjects}
-                        onChange={setSortOrder}
-                        options={buildSortOptions()}
-                        size="small"
-                        style={{ minWidth: 152 }}
+                    <Select
+                        onValueChange={(value) =>
+                            setSortOrder(value as ProjectListSort)
+                        }
                         value={sortOrder}
-                        variant="borderless"
-                    />
-                </SortRow>
-            </Toolbar>
-            <Grid role="list" aria-label={microcopy.a11y.projects}>
+                    >
+                        <SelectTrigger
+                            aria-label={microcopy.a11y.sortProjects}
+                            className="h-8 w-auto min-w-[152px] border-0 bg-transparent"
+                        >
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {buildSortOptions().map((option) => (
+                                <SelectItem
+                                    key={option.value}
+                                    value={option.value}
+                                >
+                                    {option.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </span>
+            </div>
+            <div
+                role="list"
+                aria-label={microcopy.a11y.projects}
+                className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,16rem),1fr))] gap-md sm:grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] sm:gap-lg"
+            >
                 {pagedProjects.map((p) => {
                     const handlers = getCardHandlers(p._id);
                     return (
@@ -540,34 +521,52 @@ const ProjectList: React.FC<Props> = ({
                         </div>
                     );
                 })}
-            </Grid>
-            {/*
-             * Only mount the pager once the list outgrows the smallest
-             * page size — a workspace with a single grid-row of projects
-             * doesn't need a "1" footer button. The size-changer lets
-             * power users widen the page; AntD reads `current` from
-             * `safePage` so a shrink-clamp (last page deleted) is
-             * reflected without a flash of an empty grid.
-             */}
+            </div>
             {total > PAGE_SIZE_OPTIONS[0] ? (
-                <PaginationRow>
-                    <Pagination
-                        aria-label={microcopy.a11y.projectPagination}
-                        current={safePage}
-                        onChange={(nextPage, nextSize) => {
-                            setPage(nextPage);
-                            if (nextSize !== pageSize) setPageSize(nextSize);
+                <nav
+                    aria-label={microcopy.a11y.projectPagination}
+                    className="flex flex-wrap items-center justify-center gap-xs sm:justify-end"
+                >
+                    {Array.from({ length: pageCount }, (_, idx) => idx + 1).map(
+                        (n) => (
+                            <Button
+                                key={n}
+                                aria-current={
+                                    n === safePage ? "page" : undefined
+                                }
+                                className="size-8 min-w-8 px-0"
+                                onClick={() => setPage(n)}
+                                size="sm"
+                                variant={n === safePage ? "primary" : "default"}
+                            >
+                                {n}
+                            </Button>
+                        )
+                    )}
+                    <Select
+                        onValueChange={(value) => {
+                            setPageSize(Number(value));
+                            setPage(1);
                         }}
-                        pageSize={pageSize}
-                        pageSizeOptions={PAGE_SIZE_OPTIONS}
-                        responsive
-                        showSizeChanger
-                        size="small"
-                        total={total}
-                    />
-                </PaginationRow>
+                        value={String(pageSize)}
+                    >
+                        <SelectTrigger
+                            aria-label={microcopy.a11y.projectPagination}
+                            className="h-8 w-auto"
+                        >
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {PAGE_SIZE_OPTIONS.map((size) => (
+                                <SelectItem key={size} value={String(size)}>
+                                    {String(size)}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </nav>
             ) : null}
-        </ListSurface>
+        </section>
     );
 };
 

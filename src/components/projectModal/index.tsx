@@ -1,9 +1,20 @@
-import { Button, Form, Grid, Input, Select, Spin, Typography } from "antd";
-import { useForm } from "antd/lib/form/Form";
 import { useEffect, useState } from "react";
 
+import { Button } from "@/components/ui/button";
+import { Form } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
+import { Typography } from "@/components/ui/typography";
+
 import { microcopy, microcopyString } from "../../constants/microcopy";
-import { fontSize, lineHeight, modalWidthCss, space } from "../../theme/tokens";
+import { modalWidthCss } from "../../theme/tokens";
 import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useMembersList from "../../utils/hooks/useMembersList";
 import useProjectModal from "../../utils/hooks/useProjectModal";
@@ -23,11 +34,17 @@ import ResponsiveFormSheet from "../responsiveFormSheet";
  * from the central microcopy bundle so casing stays consistent and we never
  * fall back to the banned `Submit` / `OK` strings.
  */
+interface ProjectFormValues {
+    projectName: string;
+    organization: string;
+    managerId: string;
+    [key: string]: unknown;
+}
+
 const ProjectModal: React.FC = () => {
     const { isModalOpened, closeModal, editingProject, isLoading } =
         useProjectModal();
     const isEditing = Boolean(editingProject);
-    const screens = Grid.useBreakpoint();
 
     const [saveError, setSaveError] = useState<Error | null>(null);
     const createProjectMutation = useReactMutation<IProject>(
@@ -71,7 +88,7 @@ const ProjectModal: React.FC = () => {
     const { record: recordActivity } = useActivityFeed();
     const { show: showUndoToast } = useUndoToast();
 
-    const [form] = useForm();
+    const [form] = Form.useForm<ProjectFormValues>();
     const onClose = () => {
         closeModal();
         form.resetFields();
@@ -182,7 +199,11 @@ const ProjectModal: React.FC = () => {
         : microcopy.actions.createProject;
 
     useEffect(() => {
-        form.setFieldsValue(editingProject);
+        if (editingProject) {
+            form.setFieldsValue(
+                editingProject as unknown as Partial<ProjectFormValues>
+            );
+        }
     }, [editingProject, form]);
 
     /*
@@ -206,24 +227,22 @@ const ProjectModal: React.FC = () => {
      * AntD footer produced when both buttons wrapped.
      */
     const footer = (
-        <div
-            style={{
-                display: "flex",
-                flexDirection: screens.sm ? "row" : "column",
-                gap: space.xs,
-                justifyContent: "flex-end"
-            }}
-        >
-            <Button block={!screens.sm} onClick={requestClose} size="large">
+        <div className="flex flex-col justify-end gap-xs sm:flex-row">
+            <Button
+                className="w-full sm:w-auto"
+                onClick={requestClose}
+                size="lg"
+                variant="default"
+            >
                 {microcopy.actions.cancel}
             </Button>
             <Button
-                block={!screens.sm}
+                className="w-full sm:w-auto"
                 disabled={isLoading}
                 loading={mutateLoading}
                 onClick={submit}
-                size="large"
-                type="primary"
+                size="lg"
+                variant="primary"
             >
                 {okText}
             </Button>
@@ -265,17 +284,14 @@ const ProjectModal: React.FC = () => {
                 title={modalTitle}
                 width={modalWidthCss(520)}
             >
-                <Spin
-                    aria-label={microcopy.a11y.loadingProject}
-                    spinning={isLoading}
-                >
+                <div className="relative">
+                    {isLoading ? (
+                        <div className="absolute inset-0 z-[1] flex items-center justify-center bg-background/60">
+                            <Spinner label={microcopy.a11y.loadingProject} />
+                        </div>
+                    ) : null}
                     <Typography.Text
-                        style={{
-                            display: "block",
-                            fontSize: fontSize.sm,
-                            lineHeight: lineHeight.normal,
-                            marginBottom: space.md
-                        }}
+                        className="mb-md block leading-normal"
                         type="secondary"
                     >
                         {isEditing
@@ -336,22 +352,33 @@ const ProjectModal: React.FC = () => {
                                         microcopy.validation.managerRequired
                                 }
                             ]}
+                            trigger="onValueChange"
                             validateTrigger={["onBlur", "onSubmit"]}
                         >
-                            <Select
-                                options={(members ?? []).map((member) => ({
-                                    label: member.username,
-                                    value: member._id
-                                }))}
-                                placeholder={
-                                    microcopy.placeholders.selectManager
-                                }
-                                showSearch
-                                optionFilterProp="label"
-                            />
+                            <Select>
+                                <SelectTrigger
+                                    aria-label={microcopy.fields.manager}
+                                >
+                                    <SelectValue
+                                        placeholder={
+                                            microcopy.placeholders.selectManager
+                                        }
+                                    />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {(members ?? []).map((member) => (
+                                        <SelectItem
+                                            key={member._id}
+                                            value={member._id}
+                                        >
+                                            {member.username}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </Form.Item>
                     </Form>
-                </Spin>
+                </div>
             </ResponsiveFormSheet>
         </>
     );

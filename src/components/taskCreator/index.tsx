@@ -1,17 +1,10 @@
-import { PlusOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
-import { Button, Input } from "antd";
-import type { InputRef } from "antd";
+import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
+import { cn } from "@/lib/utils";
+
 import { microcopy, microcopyString } from "../../constants/microcopy";
-import {
-    fontWeight,
-    radius,
-    space,
-    touchTargetCoarse
-} from "../../theme/tokens";
 import useActivityFeed from "../../utils/hooks/useActivityFeed";
 import useAiDraftModal from "../../utils/hooks/useAiDraftModal";
 import useAiEnabled from "../../utils/hooks/useAiEnabled";
@@ -22,73 +15,17 @@ import newTaskCallback from "../../utils/optimisticUpdate/createTask";
 import deleteTaskCallback from "../../utils/optimisticUpdate/deleteTask";
 import AiSparkleIcon from "../aiSparkleIcon";
 import AiTaskDraftModal from "../aiTaskDraftModal";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { TOUCH_TARGET } from "../ui/touchTarget";
 
-const CreatorRow = styled.div`
-    align-items: center;
-    /*
-     * Stretch to the column width so the two affordances ("Create task" and
-     * "Draft with AI") do not crowd each other inside a narrow column. The
-     * row still wraps cleanly when both labels exceed the available width.
-     */
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xxs}px;
-    margin-top: ${space.xxs}px;
-    padding: 0 ${space.xs}px;
-    width: 100%;
-`;
-
-const CreateLink = styled.button`
-    align-items: center;
-    background: transparent;
-    border: 1px dashed transparent;
-    border-radius: ${radius.md}px;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-    cursor: pointer;
-    display: inline-flex;
-    font: inherit;
-    font-weight: ${fontWeight.medium};
-    gap: ${space.xxs}px;
-    /*
-     * 32 px keeps the affordance comfortably tappable on a fine-pointer
-     * desktop. On coarse pointers (touch) we lift to 44 px to satisfy
-     * WCAG 2.5.8 (target size, AA recommendation) so a thumb can land
-     * the link without zoom.
-     */
-    min-height: 32px;
-    padding: ${space.xs}px ${space.sm}px;
-    transition:
-        background-color 120ms ease-out,
-        color 120ms ease-out,
-        border-color 120ms ease-out;
-
-    &:hover:not(:disabled),
-    &:focus-visible:not(:disabled) {
-        background: var(--ant-color-primary-bg, rgba(234, 88, 12, 0.06));
-        color: var(--ant-color-primary, #ea580c);
-    }
-
-    /* Keyboard focus ring is handled globally in App.css; this rule
-     * just adds the brand-tinted hover background so the focused state
-     * matches the hover state visually. */
-
-    &:disabled {
-        cursor: default;
-        opacity: 0.5;
-    }
-
-    @media (pointer: coarse) {
-        min-height: 44px;
-    }
-`;
-
-const DraftWithAiButton = styled(Button)`
-    @media (pointer: coarse) {
-        && {
-            min-height: ${touchTargetCoarse}px;
-        }
-    }
-`;
+const CREATE_LINK_CLASS = cn(
+    "inline-flex min-h-[32px] items-center gap-xxs rounded-md border border-dashed border-transparent px-sm py-xs font-medium text-muted-foreground transition-colors",
+    "enabled:hover:bg-primary/[0.06] enabled:hover:text-primary",
+    "enabled:focus-visible:bg-primary/[0.06] enabled:focus-visible:text-primary",
+    "disabled:cursor-default disabled:opacity-50",
+    TOUCH_TARGET
+);
 
 const TaskCreator: React.FC<{
     columnId?: string;
@@ -98,7 +35,7 @@ const TaskCreator: React.FC<{
     const { user } = useAuth();
     const [taskName, setTaskName] = useState("");
     const [inputMode, setInputMode] = useState(false);
-    const inputRef = useRef<InputRef>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
     // The AI draft modal opens via a URL query param so the system back
     // button dismisses it. The query value is the column id so multiple
     // per-column triggers on the same board don't cross-talk.
@@ -202,27 +139,28 @@ const TaskCreator: React.FC<{
 
     if (!inputMode) {
         return (
-            <CreatorRow>
-                <CreateLink
+            <div className="mt-xxs flex w-full flex-wrap items-center gap-xxs px-xs">
+                <button
                     aria-label={microcopy.actions.createTask}
+                    className={CREATE_LINK_CLASS}
                     disabled={disabled}
                     onClick={toggle}
                     type="button"
                 >
-                    <PlusOutlined aria-hidden /> {microcopy.actions.createTask}
-                </CreateLink>
+                    <Plus aria-hidden /> {microcopy.actions.createTask}
+                </button>
                 {aiEnabled && boardAiOn && (
                     <>
-                        <DraftWithAiButton
+                        <Button
                             aria-label={microcopy.actions.draftWithAi}
                             disabled={disabled}
-                            icon={<AiSparkleIcon aria-hidden />}
                             onClick={() => columnId && openAiDraft(columnId)}
-                            size="small"
-                            type="link"
+                            size="sm"
+                            variant="link"
                         >
+                            <AiSparkleIcon aria-hidden />
                             {microcopy.actions.draftWithAi}
-                        </DraftWithAiButton>
+                        </Button>
                         {aiOpen && (
                             <AiTaskDraftModal
                                 columnId={columnId}
@@ -232,30 +170,32 @@ const TaskCreator: React.FC<{
                         )}
                     </>
                 )}
-            </CreatorRow>
+            </div>
         );
     }
     return (
         <Input
             aria-label={microcopy.a11y.newTaskName}
+            autoComplete="off"
+            className="mt-xxs"
             disabled={isLoading || disabled}
             enterKeyHint="done"
             inputMode="text"
             onBlur={toggle}
-            placeholder={microcopy.placeholders.whatNeedsToBeDone}
-            autoComplete="off"
-            ref={inputRef}
-            onPressEnter={submit}
-            onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                    setInputMode(false);
-                }
-            }}
-            value={taskName}
             onChange={(e) => {
                 setTaskName(e.target.value);
             }}
-            style={{ marginTop: space.xxs }}
+            onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                    setInputMode(false);
+                } else if (event.key === "Enter") {
+                    event.preventDefault();
+                    void submit();
+                }
+            }}
+            placeholder={microcopy.placeholders.whatNeedsToBeDone}
+            ref={inputRef}
+            value={taskName}
         />
     );
 };

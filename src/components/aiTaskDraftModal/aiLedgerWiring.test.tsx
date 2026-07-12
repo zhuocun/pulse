@@ -9,7 +9,7 @@ import { __resetAiLedgerUndoCallbacksForTests } from "../../utils/hooks/useAiLed
 
 import AiTaskDraftModal from ".";
 
-const installAntdMocks = () => {
+const installBrowserMocks = () => {
     Object.defineProperty(window, "matchMedia", {
         writable: true,
         value: () => ({
@@ -62,7 +62,7 @@ describe("AiTaskDraftModal — activity ledger wiring (A8)", () => {
     const fetchMock = jest.spyOn(global, "fetch");
 
     beforeAll(() => {
-        installAntdMocks();
+        installBrowserMocks();
     });
 
     beforeEach(() => {

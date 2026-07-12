@@ -1,10 +1,11 @@
-import { Button, Space, Typography } from "antd";
 import { useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { Button } from "@/components/ui/button";
+import { Text } from "@/components/ui/typography";
+
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import { microcopy, microcopyString } from "../../constants/microcopy";
-import { fontSize, space } from "../../theme/tokens";
 import type { TriageNudge } from "../../interfaces/agent";
 import EmptyState from "../emptyState";
 import NudgeCard from "../nudgeCard";
@@ -94,13 +95,8 @@ const InboxTabBody: React.FC<InboxTabBodyProps> = ({
     if (nudges.length === 0) {
         return (
             <div
+                className="flex min-h-0 flex-1 flex-col"
                 data-testid="copilot-dock-inbox-empty"
-                style={{
-                    display: "flex",
-                    flex: "1 1 auto",
-                    flexDirection: "column",
-                    minHeight: 0
-                }}
             >
                 <EmptyState
                     description={
@@ -116,29 +112,13 @@ const InboxTabBody: React.FC<InboxTabBodyProps> = ({
 
     return (
         <div
+            className="flex min-h-0 flex-1 flex-col"
             data-testid="copilot-dock-inbox-list"
-            style={{
-                display: "flex",
-                flex: "1 1 auto",
-                flexDirection: "column",
-                minHeight: 0
-            }}
         >
-            <Typography.Text
-                style={{
-                    display: "block",
-                    fontSize: fontSize.xs,
-                    marginBottom: space.xs
-                }}
-                type="secondary"
-            >
+            <Text className="mb-xs block text-xs" type="secondary">
                 {microcopy.copilotDock.inboxTab.sectionLabel}
-            </Typography.Text>
-            <Space
-                direction="vertical"
-                size={space.xxs}
-                style={{ width: "100%" }}
-            >
+            </Text>
+            <div className="flex w-full flex-col gap-xxs">
                 {nudges.map((nudge) => (
                     <NudgeCard
                         actionLabel={microcopyString(
@@ -150,8 +130,8 @@ const InboxTabBody: React.FC<InboxTabBodyProps> = ({
                         onDismiss={onDismissNudge}
                     />
                 ))}
-            </Space>
-            <div style={{ marginTop: "auto", paddingTop: space.sm }}>
+            </div>
+            <div className="mt-auto pt-sm">
                 <Button
                     aria-label={microcopyString(
                         microcopy.copilotDock.inboxTab.seeAll
@@ -159,8 +139,8 @@ const InboxTabBody: React.FC<InboxTabBodyProps> = ({
                     block
                     data-testid="copilot-dock-inbox-see-all"
                     onClick={handleSeeAll}
-                    size="small"
-                    type="link"
+                    size="sm"
+                    variant="link"
                 >
                     {microcopyString(microcopy.copilotDock.inboxTab.seeAll)}
                 </Button>

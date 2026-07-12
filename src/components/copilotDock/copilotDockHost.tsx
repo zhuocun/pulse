@@ -37,10 +37,10 @@ import { CopilotDockBody, CopilotDockShell } from "./index";
  *     scope chat / brief context to).
  *   - The current project has AI opted out per-project.
  *
- * Phase 4 A8 — Drawer-lift architecture:
- *   - The `<CopilotDockShell>` (the AntD Drawer + chrome) is owned by
- *     this host and stays mounted across projectId changes — AntD does
- *     NOT animate a close/open transition because the Drawer's `open`
+ * Phase 4 A8 — shell-lift architecture:
+ *   - The `<CopilotDockShell>` (the Sheet surface + chrome) is owned by
+ *     this host and stays mounted across projectId changes — it does
+ *     NOT animate a close/open transition because the Sheet's `open`
  *     prop never flips false during the navigation.
  *   - The project-scoped body (`<ProjectScopedDockBody key={projectId}>`)
  *     is rendered AS A CHILD of the shell. The keyed remount tears down
@@ -435,10 +435,10 @@ const CopilotDockHostInner: React.FC<{
     }, [inboxSurfaceVisible, markInboxRead]);
 
     /*
-     * Drawer-lift (Phase 4 A8 — Lane A caveat fix): the
-     * `<CopilotDockShell>` owns the AntD Drawer mount and stays
+     * Shell-lift (Phase 4 A8 — Lane A caveat fix): the
+     * `<CopilotDockShell>` owns the Sheet surface mount and stays
      * mounted continuously while the dock flag is on, so a project
-     * switch with the dock open does NOT animate a Drawer close/open
+     * switch with the dock open does NOT animate a surface close/open
      * transition. `<ProjectScopedDockBody key={projectId}>` is the
      * body slot inside the shell — the `key={projectId}` remount tears
      * down per-project state (chat hook messages, triage agent thread,

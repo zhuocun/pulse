@@ -1,11 +1,10 @@
-import styled from "@emotion/styled";
-import { Button } from "antd";
 import React, { useCallback, useEffect, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import useAppMessage from "@/components/ui/toast";
 
 import { ANALYTICS_EVENTS, track } from "../../constants/analytics";
 import { microcopy } from "../../constants/microcopy";
-import { space, touchTargetCoarse } from "../../theme/tokens";
-import useAppMessage from "../../utils/hooks/useAppMessage";
 
 import AiFeedbackPopover, { AiFeedbackSubmission } from "./feedbackPopover";
 
@@ -17,21 +16,6 @@ export interface AiCopilotSurfaceFeedbackProps {
     citationCount?: number;
     ariaGroupLabel: string;
 }
-
-const FeedbackRail = styled.div`
-    align-items: center;
-    column-gap: ${space.xxs}px;
-    display: inline-flex;
-    flex-wrap: wrap;
-    row-gap: ${space.xxs}px;
-
-    @media (pointer: coarse) {
-        && .ant-btn {
-            min-height: ${touchTargetCoarse}px;
-            min-width: ${touchTargetCoarse}px;
-        }
-    }
-`;
 
 /**
  * Mirrors `AiChatDrawer` thumbs rail for non-chat surfaces — same analytics
@@ -45,10 +29,8 @@ const AiCopilotSurfaceFeedback: React.FC<AiCopilotSurfaceFeedbackProps> = ({
 }) => {
     const [value, setValue] = useState<"up" | "down" | null>(null);
     const [feedbackOpen, setFeedbackOpen] = useState(false);
-    // AntD v6: static `message` import warns it can't read dynamic
-    // theme. `useAppMessage()` returns a theme-aware instance from the
-    // nearest `<App>` provider (with a static fallback for tests
-    // rendering in isolation).
+    // Toasts route through the sonner-backed `message` seam, which
+    // no-ops until a `<Toaster>` is mounted (test-safe by default).
     const message = useAppMessage();
 
     useEffect(() => {
@@ -99,13 +81,17 @@ const AiCopilotSurfaceFeedback: React.FC<AiCopilotSurfaceFeedbackProps> = ({
     if (!suggestionKey) return null;
 
     return (
-        <FeedbackRail aria-label={ariaGroupLabel} role="group">
+        <div
+            aria-label={ariaGroupLabel}
+            className="inline-flex flex-wrap items-center gap-xxs"
+            role="group"
+        >
             <Button
                 aria-label={microcopy.a11y.helpfulAnswer}
                 aria-pressed={value === "up"}
                 onClick={handleThumbsUp}
-                size="small"
-                type={value === "up" ? "primary" : "text"}
+                size="sm"
+                variant={value === "up" ? "primary" : "ghost"}
             >
                 👍
             </Button>
@@ -120,14 +106,14 @@ const AiCopilotSurfaceFeedback: React.FC<AiCopilotSurfaceFeedbackProps> = ({
                     aria-haspopup="dialog"
                     aria-label={microcopy.a11y.notHelpfulGiveFeedback}
                     aria-pressed={value === "down"}
-                    size="small"
+                    size="sm"
                     title={microcopy.ai.feedbackThumbsDownTooltip}
-                    type={value === "down" ? "primary" : "text"}
+                    variant={value === "down" ? "primary" : "ghost"}
                 >
                     👎
                 </Button>
             </AiFeedbackPopover>
-        </FeedbackRail>
+        </div>
     );
 };
 

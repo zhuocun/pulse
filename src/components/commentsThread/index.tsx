@@ -1,15 +1,23 @@
-import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
-import { Alert, Button, Input, Popconfirm, Select, Typography } from "antd";
+import { AlertCircle, ChevronDown, Pencil, Trash2 } from "lucide-react";
 import React, { useCallback, useMemo, useState } from "react";
 
-import { microcopy, microcopyString } from "../../constants/microcopy";
+import { Alert, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import {
-    fontSize,
-    fontWeight,
-    space,
-    touchTargetCoarse
-} from "../../theme/tokens";
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger
+} from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
+import { Typography } from "@/components/ui/typography";
+
+import { microcopy, microcopyString } from "../../constants/microcopy";
 import useAuth from "../../utils/hooks/useAuth";
 import useComments from "../../utils/hooks/useComments";
 import useProjectMembers from "../../utils/hooks/useProjectMembers";
@@ -33,109 +41,7 @@ import useProjectMembers from "../../utils/hooks/useProjectMembers";
  * (`white-space: pre-wrap`) — never `dangerouslySetInnerHTML`.
  */
 
-const Wrapper = styled.section`
-    border-top: 1px solid
-        var(--ant-color-border-secondary, rgba(15, 23, 42, 0.08));
-    display: flex;
-    flex-direction: column;
-    gap: ${space.md}px;
-    margin-block-start: ${space.lg}px;
-    padding-block-start: ${space.md}px;
-`;
-
-const Heading = styled(Typography.Text)`
-    && {
-        font-size: ${fontSize.sm}px;
-        font-weight: ${fontWeight.semibold};
-    }
-`;
-
-const List = styled.ul`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.sm}px;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-`;
-
-const Row = styled.li`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xxs}px;
-    margin: 0;
-    padding: 0;
-`;
-
-const RowHeader = styled.div`
-    align-items: baseline;
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xs}px;
-`;
-
-const AuthorName = styled(Typography.Text)`
-    && {
-        font-size: ${fontSize.sm}px;
-        font-weight: ${fontWeight.semibold};
-    }
-`;
-
-const TimeStamp = styled.time`
-    color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45));
-    font-size: ${fontSize.xs}px;
-`;
-
-const Body = styled.div`
-    font-size: ${fontSize.base}px;
-    white-space: pre-wrap;
-    word-break: break-word;
-`;
-
-const RowActions = styled.div`
-    display: flex;
-    gap: ${space.xxs}px;
-    margin-inline-start: auto;
-`;
-
-const ActionButton = styled(Button)`
-    @media (pointer: coarse) {
-        min-height: ${touchTargetCoarse}px;
-        min-width: ${touchTargetCoarse}px;
-    }
-`;
-
-const Composer = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xs}px;
-`;
-
-const ComposerActions = styled.div`
-    align-items: center;
-    display: flex;
-    gap: ${space.xs}px;
-    justify-content: flex-end;
-`;
-
-const EditActions = styled.div`
-    display: flex;
-    gap: ${space.xs}px;
-`;
-
-const PostButton = styled(Button)`
-    @media (pointer: coarse) {
-        min-height: ${touchTargetCoarse}px;
-    }
-`;
-
-const MentionSelect = styled(Select)`
-    @media (pointer: coarse) {
-        .ant-select-selector {
-            min-height: ${touchTargetCoarse}px;
-        }
-    }
-`;
+const ICON_BUTTON_CLASS = "coarse:min-w-[44px]";
 
 /**
  * Format a server `createdAt` ISO string to a localized absolute
@@ -159,6 +65,63 @@ interface CommentsThreadProps {
     /** Placeholder / not-yet-persisted task — render nothing. */
     disabled?: boolean;
 }
+
+interface ConfirmPopoverProps {
+    trigger: React.ReactNode;
+    title: string;
+    okText: string;
+    cancelText: string;
+    onConfirm: () => void;
+}
+
+const ConfirmPopover: React.FC<ConfirmPopoverProps> = ({
+    trigger,
+    title,
+    okText,
+    cancelText,
+    onConfirm
+}) => {
+    const [open, setOpen] = useState(false);
+    return (
+        <Popover onOpenChange={setOpen} open={open}>
+            <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+            <PopoverContent aria-label={title} className="w-64" role="dialog">
+                <p className="text-sm font-medium text-foreground">{title}</p>
+                <div className="mt-sm flex justify-end gap-xs">
+                    <Button
+                        onClick={() => setOpen(false)}
+                        size="sm"
+                        variant="default"
+                    >
+                        {cancelText}
+                    </Button>
+                    <Button
+                        onClick={() => {
+                            setOpen(false);
+                            onConfirm();
+                        }}
+                        size="sm"
+                        variant="destructive"
+                    >
+                        {okText}
+                    </Button>
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+};
+
+interface ErrorBannerProps {
+    testId: string;
+    message: string;
+}
+
+const ErrorBanner: React.FC<ErrorBannerProps> = ({ testId, message }) => (
+    <Alert data-testid={testId} variant="destructive">
+        <AlertCircle aria-hidden />
+        <AlertTitle>{message}</AlertTitle>
+    </Alert>
+);
 
 const CommentsThread: React.FC<CommentsThreadProps> = ({
     taskId,
@@ -242,6 +205,16 @@ const CommentsThread: React.FC<CommentsThreadProps> = ({
     const trimmedBody = body.trim();
     const canPost = trimmedBody.length > 0 && !isCreating;
 
+    const toggleMention = useCallback((memberId: string, checked: boolean) => {
+        setMentions((current) =>
+            checked
+                ? current.includes(memberId)
+                    ? current
+                    : [...current, memberId]
+                : current.filter((id) => id !== memberId)
+        );
+    }, []);
+
     const handlePost = useCallback(async () => {
         if (!canPost) return;
         setPostError(false);
@@ -299,135 +272,134 @@ const CommentsThread: React.FC<CommentsThreadProps> = ({
     if (disabled) return null;
 
     const list = comments ?? [];
+    const mentionCount = mentions.length;
 
     return (
-        <Wrapper>
-            <Heading>{microcopyString(microcopy.comments.heading)}</Heading>
+        <section className="mt-lg flex flex-col gap-md border-t border-border pt-md">
+            <Typography.Text strong>
+                {microcopyString(microcopy.comments.heading)}
+            </Typography.Text>
 
             {isError ? (
-                <Alert
-                    data-testid="comments-load-error"
+                <ErrorBanner
                     message={microcopyString(microcopy.comments.loadError)}
-                    showIcon
-                    type="error"
+                    testId="comments-load-error"
                 />
             ) : null}
 
             {!isError && list.length === 0 ? (
-                <Typography.Text
-                    data-testid="comments-empty"
-                    type="secondary"
-                    style={{ fontSize: fontSize.sm }}
-                >
+                <Typography.Text data-testid="comments-empty" type="secondary">
                     {microcopyString(microcopy.comments.empty)}
                 </Typography.Text>
             ) : null}
 
             {list.length > 0 ? (
-                <List
+                <ul
                     aria-label={microcopyString(
                         microcopy.comments.listAriaLabel
                     )}
+                    className="m-0 flex list-none flex-col gap-sm p-0"
                 >
                     {list.map((comment) => {
                         const isAuthor = comment.authorId === currentUserId;
                         const timestamp = formatTimestamp(comment.createdAt);
                         const editing = editingId === comment._id;
                         return (
-                            <Row
-                                key={comment._id}
-                                data-testid="comment-row"
+                            <li
+                                className="m-0 flex flex-col gap-xxs p-0"
                                 data-comment-id={comment._id}
+                                data-testid="comment-row"
+                                key={comment._id}
                             >
-                                <RowHeader>
-                                    <AuthorName>
+                                <div className="flex flex-wrap items-baseline gap-xs">
+                                    <Typography.Text strong>
                                         {resolveAuthorName(comment.authorId)}
-                                    </AuthorName>
+                                    </Typography.Text>
                                     {timestamp ? (
-                                        <TimeStamp dateTime={comment.createdAt}>
+                                        <time
+                                            className="text-xs text-muted-foreground"
+                                            dateTime={comment.createdAt}
+                                        >
                                             {timestamp}
-                                        </TimeStamp>
+                                        </time>
                                     ) : null}
                                     {!editing && (isAuthor || isOwner) ? (
-                                        <RowActions>
+                                        <div className="ms-auto flex gap-xxs">
                                             {isAuthor ? (
-                                                <ActionButton
+                                                <Button
                                                     aria-label={microcopyString(
                                                         microcopy.comments
                                                             .editAriaLabel
                                                     )}
-                                                    data-testid="comment-edit"
-                                                    icon={
-                                                        <EditOutlined
-                                                            aria-hidden
-                                                        />
+                                                    className={
+                                                        ICON_BUTTON_CLASS
                                                     }
+                                                    data-testid="comment-edit"
                                                     onClick={() =>
                                                         handleStartEdit(comment)
                                                     }
-                                                    size="small"
-                                                    type="text"
-                                                />
-                                            ) : null}
-                                            {isAuthor || isOwner ? (
-                                                <Popconfirm
-                                                    cancelText={
-                                                        microcopy.actions.cancel
-                                                    }
-                                                    okText={
-                                                        microcopy.actions.delete
-                                                    }
-                                                    onConfirm={() =>
-                                                        handleDelete(
-                                                            comment._id
-                                                        )
-                                                    }
-                                                    title={microcopyString(
-                                                        microcopy.comments
-                                                            .deleteConfirmTitle
-                                                    )}
+                                                    size="sm"
+                                                    variant="ghost"
                                                 >
-                                                    <ActionButton
+                                                    <Pencil aria-hidden />
+                                                </Button>
+                                            ) : null}
+                                            <ConfirmPopover
+                                                cancelText={
+                                                    microcopy.actions.cancel
+                                                }
+                                                okText={
+                                                    microcopy.actions.delete
+                                                }
+                                                onConfirm={() =>
+                                                    handleDelete(comment._id)
+                                                }
+                                                title={microcopyString(
+                                                    microcopy.comments
+                                                        .deleteConfirmTitle
+                                                )}
+                                                trigger={
+                                                    <Button
                                                         aria-label={microcopyString(
                                                             microcopy.comments
                                                                 .deleteAriaLabel
                                                         )}
-                                                        danger
-                                                        data-testid="comment-delete"
-                                                        icon={
-                                                            <DeleteOutlined
-                                                                aria-hidden
-                                                            />
+                                                        className={
+                                                            ICON_BUTTON_CLASS
                                                         }
-                                                        size="small"
-                                                        type="text"
-                                                    />
-                                                </Popconfirm>
-                                            ) : null}
-                                        </RowActions>
+                                                        data-testid="comment-delete"
+                                                        size="sm"
+                                                        variant="ghost"
+                                                    >
+                                                        <Trash2
+                                                            aria-hidden
+                                                            className="text-destructive"
+                                                        />
+                                                    </Button>
+                                                }
+                                            />
+                                        </div>
                                     ) : null}
-                                </RowHeader>
+                                </div>
                                 {editing ? (
-                                    <Composer>
-                                        <Input.TextArea
+                                    <div className="flex flex-col gap-xs">
+                                        <Textarea
                                             aria-label={microcopyString(
                                                 microcopy.comments.editAriaLabel
                                             )}
                                             autoComplete="off"
-                                            autoSize={{
-                                                minRows: 2,
-                                                maxRows: 6
-                                            }}
+                                            className="min-h-[3rem]"
                                             data-testid="comment-edit-input"
                                             enterKeyHint="enter"
                                             inputMode="text"
                                             onChange={(event) =>
                                                 setEditBody(event.target.value)
                                             }
+                                            rows={2}
                                             value={editBody}
                                         />
-                                        <EditActions>
-                                            <ActionButton
+                                        <div className="flex gap-xs">
+                                            <Button
                                                 data-testid="comment-edit-save"
                                                 disabled={
                                                     editBody.trim().length === 0
@@ -436,59 +408,56 @@ const CommentsThread: React.FC<CommentsThreadProps> = ({
                                                 onClick={() =>
                                                     handleSaveEdit(comment._id)
                                                 }
-                                                size="small"
-                                                type="primary"
+                                                size="sm"
+                                                variant="primary"
                                             >
                                                 {microcopy.actions.save}
-                                            </ActionButton>
-                                            <ActionButton
+                                            </Button>
+                                            <Button
                                                 data-testid="comment-edit-cancel"
                                                 onClick={handleCancelEdit}
-                                                size="small"
+                                                size="sm"
+                                                variant="default"
                                             >
                                                 {microcopy.actions.cancel}
-                                            </ActionButton>
-                                        </EditActions>
-                                    </Composer>
+                                            </Button>
+                                        </div>
+                                    </div>
                                 ) : (
-                                    <Body>{comment.body}</Body>
+                                    <div className="whitespace-pre-wrap break-words text-sm text-foreground">
+                                        {comment.body}
+                                    </div>
                                 )}
-                            </Row>
+                            </li>
                         );
                     })}
-                </List>
+                </ul>
             ) : null}
 
             {postError ? (
-                <Alert
-                    data-testid="comments-post-error"
+                <ErrorBanner
                     message={microcopyString(microcopy.comments.postError)}
-                    showIcon
-                    type="error"
+                    testId="comments-post-error"
                 />
             ) : null}
             {editError ? (
-                <Alert
-                    data-testid="comments-edit-error"
+                <ErrorBanner
                     message={microcopyString(microcopy.comments.editError)}
-                    showIcon
-                    type="error"
+                    testId="comments-edit-error"
                 />
             ) : null}
             {deleteError ? (
-                <Alert
-                    data-testid="comments-delete-error"
+                <ErrorBanner
                     message={microcopyString(microcopy.comments.deleteError)}
-                    showIcon
-                    type="error"
+                    testId="comments-delete-error"
                 />
             ) : null}
 
-            <Composer>
-                <Input.TextArea
+            <div className="flex flex-col gap-xs">
+                <Textarea
                     aria-label={microcopyString(microcopy.comments.placeholder)}
                     autoComplete="off"
-                    autoSize={{ minRows: 2, maxRows: 6 }}
+                    className="min-h-[3rem]"
                     data-testid="comment-composer-input"
                     enterKeyHint="enter"
                     inputMode="text"
@@ -496,36 +465,62 @@ const CommentsThread: React.FC<CommentsThreadProps> = ({
                     placeholder={microcopyString(
                         microcopy.comments.placeholder
                     )}
+                    rows={2}
                     value={body}
                 />
-                <MentionSelect
-                    aria-label={microcopyString(
-                        microcopy.comments.mentionLabel
-                    )}
-                    data-testid="comment-mention-select"
-                    mode="multiple"
-                    onChange={(value) => setMentions(value as string[])}
-                    options={mentionOptions}
-                    placeholder={microcopyString(
-                        microcopy.comments.mentionPlaceholder
-                    )}
-                    value={mentions}
-                />
-                <ComposerActions>
-                    <PostButton
+                <DropdownMenu modal={false}>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            aria-label={microcopyString(
+                                microcopy.comments.mentionLabel
+                            )}
+                            className="justify-between"
+                            data-testid="comment-mention-select"
+                            variant="outline"
+                        >
+                            {mentionCount > 0
+                                ? mentions
+                                      .map((id) => nameById.get(id) ?? id)
+                                      .join(", ")
+                                : microcopyString(
+                                      microcopy.comments.mentionPlaceholder
+                                  )}
+                            <ChevronDown aria-hidden />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                        align="start"
+                        className="min-w-[12rem]"
+                    >
+                        {mentionOptions.map((option) => (
+                            <DropdownMenuCheckboxItem
+                                checked={mentions.includes(option.value)}
+                                key={option.value}
+                                onCheckedChange={(checked) =>
+                                    toggleMention(option.value, checked)
+                                }
+                                onSelect={(event) => event.preventDefault()}
+                            >
+                                {option.label}
+                            </DropdownMenuCheckboxItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+                <div className="flex items-center justify-end gap-xs">
+                    <Button
                         data-testid="comment-post"
                         disabled={!canPost}
                         loading={isCreating}
                         onClick={handlePost}
-                        type="primary"
+                        variant="primary"
                     >
                         {isCreating
                             ? microcopyString(microcopy.comments.posting)
                             : microcopyString(microcopy.comments.post)}
-                    </PostButton>
-                </ComposerActions>
-            </Composer>
-        </Wrapper>
+                    </Button>
+                </div>
+            </div>
+        </section>
     );
 };
 

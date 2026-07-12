@@ -7,11 +7,7 @@ import {
     type AnalyticsSink
 } from "../../constants/analytics";
 import type { TriageNudge } from "../../interfaces/agent";
-import {
-    coarseTouchTargetsFor,
-    ruleTextsFor,
-    styledClassFor
-} from "../../testUtils/styleRules";
+import { declaresTouchTarget } from "../ui/testHelpers";
 
 import NudgeCard from "./index";
 
@@ -135,14 +131,14 @@ describe("NudgeCard", () => {
     it("wraps actions and declares mobile touch targets", () => {
         renderWith({}, { onAction: jest.fn(), onDismiss: jest.fn() });
         const row = screen.getByTestId("nudge-card-action-row");
-        const styledClass = styledClassFor(row);
-        expect(styledClass).toBeTruthy();
+        const rowClasses = row.className.split(/\s+/);
+        expect(rowClasses).toContain("flex");
+        expect(rowClasses).toContain("flex-wrap");
 
-        const ruleText = ruleTextsFor(styledClass ?? "").join("\n");
-        expect(ruleText).toContain("display: flex");
-        expect(ruleText).toContain("flex-wrap: wrap");
-        const { heights, widths } = coarseTouchTargetsFor(styledClass ?? "");
-        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
-        expect(Math.max(...widths)).toBeGreaterThanOrEqual(44);
+        const buttons = screen.getAllByRole("button");
+        expect(buttons.length).toBeGreaterThan(0);
+        buttons.forEach((button) => {
+            expect(declaresTouchTarget(button)).toBe(true);
+        });
     });
 });

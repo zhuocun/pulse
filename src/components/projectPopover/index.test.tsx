@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router-dom";
 
 import useProjectModal from "../../utils/hooks/useProjectModal";
@@ -26,21 +27,7 @@ const project = (overrides: Partial<IProject> = {}): IProject => ({
     ...overrides
 });
 
-const installAntdBrowserMocks = () => {
-    Object.defineProperty(window, "matchMedia", {
-        writable: true,
-        value: (query: string) => ({
-            addEventListener: jest.fn(),
-            addListener: jest.fn(),
-            dispatchEvent: jest.fn(),
-            matches: false,
-            media: query,
-            onchange: null,
-            removeEventListener: jest.fn(),
-            removeListener: jest.fn()
-        })
-    });
-
+const installBrowserMocks = () => {
     class ResizeObserverMock {
         observe = jest.fn();
 
@@ -53,6 +40,12 @@ const installAntdBrowserMocks = () => {
         writable: true,
         value: ResizeObserverMock
     });
+
+    // Radix Popover drives its surface with pointer-capture APIs jsdom
+    // doesn't ship; polyfill them so the switcher can open.
+    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+    Element.prototype.releasePointerCapture = jest.fn();
 };
 
 const renderProjectPopover = () => {
@@ -98,19 +91,26 @@ const renderProjectPopover = () => {
 
 describe("ProjectPopover", () => {
     beforeAll(() => {
-        installAntdBrowserMocks();
+        installBrowserMocks();
     });
 
     beforeEach(() => {
         jest.clearAllMocks();
     });
 
+    const openSwitcher = async () => {
+        const user = userEvent.setup();
+        await user.click(
+            screen.getByRole("button", { name: /switch project/i })
+        );
+        return user;
+    };
+
     it("shows projects and navigates to a selected project", async () => {
         renderProjectPopover();
 
-        fireEvent.mouseEnter(screen.getByText("Boards"));
-
-        fireEvent.click(await screen.findByText("Roadmap"));
+        const user = await openSwitcher();
+        await user.click(await screen.findByText("Roadmap"));
 
         await waitFor(() => {
             expect(window.location.pathname).toBe("/projects/p1");
@@ -120,9 +120,8 @@ describe("ProjectPopover", () => {
     it("opens the project modal from the create action", async () => {
         const { openModal } = renderProjectPopover();
 
-        fireEvent.mouseEnter(screen.getByText("Boards"));
-
-        fireEvent.click(
+        const user = await openSwitcher();
+        await user.click(
             await screen.findByRole("button", { name: /create project/i })
         );
 

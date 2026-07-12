@@ -1,11 +1,18 @@
-import { InfoCircleOutlined } from "@ant-design/icons";
-import styled from "@emotion/styled";
-import { Button, Popover, Tag, Typography } from "antd";
+import { Info } from "lucide-react";
 import React from "react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger
+} from "@/components/ui/popover";
+import { Typography } from "@/components/ui/typography";
 
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
-import { fontSize, fontWeight, space } from "../../theme/tokens";
+import { space } from "../../theme/tokens";
 import { getAiDataScope } from "../../utils/ai/aiDataScope";
 import type { AiNonRoute } from "../../utils/ai/aiDataScope";
 import type { AiRoute } from "../../utils/hooks/useAi";
@@ -22,37 +29,31 @@ import type { AiRoute } from "../../utils/hooks/useAi";
  * (e.g. AiTaskDraftModal first use) read the same `microcopy.ai.privacy*`
  * strings without rendering the popover, so wording stays consistent.
  */
-const Trigger = styled.button`
-    align-items: center;
-    background: none;
-    border: 0;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.65));
-    cursor: pointer;
-    display: inline-flex;
-    font-size: ${fontSize.xs}px;
-    font-weight: ${fontWeight.medium};
-    gap: 4px;
-    padding: 0;
-    text-decoration: underline;
-    text-underline-offset: 2px;
+const LIST_CLASS = "m-0 max-w-[24rem] ps-lg list-disc";
 
-    @media (pointer: coarse) {
-        min-height: 44px;
-        min-width: 44px;
-        padding-inline: ${space.xs}px;
-    }
+/**
+ * Public placement API is preserved from the AntD surface; each value maps
+ * to the Radix `side` + `align` pair the primitive consumes.
+ */
+export type CopilotPrivacyPlacement =
+    | "top"
+    | "topLeft"
+    | "topRight"
+    | "bottom"
+    | "bottomLeft"
+    | "bottomRight";
 
-    &:hover,
-    &:focus-visible {
-        color: var(--ant-color-text, rgba(15, 23, 42, 0.9));
-    }
-`;
-
-const List = styled.ul`
-    margin: 0;
-    max-width: 24rem;
-    padding-inline-start: ${space.lg}px;
-`;
+const PLACEMENT_MAP: Record<
+    CopilotPrivacyPlacement,
+    { side: "top" | "bottom"; align: "start" | "center" | "end" }
+> = {
+    top: { side: "top", align: "center" },
+    topLeft: { side: "top", align: "start" },
+    topRight: { side: "top", align: "end" },
+    bottom: { side: "bottom", align: "center" },
+    bottomLeft: { side: "bottom", align: "start" },
+    bottomRight: { side: "bottom", align: "end" }
+};
 
 const getAiServiceOrigin = (baseUrl: string): string | null => {
     if (!baseUrl.trim()) return null;
@@ -83,14 +84,8 @@ interface CopilotPrivacyPopoverProps {
      * disclosure inside another UI element.
      */
     label?: React.ReactNode;
-    /** AntD Popover placement — defaults to top-right. */
-    placement?:
-        | "top"
-        | "topLeft"
-        | "topRight"
-        | "bottom"
-        | "bottomLeft"
-        | "bottomRight";
+    /** Popover placement — defaults to top-right. */
+    placement?: CopilotPrivacyPlacement;
     /**
      * Route-aware scope (Optimization Plan §3 P0-1). When set, the popover
      * shows the exact data this surface sends instead of the generic global
@@ -109,61 +104,70 @@ const CopilotPrivacyPopover: React.FC<CopilotPrivacyPopoverProps> = ({
     const scope = route ? getAiDataScope(route) : null;
     const items = scope ? scope.items : microcopy.ai.privacyDataScope;
     const summary = scope ? scope.summary : microcopy.ai.privacyDisclosure;
-    const content = (
-        <div>
-            <Typography.Title level={5} style={{ marginTop: 0 }}>
-                {microcopy.ai.privacyTitle}
-            </Typography.Title>
-            <Typography.Paragraph
-                style={{ marginBottom: space.xs, marginTop: 0 }}
-                type="secondary"
-            >
-                {summary}
-            </Typography.Paragraph>
-            <List>
-                {items.map((item) => (
-                    <li key={item}>{item}</li>
-                ))}
-            </List>
-            <Typography.Paragraph
-                style={{
-                    alignItems: "center",
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 6,
-                    marginBottom: space.xs,
-                    marginTop: space.xs
-                }}
-                type="secondary"
-            >
-                <Tag
-                    color={environment.aiUseLocalEngine ? "default" : "purple"}
-                    style={{ marginInlineEnd: 0 }}
-                >
-                    {environment.aiUseLocalEngine
-                        ? microcopy.ai.processingModeLocalLabel
-                        : microcopy.ai.processingModeRemoteLabel}
-                </Tag>
-                <span>{processingDisclosure}</span>
-            </Typography.Paragraph>
-            <Typography.Paragraph
-                style={{ marginBottom: 0, marginTop: 0 }}
-                type="secondary"
-            >
-                {microcopy.ai.privacyExclusions}
-            </Typography.Paragraph>
-        </div>
-    );
+    const { side, align } = PLACEMENT_MAP[placement];
     return (
-        <Popover
-            content={content}
-            placement={placement}
-            trigger={["click", "focus"]}
-        >
-            <Trigger aria-label={microcopy.ai.privacyLink} type="button">
-                <InfoCircleOutlined aria-hidden />
-                {label ?? microcopy.ai.privacyLink}
-            </Trigger>
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button
+                    aria-label={microcopy.ai.privacyLink}
+                    className="h-auto gap-xxs px-xs py-0 text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    variant="link"
+                >
+                    <Info aria-hidden />
+                    {label ?? microcopy.ai.privacyLink}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent
+                align={align}
+                aria-label={microcopy.ai.privacyTitle}
+                className="w-auto max-w-[calc(100vw-2rem)]"
+                side={side}
+            >
+                <Typography.Title level={5} style={{ marginTop: 0 }}>
+                    {microcopy.ai.privacyTitle}
+                </Typography.Title>
+                <Typography.Paragraph
+                    style={{ marginBottom: space.xs, marginTop: 0 }}
+                    type="secondary"
+                >
+                    {summary}
+                </Typography.Paragraph>
+                <ul className={LIST_CLASS}>
+                    {items.map((item) => (
+                        <li key={item}>{item}</li>
+                    ))}
+                </ul>
+                <Typography.Paragraph
+                    style={{
+                        alignItems: "center",
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 6,
+                        marginBottom: space.xs,
+                        marginTop: space.xs
+                    }}
+                    type="secondary"
+                >
+                    <Badge
+                        variant={
+                            environment.aiUseLocalEngine
+                                ? "secondary"
+                                : "default"
+                        }
+                    >
+                        {environment.aiUseLocalEngine
+                            ? microcopy.ai.processingModeLocalLabel
+                            : microcopy.ai.processingModeRemoteLabel}
+                    </Badge>
+                    <span>{processingDisclosure}</span>
+                </Typography.Paragraph>
+                <Typography.Paragraph
+                    style={{ marginBottom: 0, marginTop: 0 }}
+                    type="secondary"
+                >
+                    {microcopy.ai.privacyExclusions}
+                </Typography.Paragraph>
+            </PopoverContent>
         </Popover>
     );
 };
@@ -293,11 +297,11 @@ export const CopilotPrivacyDisclosure: React.FC<
                 {summary}
             </Typography.Paragraph>
             {scope && (
-                <List>
+                <ul className={LIST_CLASS}>
                     {scope.items.map((item) => (
                         <li key={item}>{item}</li>
                     ))}
-                </List>
+                </ul>
             )}
             <Typography.Paragraph
                 style={{
@@ -310,14 +314,15 @@ export const CopilotPrivacyDisclosure: React.FC<
                 }}
                 type="secondary"
             >
-                <Tag
-                    color={environment.aiUseLocalEngine ? "default" : "purple"}
-                    style={{ marginInlineEnd: 0 }}
+                <Badge
+                    variant={
+                        environment.aiUseLocalEngine ? "secondary" : "default"
+                    }
                 >
                     {environment.aiUseLocalEngine
                         ? microcopy.ai.processingModeLocalLabel
                         : microcopy.ai.processingModeRemoteLabel}
-                </Tag>
+                </Badge>
                 <span>{processingDisclosure}</span>
             </Typography.Paragraph>
             <Typography.Paragraph
@@ -326,17 +331,11 @@ export const CopilotPrivacyDisclosure: React.FC<
             >
                 {microcopy.ai.privacyExclusions}
             </Typography.Paragraph>
-            <div
-                style={{
-                    display: "flex",
-                    gap: space.xs,
-                    justifyContent: "flex-end"
-                }}
-            >
-                <Button onClick={acknowledge} size="small" type="primary">
+            <div className="flex justify-end gap-xs">
+                <Button onClick={acknowledge} size="sm" variant="primary">
                     {microcopy.ai.privacyAcknowledge}
                 </Button>
-                <Button onClick={acknowledge} size="small" type="text">
+                <Button onClick={acknowledge} size="sm" variant="ghost">
                     {microcopy.ai.privacySuppress}
                 </Button>
             </div>

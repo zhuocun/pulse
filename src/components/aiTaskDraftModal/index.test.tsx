@@ -1,18 +1,21 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+    within
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
+import { resetToastersForTests, Toaster } from "@/components/ui/toast";
+
 import { microcopy } from "../../constants/microcopy";
 import { store } from "../../store";
-import {
-    coarseTouchTargetsFor,
-    mediaRuleTextsFor,
-    ruleTextsFor,
-    styledClassFor
-} from "../../testUtils/styleRules";
 import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useReducedMotion from "../../utils/hooks/useReducedMotion";
+import { declaresTouchTarget } from "../ui/testHelpers";
 
 import AiTaskDraftModal from ".";
 
@@ -26,7 +29,7 @@ const mockedUseReducedMotion = useReducedMotion as jest.MockedFunction<
     typeof useReducedMotion
 >;
 
-const installAntdMocks = () => {
+const installBrowserMocks = () => {
     Object.defineProperty(window, "matchMedia", {
         writable: true,
         value: () => ({
@@ -40,6 +43,10 @@ const installAntdMocks = () => {
             removeListener: jest.fn()
         })
     });
+    // Radix Select / Dialog lean on PointerEvent APIs jsdom doesn't ship.
+    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.hasPointerCapture = jest.fn(() => false);
+    Element.prototype.releasePointerCapture = jest.fn();
 };
 
 const seedClient = () => {
@@ -73,6 +80,7 @@ const mountModal = (onClose: () => void = jest.fn()) => {
     return render(
         <Provider store={store}>
             <QueryClientProvider client={queryClient}>
+                <Toaster />
                 <MemoryRouter initialEntries={["/projects/p1/board"]}>
                     <Routes>
                         <Route
@@ -103,10 +111,11 @@ describe("AiTaskDraftModal", () => {
     const fetchMock = jest.spyOn(global, "fetch");
 
     beforeAll(() => {
-        installAntdMocks();
+        installBrowserMocks();
     });
 
     beforeEach(() => {
+        resetToastersForTests();
         fetchMock.mockReset();
         fetchMock.mockResolvedValue(response({ _id: "task-new" }));
         mockedUseIsPhoneChrome.mockReturnValue(false);
@@ -126,10 +135,12 @@ describe("AiTaskDraftModal", () => {
         // to a negative max-height in landscape orientation.
         mountModal();
         const dialog = await screen.findByRole("dialog");
-        const body = dialog.querySelector(
-            ".ant-modal-body"
-        ) as HTMLElement | null;
-        expect(body).not.toBeNull();
+        // The ResponsiveFormSheet applies `styles.body` to a plain scroll
+        // wrapper (no framework class), so find it by its inline max-height.
+        const body = Array.from(
+            dialog.querySelectorAll<HTMLElement>("div")
+        ).find((node) => node.style.maxHeight);
+        expect(body).toBeTruthy();
         expect(body!.style.maxHeight).toMatch(/env\(keyboard-inset-height/);
         expect(body!.style.maxHeight).toMatch(/max\(/);
     });
@@ -137,17 +148,15 @@ describe("AiTaskDraftModal", () => {
     it("renders the AI draft action row with mobile wrapping and touch targets", async () => {
         mountModal();
         const row = await screen.findByTestId("ai-task-draft-action-row");
-        const styledClass = styledClassFor(row);
-        expect(styledClass).toBeTruthy();
-
-        const ruleText = ruleTextsFor(styledClass ?? "").join("\n");
-        expect(ruleText).toContain("display: flex");
-        expect(ruleText).toContain("flex-wrap: wrap");
-        expect(
-            mediaRuleTextsFor(styledClass ?? "", "480px").join("\n")
-        ).toContain("width: 100%");
-        const { heights } = coarseTouchTargetsFor(styledClass ?? "");
-        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
+        // Tailwind flex-wrap row; children stretch full-width below `sm`.
+        expect(row.className).toContain("flex");
+        expect(row.className).toContain("flex-wrap");
+        const draftButton = within(row).getByLabelText(
+            microcopy.a11y.draftTaskWithCopilot
+        );
+        expect(draftButton.className).toContain("max-sm:w-full");
+        // The primitives carry the ≥44px coarse-pointer touch floor.
+        expect(declaresTouchTarget(draftButton)).toBe(true);
     });
 
     it("wraps sample prompt chips within narrow modal bodies", async () => {
@@ -155,14 +164,9 @@ describe("AiTaskDraftModal", () => {
         const sample = await screen.findByRole("button", {
             name: microcopy.ai.draftSuggestions[0]
         });
-        const styledClass = styledClassFor(sample);
-        expect(styledClass).toBeTruthy();
-
-        const ruleText = ruleTextsFor(styledClass ?? "").join("\n");
-        expect(ruleText).toContain("max-width: 100%");
-        expect(ruleText).toContain("white-space: normal");
-        const { heights } = coarseTouchTargetsFor(styledClass ?? "");
-        expect(Math.max(...heights)).toBeGreaterThanOrEqual(44);
+        expect(sample.className).toContain("max-w-full");
+        expect(sample.className).toContain("whitespace-normal");
+        expect(declaresTouchTarget(sample)).toBe(true);
     });
 
     it("shows the Cmd/Ctrl+Enter draft hint on fine-pointer chrome", async () => {
@@ -374,18 +378,21 @@ describe("AiTaskDraftModal", () => {
         const checkboxes = await screen.findAllByRole("checkbox");
         expect(checkboxes.length).toBeGreaterThanOrEqual(2);
 
+        // Radix Checkbox is a <button role="checkbox">; read `aria-checked`.
+        const isChecked = (el: Element) =>
+            el.getAttribute("aria-checked") === "true";
         // Keep exactly two items checked
         // Uncheck all beyond the second
         for (let i = 2; i < checkboxes.length; i++) {
-            if ((checkboxes[i] as HTMLInputElement).checked) {
+            if (isChecked(checkboxes[i])) {
                 fireEvent.click(checkboxes[i]);
             }
         }
         // Ensure first two are checked
-        if (!(checkboxes[0] as HTMLInputElement).checked) {
+        if (!isChecked(checkboxes[0])) {
             fireEvent.click(checkboxes[0]);
         }
-        if (!(checkboxes[1] as HTMLInputElement).checked) {
+        if (!isChecked(checkboxes[1])) {
             fireEvent.click(checkboxes[1]);
         }
 
@@ -429,7 +436,10 @@ describe("AiTaskDraftModal", () => {
             screen.getByLabelText("Break the prompt into subtasks")
         ).toBeInTheDocument();
 
-        // The desktop AntD Modal must NOT render on the phone branch.
-        expect(document.querySelector(".ant-modal")).toBeNull();
+        // The desktop Dialog branch must NOT render on the phone branch — the
+        // only dialog present is the bottom-sheet surface (has `data-detent`).
+        const dialogs = screen.getAllByRole("dialog");
+        expect(dialogs).toHaveLength(1);
+        expect(dialogs[0]).toHaveAttribute("data-detent");
     });
 });

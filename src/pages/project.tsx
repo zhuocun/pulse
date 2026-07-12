@@ -1,14 +1,11 @@
-import {
-    AppstoreOutlined,
-    BankOutlined,
-    PlusOutlined,
-    TeamOutlined
-} from "@ant-design/icons";
-import styled from "@emotion/styled";
-import { Alert, Badge, Button, Typography } from "antd";
+import { Building2, CircleAlert, LayoutGrid, Plus, Users } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Typography } from "@/components/ui/typography";
+import { cn } from "@/lib/utils";
 import AiSearchInput from "../components/aiSearchInput";
 import AiSparkleIcon from "../components/aiSparkleIcon";
 import PageContainer from "../components/pageContainer";
@@ -18,16 +15,7 @@ import PullToRefresh from "../components/pullToRefresh";
 import environment from "../constants/env";
 import { microcopy } from "../constants/microcopy";
 import type { ProjectListSort } from "../store/reducers/userPreferencesSlice";
-import {
-    accent,
-    breakpoints,
-    fontSize,
-    fontWeight,
-    letterSpacing,
-    lineHeight,
-    radius,
-    space
-} from "../theme/tokens";
+import { accent, space } from "../theme/tokens";
 import SrOnlyLive from "../utils/a11y/SrOnlyLive";
 import useAiChatDrawer from "../utils/hooks/useAiChatDrawer";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
@@ -76,228 +64,91 @@ const pluralCount = (
 ): string =>
     (count === 1 ? pair.one : pair.other).replace("{count}", String(count));
 
-const PageHeader = styled.header`
-    align-items: flex-end;
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.sm}px;
-    justify-content: space-between;
-    margin-bottom: ${space.lg}px;
-    row-gap: ${space.xs}px;
+const PAGE_HEADER_CLASS = cn(
+    "flex flex-wrap items-end justify-between gap-sm [row-gap:var(--pulse-space-xs)] mb-lg",
+    "md:mb-xl"
+);
 
-    @media (min-width: ${breakpoints.md}px) {
-        margin-bottom: ${space.xl}px;
-    }
-`;
+const PAGE_HEADING_CLASS = cn(
+    "text-xl font-semibold tracking-tight leading-tight m-0 min-w-0",
+    "md:text-xxl"
+);
 
-const PageHeading = styled(Typography.Title)`
-    && {
-        font-size: ${fontSize.xl}px;
-        font-weight: ${fontWeight.semibold};
-        letter-spacing: ${letterSpacing.tight};
-        line-height: ${lineHeight.tight};
-        margin: 0;
-        min-width: 0;
-    }
+const PAGE_SUBHEADING_CLASS = cn(
+    "text-base leading-normal [margin:var(--pulse-space-xxs)_0_0] max-w-[56ch]",
+    "[color:var(--pulse-text-secondary)]",
+    "max-[767px]:hidden"
+);
 
-    @media (min-width: ${breakpoints.md}px) {
-        && {
-            font-size: ${fontSize.xxl}px;
-        }
-    }
-`;
+const MOBILE_FIRST_SECTION_CLASS = cn(
+    "contents",
+    "max-[767px]:flex max-[767px]:flex-col max-[767px]:gap-md"
+);
 
-const PageSubheading = styled.p`
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-    font-size: ${fontSize.base}px;
-    line-height: ${lineHeight.normal};
-    margin: ${space.xxs}px 0 0;
-    max-width: 56ch;
+const DESKTOP_FIRST_SECTION_CLASS = "contents";
 
-    @media (max-width: ${breakpoints.md - 1}px) {
-        display: none;
-    }
-`;
+const PAGE_HEADING_GROUP_CLASS = "flex-[1_1_auto] min-w-0";
 
-const MobileFirstSection = styled.div`
-    display: contents;
+const TOOLBAR_CLASS = cn(
+    "flex flex-wrap flex-shrink-0 items-center gap-xs",
+    "max-[479px]:basis-full max-[479px]:[&>button]:flex-[1_1_0] max-[479px]:[&>.relative]:flex-[1_1_0]"
+);
 
-    @media (max-width: ${breakpoints.md - 1}px) {
-        display: flex;
-        flex-direction: column;
-        gap: ${space.md}px;
-    }
-`;
+const STAT_RAIL_CLASS = cn(
+    "hidden grid-cols-3 gap-xs mb-md",
+    "md:grid md:gap-sm md:mb-lg"
+);
 
-const DesktopFirstSection = styled.div`
-    display: contents;
-`;
+const COMPACT_STATS_LINE_CLASS = "block mb-sm md:hidden";
 
-const PageHeadingGroup = styled.div`
-    flex: 1 1 auto;
-    min-width: 0;
-`;
+/*
+ * Stat card. On phone-sized viewports everything centres because the
+ * StatHeader stacks its icon over the label, so a left-aligned value would
+ * float awkwardly off-axis. Border + surface thread the app-owned
+ * `--pulse-*` tokens (formerly AntD's `--ant-color-*`).
+ */
+const STAT_CARD_CLASS = cn(
+    "relative flex flex-col items-start gap-[2px] min-w-0 rounded-lg px-sm py-xs",
+    "[background:var(--pulse-bg-container,#fff)] [border:1px_solid_var(--pulse-border-secondary)]",
+    "max-[479px]:items-center max-[479px]:gap-xxs max-[479px]:text-center",
+    "min-[480px]:gap-xxs min-[480px]:px-lg min-[480px]:py-md"
+);
 
-const Toolbar = styled.div`
-    align-items: center;
-    display: flex;
-    flex-shrink: 0;
-    flex-wrap: wrap;
-    gap: ${space.xs}px;
+/*
+ * Stack the icon above the label on phone-sized viewports so the label
+ * claims the full card width instead of sharing it with the icon + gap. On
+ * sm+ the inline row returns since the cards are wide enough.
+ */
+const STAT_HEADER_CLASS = cn(
+    "flex items-center gap-xs min-w-0 w-full [color:var(--pulse-text-tertiary)]",
+    "max-[479px]:flex-col max-[479px]:gap-xxs"
+);
 
-    @media (max-width: ${breakpoints.sm - 1}px) {
-        flex-basis: 100%;
-        > .ant-btn {
-            flex: 1 1 0;
-        }
-    }
-`;
+/* Icon-glyph stays compact; the surrounding pill carries the colour. */
+const STAT_ICON_CLASS = cn(
+    "inline-flex flex-[0_0_auto] items-center justify-center h-6 w-6 rounded-sm",
+    "[color:var(--pulse-brand-primary,#ea580c)] [&_svg]:h-[14px] [&_svg]:w-[14px]",
+    "max-[479px]:h-5 max-[479px]:w-5 max-[479px]:[&_svg]:h-3 max-[479px]:[&_svg]:w-3"
+);
 
-const StatRail = styled.div`
-    display: none;
-    gap: ${space.xs}px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin-bottom: ${space.md}px;
+/*
+ * `StatCard` uses `items-start` (so values don't stretch), which sizes
+ * children to their content on the cross axis, so the `max-w-full` cap +
+ * ellipsis keep a long label ("Team members") from spilling. Below sm the
+ * label gets the whole card width once the header stacks: shrink a notch and
+ * wrap on the space (`keep-all` + `whitespace-normal`) rather than splitting
+ * a single token mid-character.
+ */
+const STAT_LABEL_CLASS = cn(
+    "text-xs font-medium max-w-full overflow-hidden text-ellipsis whitespace-nowrap",
+    "[color:var(--pulse-text-tertiary)]",
+    "max-[479px]:[font-size:clamp(10px,2.9vw,11px)] max-[479px]:leading-tight max-[479px]:text-center max-[479px]:whitespace-normal max-[479px]:[word-break:keep-all]"
+);
 
-    @media (min-width: ${breakpoints.md}px) {
-        display: grid;
-        gap: ${space.sm}px;
-        margin-bottom: ${space.lg}px;
-    }
-`;
-
-const CompactStatsLine = styled(Typography.Text)`
-    && {
-        display: block;
-        margin-bottom: ${space.sm}px;
-    }
-
-    @media (min-width: ${breakpoints.md}px) {
-        && {
-            display: none;
-        }
-    }
-`;
-
-const StatCard = styled.div`
-    align-items: flex-start;
-    background: var(--ant-color-bg-container, #fff);
-    border: 1px solid var(--ant-color-border-secondary, rgba(15, 23, 42, 0.06));
-    border-radius: ${radius.lg}px;
-    display: flex;
-    flex-direction: column;
-    gap: ${space.xxs / 2}px;
-    min-width: 0;
-    padding: ${space.xs}px ${space.sm}px;
-    position: relative;
-
-    /*
-     * Centre everything on phone-sized viewports — the StatHeader stacks
-     * its icon over the label there, so a left-aligned value would float
-     * awkwardly off-axis from the now-centred header.
-     */
-    @media (max-width: ${breakpoints.sm - 1}px) {
-        align-items: center;
-        gap: ${space.xxs}px;
-        text-align: center;
-    }
-
-    @media (min-width: ${breakpoints.sm}px) {
-        gap: ${space.xxs}px;
-        padding: ${space.md}px ${space.lg}px;
-    }
-`;
-
-const StatHeader = styled.div`
-    align-items: center;
-    color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.55));
-    display: flex;
-    gap: ${space.xs}px;
-    min-width: 0;
-    width: 100%;
-
-    /*
-     * Stack the icon above the label on phone-sized viewports so the
-     * label claims the full card width (~80–100 px) instead of sharing
-     * it with the icon + gap (which previously left ~55 px and forced
-     * the longest label to break mid-word). On sm+ the inline row
-     * returns since the cards are wide enough.
-     */
-    @media (max-width: ${breakpoints.sm - 1}px) {
-        flex-direction: column;
-        gap: ${space.xxs}px;
-    }
-`;
-
-const StatIcon = styled.span`
-    align-items: center;
-    background: ${accent.bgSubtle};
-    border-radius: ${radius.sm}px;
-    color: var(--ant-color-primary, #ea580c);
-    display: inline-flex;
-    flex: 0 0 auto;
-    height: 24px;
-    justify-content: center;
-    width: 24px;
-
-    /* Icon-glyph stays compact; the surrounding pill carries the colour. */
-    svg {
-        font-size: 14px;
-    }
-
-    @media (max-width: ${breakpoints.sm - 1}px) {
-        height: 20px;
-        width: 20px;
-
-        svg {
-            font-size: 12px;
-        }
-    }
-`;
-
-const StatLabel = styled.span`
-    color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.55));
-    font-size: ${fontSize.xs}px;
-    font-weight: ${fontWeight.medium};
-    /* The card uses align-items: flex-start (so values don't stretch),
-     * which sizes children to their content on the cross axis. Without
-     * this cap, "Team members" sizes to its max-content and
-     * spills past the card on narrow viewports — the
-     * text-overflow: ellipsis below only fires when the element is
-     * actually narrower than its content. */
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-
-    /* Below sm (480 px) three columns leave ~80–100 px per card. With
-     * the icon stacked above (see StatHeader) the label gets the whole
-     * card width. Shrink the size a notch and use
-     * word-break: keep-all + white-space: normal so two-word
-     * labels wrap at their space ("Team" / "members") and the
-     * single-token "Organizations" stays on one line instead of
-     * splitting mid-character ("Organizati / ons"). The clamp scales the
-     * font down to 10 px on iPhone-SE-class viewports (≤ 360 px wide)
-     * so even the longest label fits. */
-    @media (max-width: ${breakpoints.sm - 1}px) {
-        font-size: clamp(10px, 2.9vw, 11px);
-        line-height: ${lineHeight.tight};
-        text-align: center;
-        white-space: normal;
-        word-break: keep-all;
-    }
-`;
-
-const StatValue = styled.span`
-    color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
-    font-size: ${fontSize.md}px;
-    font-weight: ${fontWeight.semibold};
-    letter-spacing: ${letterSpacing.tight};
-
-    @media (min-width: ${breakpoints.sm}px) {
-        font-size: ${fontSize.xl}px;
-    }
-`;
+const STAT_VALUE_CLASS = cn(
+    "text-md font-semibold tracking-tight [color:var(--pulse-text-base)]",
+    "min-[480px]:text-xl"
+);
 
 const ProjectPage = () => {
     useTitle(composeBrandedTitle(microcopy.pageTitle.projects), false);
@@ -615,25 +466,25 @@ const ProjectPage = () => {
 
     const projectsErrorAlert =
         pError || mError ? (
-            <Alert
-                action={
+            <Alert variant="destructive" style={{ marginBottom: space.sm }}>
+                <CircleAlert aria-hidden />
+                <AlertTitle>{microcopy.feedback.loadFailed}</AlertTitle>
+                <AlertDescription>
+                    {microcopy.feedback.retryHint}
+                </AlertDescription>
+                <div style={{ marginTop: space.sm }}>
                     <Button
                         onClick={() => {
                             if (pError) refetchProjects();
                             if (mError) refetchMembers();
                         }}
-                        size="small"
-                        type="primary"
+                        size="sm"
+                        variant="primary"
                     >
                         {microcopy.actions.retry}
                     </Button>
-                }
-                description={microcopy.feedback.retryHint}
-                showIcon
-                style={{ marginBottom: space.sm }}
-                title={microcopy.feedback.loadFailed}
-                type="error"
-            />
+                </div>
+            </Alert>
         ) : null;
 
     const projectList = (
@@ -654,49 +505,63 @@ const ProjectPage = () => {
                 onRefresh={handleRefresh}
                 refreshing={projectsRefetching}
             >
-                <PageHeader>
-                    <PageHeadingGroup>
-                        <PageHeading level={1}>
+                <header className={PAGE_HEADER_CLASS}>
+                    <div className={PAGE_HEADING_GROUP_CLASS}>
+                        <Typography.Title
+                            className={PAGE_HEADING_CLASS}
+                            level={1}
+                        >
                             {microcopy.projectsPage.title}
-                        </PageHeading>
-                        <PageSubheading>
+                        </Typography.Title>
+                        <p className={PAGE_SUBHEADING_CLASS}>
                             {microcopy.projectsPage.subtitle}
-                        </PageSubheading>
-                    </PageHeadingGroup>
-                    <Toolbar>
+                        </p>
+                    </div>
+                    <div className={TOOLBAR_CLASS}>
                         {aiEnabled &&
                             environment.copilotDockEnabled &&
                             !isPhone && (
-                                <Badge
+                                <div
                                     aria-label={copilotUnreadAriaLabel}
-                                    count={copilotInboxUnread}
+                                    className="relative inline-flex"
                                     data-testid="copilot-launcher-badge"
-                                    offset={[-4, 4]}
-                                    size="small"
                                 >
                                     <Button
                                         aria-label={microcopy.ai.askCopilot}
-                                        icon={<AiSparkleIcon aria-hidden />}
                                         onClick={() => openChatDrawer()}
-                                        type="default"
+                                        variant="default"
                                     >
+                                        <AiSparkleIcon aria-hidden />
                                         {microcopy.labels.askShort}
                                     </Button>
-                                </Badge>
+                                    {copilotInboxUnread > 0 ? (
+                                        <span
+                                            aria-hidden
+                                            className="pointer-events-none absolute -right-xxs -top-xxs inline-flex min-w-4 items-center justify-center rounded-pill bg-destructive px-[4px] text-[10px] font-semibold leading-4 text-destructive-foreground"
+                                        >
+                                            {copilotInboxUnread > 99
+                                                ? "99+"
+                                                : copilotInboxUnread}
+                                        </span>
+                                    ) : null}
+                                </div>
                             )}
                         <Button
                             aria-label={microcopy.actions.createProject}
-                            icon={<PlusOutlined aria-hidden />}
                             onClick={openModal}
-                            type="primary"
+                            variant="primary"
                         >
+                            <Plus aria-hidden />
                             {microcopy.actions.createProject}
                         </Button>
-                    </Toolbar>
-                </PageHeader>
-                <CompactStatsLine type="secondary">
+                    </div>
+                </header>
+                <Typography.Text
+                    className={COMPACT_STATS_LINE_CLASS}
+                    type="secondary"
+                >
                     {statsAnnouncement}
-                </CompactStatsLine>
+                </Typography.Text>
                 {/*
                  * Stat rail — hidden for small workspaces where the counts
                  * duplicate what the list already shows. Keeps the sr-only
@@ -704,50 +569,62 @@ const ProjectPage = () => {
                  * workspace is large enough to benefit from the summary.
                  */}
                 {statsBusy || stats.total >= 8 ? (
-                    <StatRail aria-busy={statsBusy}>
-                        <StatCard>
-                            <StatHeader>
-                                <StatIcon aria-hidden>
-                                    <AppstoreOutlined />
-                                </StatIcon>
-                                <StatLabel>
+                    <div className={STAT_RAIL_CLASS} aria-busy={statsBusy}>
+                        <div className={STAT_CARD_CLASS}>
+                            <div className={STAT_HEADER_CLASS}>
+                                <span
+                                    className={STAT_ICON_CLASS}
+                                    style={{ background: accent.bgSubtle }}
+                                    aria-hidden
+                                >
+                                    <LayoutGrid />
+                                </span>
+                                <span className={STAT_LABEL_CLASS}>
                                     {microcopy.projectsPage.totalProjects}
-                                </StatLabel>
-                            </StatHeader>
-                            <StatValue>
+                                </span>
+                            </div>
+                            <span className={STAT_VALUE_CLASS}>
                                 {pLoading ? "—" : stats.total}
-                            </StatValue>
-                        </StatCard>
-                        <StatCard>
-                            <StatHeader>
-                                <StatIcon aria-hidden>
-                                    <BankOutlined />
-                                </StatIcon>
-                                <StatLabel>
+                            </span>
+                        </div>
+                        <div className={STAT_CARD_CLASS}>
+                            <div className={STAT_HEADER_CLASS}>
+                                <span
+                                    className={STAT_ICON_CLASS}
+                                    style={{ background: accent.bgSubtle }}
+                                    aria-hidden
+                                >
+                                    <Building2 />
+                                </span>
+                                <span className={STAT_LABEL_CLASS}>
                                     {microcopy.projectsPage.organizations}
-                                </StatLabel>
-                            </StatHeader>
-                            <StatValue>
+                                </span>
+                            </div>
+                            <span className={STAT_VALUE_CLASS}>
                                 {pLoading ? "—" : stats.organizations}
-                            </StatValue>
-                        </StatCard>
-                        <StatCard>
-                            <StatHeader>
-                                <StatIcon aria-hidden>
-                                    <TeamOutlined />
-                                </StatIcon>
-                                <StatLabel>
+                            </span>
+                        </div>
+                        <div className={STAT_CARD_CLASS}>
+                            <div className={STAT_HEADER_CLASS}>
+                                <span
+                                    className={STAT_ICON_CLASS}
+                                    style={{ background: accent.bgSubtle }}
+                                    aria-hidden
+                                >
+                                    <Users />
+                                </span>
+                                <span className={STAT_LABEL_CLASS}>
                                     {microcopy.projectsPage.teamMembers}
-                                </StatLabel>
-                            </StatHeader>
-                            <StatValue>
+                                </span>
+                            </div>
+                            <span className={STAT_VALUE_CLASS}>
                                 {mLoading ? "—" : (members?.length ?? 0)}
-                            </StatValue>
-                        </StatCard>
-                    </StatRail>
+                            </span>
+                        </div>
+                    </div>
                 ) : null}
                 <SrOnlyLive>{statsAnnouncement}</SrOnlyLive>
-                <MobileFirstSection>
+                <div className={MOBILE_FIRST_SECTION_CLASS}>
                     {isPhone ? (
                         <>
                             {projectSearchPanel}
@@ -755,12 +632,12 @@ const ProjectPage = () => {
                             {projectList}
                         </>
                     ) : null}
-                </MobileFirstSection>
-                <DesktopFirstSection>
+                </div>
+                <div className={DESKTOP_FIRST_SECTION_CLASS}>
                     {!isPhone ? projectSearchPanel : null}
                     {!isPhone ? projectsErrorAlert : null}
                     {!isPhone ? projectList : null}
-                </DesktopFirstSection>
+                </div>
                 {/*
                  * The Copilot chat surface is the tabbed `<CopilotDock>`
                  * mounted once by `CopilotDockHost` inside `MainLayout`; it

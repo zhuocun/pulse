@@ -1,3 +1,5 @@
+import { fileURLToPath, URL } from "node:url";
+
 import react from "@vitejs/plugin-react";
 import { visualizer } from "rollup-plugin-visualizer";
 import { defineConfig, loadEnv } from "vite";
@@ -52,6 +54,11 @@ export default defineConfig(({ mode }) => {
     const errorReportEndpoint = env.VITE_ERROR_REPORT_ENDPOINT ?? "";
 
     return {
+        resolve: {
+            alias: {
+                "@": fileURLToPath(new URL("./src", import.meta.url))
+            }
+        },
         build: {
             chunkSizeWarningLimit: 1000,
             rolldownOptions: {
@@ -64,19 +71,9 @@ export default defineConfig(({ mode }) => {
                                 test: /node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/
                             },
                             {
-                                name: "antd-vendor",
+                                name: "radix-vendor",
                                 priority: 30,
-                                test: /node_modules[\\/](antd|@ant-design|@rc-component|rc-)[\\/]/
-                            },
-                            {
-                                name: "antd-icons",
-                                priority: 35,
-                                test: /node_modules[\\/]@ant-design[\\/](icons|icons-svg)[\\/]/
-                            },
-                            {
-                                name: "motion-vendor",
-                                priority: 20,
-                                test: /node_modules[\\/](framer-motion|motion-dom|motion-utils|tslib)[\\/]/
+                                test: /node_modules[\\/]@radix-ui[\\/]/
                             },
                             {
                                 name: "app-vendor",

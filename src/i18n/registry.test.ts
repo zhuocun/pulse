@@ -31,7 +31,6 @@ describe("i18n/registry", () => {
                 expect(typeof entry.dayjs).toBe("string");
                 expect(typeof entry.htmlLang).toBe("string");
                 expect(entry.dictionary).toBeTruthy();
-                expect(entry.antd).toBeTruthy();
             }
         });
     });
