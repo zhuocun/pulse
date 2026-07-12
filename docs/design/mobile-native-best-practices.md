@@ -123,7 +123,7 @@ In this repo:
 
 - `TOUCH_TARGET` (`src/components/ui/touchTarget.ts` — `coarse:min-h-[44px]`) is threaded into every interactive `ui/*` shadcn primitive, so even `size="sm"` controls hit the Apple HIG 44 px floor on touch; the `coarse:` variant maps to `@media (pointer: coarse)` in `tailwind.config.ts`.
 - `src/App.css:118–120` sets `-webkit-tap-highlight-color: transparent` and `text-size-adjust: 100%` at the body level.
-- View Transitions are wired on every user-initiated navigation via React Router 7's `viewTransition` prop / `navigate(..., { viewTransition: true })`. The sticky header opts out via `view-transition-name: pulse-header` so it stays anchored across route changes — see `src/components/header/index.tsx:30–47` and `src/App.css:230–248`.
+- View Transitions are wired on user-initiated route changes via React Router 7's `viewTransition` prop / `navigate(..., { viewTransition: true })`. Routed task-detail close opts out for `prefers-reduced-motion` and on phone chrome, where the bottom Sheet already owns the close animation. The sticky header opts out via `view-transition-name: pulse-header` so it stays anchored across route changes — see `src/components/header/index.tsx:30–47`, `src/components/taskDetailPanel/index.tsx`, and `src/App.css:230–248`.
 - The `motion` and `easing` token blocks at `src/theme/tokens.ts:147–158` standardize durations (60/120/200/320 ms) and curves so animations stay consistent.
 
 ### D. Forms (the highest-leverage area for mobile UX)
@@ -261,7 +261,7 @@ Applied in the audit (PR #46), the View Transitions follow-up (PR #47), and the 
 - `import isEqual from "lodash/isEqual"` instead of full lodash in `taskModal`.
 - `reportWebVitals(console.log)` in dev so INP/LCP/CLS show in the console.
 - Two new URL-driven hooks (`useAiDraftModal`, `useBoardBriefDrawer`) so the system back button dismisses overlays.
-- View Transitions on every user-initiated navigation — including logout, the not-found CTAs in `routes/index.tsx` and `projectDetail.tsx` — with the sticky header anchored via `view-transition-name`.
+- View Transitions on user-initiated route changes — including logout and the not-found CTAs in `routes/index.tsx` and `projectDetail.tsx` — with reduced-motion and phone task-detail-close opt-outs, and the sticky header anchored via `view-transition-name`.
 - Route-level code splitting (`lazy()` per page) is in place at `src/routes/index.tsx:22–27`.
 
 Already in place before the audit:
