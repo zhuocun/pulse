@@ -44,6 +44,7 @@ const installBrowserMocks = () => {
 const createLabel = jest.fn();
 const updateLabel = jest.fn();
 const removeLabel = jest.fn();
+const refetchLabels = jest.fn();
 
 const MANAGER_ID = "user-mike";
 
@@ -67,6 +68,9 @@ const setLabels = (overrides: Partial<ReturnType<typeof useLabels>> = {}) => {
     mockedUseLabels.mockReturnValue({
         labels,
         isLoading: false,
+        isError: false,
+        error: null,
+        refetch: refetchLabels,
         createLabel,
         isCreating: false,
         updateLabel,
@@ -139,6 +143,43 @@ describe("LabelsManager", () => {
         setLabels({ isLoading: true, labels: undefined });
         renderManager();
         expect(screen.getByTestId("labels-loading")).toBeInTheDocument();
+        expect(screen.getAllByTestId("label-skeleton-row")).toHaveLength(3);
+        expect(screen.getByTestId("label-add-skeleton")).toBeInTheDocument();
+    });
+
+    it("omits the add-form skeleton for a read-only viewer", () => {
+        setUser("user-vi");
+        setLabels({ isLoading: true, labels: undefined });
+        renderManager();
+        expect(screen.getAllByTestId("label-skeleton-row")).toHaveLength(3);
+        expect(
+            screen.queryByTestId("label-add-skeleton")
+        ).not.toBeInTheDocument();
+    });
+
+    it("shows the load error before empty/write controls and retries", async () => {
+        refetchLabels.mockResolvedValue(undefined);
+        setLabels({
+            labels: undefined,
+            isError: true,
+            error: new Error("labels unavailable")
+        });
+        const { rerender } = renderManager();
+
+        expect(screen.getByTestId("labels-load-error")).toHaveTextContent(
+            microcopy.projectLabels.loadError
+        );
+        expect(screen.queryByTestId("labels-empty")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("label-add-name")).not.toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole("button", { name: microcopy.actions.retry })
+        );
+        expect(refetchLabels).toHaveBeenCalledTimes(1);
+
+        setLabels({ labels: [], isError: false, error: null });
+        rerender(<LabelsManager projectId="project-1" />);
+        expect(screen.getByTestId("labels-empty")).toBeInTheDocument();
+        expect(screen.getByTestId("label-add-name")).toBeInTheDocument();
     });
 
     it("renders an empty hint when there are no labels", () => {
@@ -159,6 +200,28 @@ describe("LabelsManager", () => {
         expect(
             within(rowFor("label-2")).getByText("Frontend")
         ).toBeInTheDocument();
+    });
+
+    it("truncates long label chips while preserving the full name", () => {
+        const longName =
+            "international-enterprise-platform-reliability-and-compliance".repeat(
+                3
+            );
+        setLabels({
+            labels: [
+                {
+                    _id: "label-long",
+                    projectId: "project-1",
+                    name: longName,
+                    color: "#3b82f6"
+                }
+            ]
+        });
+        renderManager();
+
+        const chip = screen.getByTestId("label-chip");
+        expect(chip).toHaveClass("max-w-full", "min-w-0", "truncate");
+        expect(chip).toHaveAttribute("title", longName);
     });
 
     it("creates a label with the trimmed name + selected colour", async () => {

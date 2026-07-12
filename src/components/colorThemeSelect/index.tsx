@@ -1,6 +1,5 @@
 import { useCallback } from "react";
 
-import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 import { microcopy } from "../../constants/microcopy";
@@ -10,7 +9,6 @@ import {
     type ColorThemePreference
 } from "../../store/reducers/userPreferencesSlice";
 import { getPalette, paletteNames } from "../../theme/palettes";
-import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import { useReduxDispatch, useReduxSelector } from "../../utils/hooks/useRedux";
 
 /**
@@ -31,10 +29,8 @@ import { useReduxDispatch, useReduxSelector } from "../../utils/hooks/useRedux";
  * label + icon. The `role="group"` + aria-label keep the control
  * self-describing for screen readers.
  *
- * Width handling — on the coarse-pointer phone chassis the hue TEXT
- * collapses to a screen-reader-only span (the swatch already conveys the
- * colour visually) so the options fit a single grouped-table row; the
- * scroller caps the labelled control at the card width on narrow desktop.
+ * Width handling — the scroller caps the labelled control at the card width
+ * while every palette keeps a visible localized name, including on phones.
  */
 
 /*
@@ -54,7 +50,6 @@ const LABEL_KEYS: Record<
 
 const ColorThemeSelect = () => {
     const dispatch = useReduxDispatch() as ReduxDispatch;
-    const isPhone = useIsPhoneChrome();
     const colorTheme = useReduxSelector<ColorThemePreference>(
         (state: RootState) => state.userPreferences.colorTheme
     );
@@ -100,9 +95,7 @@ const ColorThemeSelect = () => {
                                             getPalette(name).brand.primary
                                     }}
                                 />
-                                <span className={cn(isPhone && "sr-only")}>
-                                    {text}
-                                </span>
+                                <span>{text}</span>
                             </span>
                         </ToggleGroupItem>
                     );

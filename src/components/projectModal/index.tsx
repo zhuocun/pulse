@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
@@ -16,6 +16,7 @@ import { Typography } from "@/components/ui/typography";
 import { microcopy, microcopyString } from "../../constants/microcopy";
 import { modalWidthCss } from "../../theme/tokens";
 import useActivityFeed from "../../utils/hooks/useActivityFeed";
+import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useMembersList from "../../utils/hooks/useMembersList";
 import useProjectModal from "../../utils/hooks/useProjectModal";
 import useReactMutation from "../../utils/hooks/useReactMutation";
@@ -41,10 +42,99 @@ interface ProjectFormValues {
     [key: string]: unknown;
 }
 
+const isVisible = (element: HTMLElement): boolean => {
+    if (
+        !element.isConnected ||
+        element.hidden ||
+        element.closest('[hidden], [aria-hidden="true"], [inert]')
+    ) {
+        return false;
+    }
+    const style = window.getComputedStyle(element);
+    return style.display !== "none" && style.visibility !== "hidden";
+};
+
+const restoreFocusAfterOverlayUnmount = (target: HTMLElement | null) => {
+    if (!target?.isConnected) return;
+    const focusTarget = target;
+
+    let timeout: number | undefined;
+    const observer = new MutationObserver(restoreIfReleased);
+
+    function cleanup() {
+        observer.disconnect();
+        if (timeout !== undefined) window.clearTimeout(timeout);
+    }
+
+    function restoreIfReleased() {
+        if (!focusTarget.isConnected) {
+            cleanup();
+            return;
+        }
+        if (!isVisible(focusTarget)) return;
+
+        const activeElement = document.activeElement;
+        if (
+            activeElement instanceof HTMLElement &&
+            activeElement !== document.body &&
+            activeElement !== focusTarget &&
+            activeElement.isConnected
+        ) {
+            if (activeElement.closest('[role="dialog"]')) return;
+            cleanup();
+            return;
+        }
+
+        focusTarget.focus({ preventScroll: true });
+        if (document.activeElement === focusTarget) cleanup();
+    }
+
+    observer.observe(document.body, {
+        attributeFilter: ["aria-hidden", "hidden", "inert"],
+        attributes: true,
+        childList: true,
+        subtree: true
+    });
+    timeout = window.setTimeout(cleanup, 1_000);
+    window.queueMicrotask(restoreIfReleased);
+};
+
 const ProjectModal: React.FC = () => {
     const { isModalOpened, closeModal, editingProject, isLoading } =
         useProjectModal();
     const isEditing = Boolean(editingProject);
+    const isPhoneChrome = useIsPhoneChrome();
+    const openerRef = useRef<HTMLElement | null>(null);
+    const lastPageFocusRef = useRef<HTMLElement | null>(null);
+    const lastModalFocusRef = useRef<HTMLElement | null>(null);
+    const modalOpenRef = useRef(isModalOpened);
+    const wasOpenRef = useRef(false);
+    modalOpenRef.current = isModalOpened;
+
+    useEffect(() => {
+        const trackFocus = (event: FocusEvent) => {
+            if (!(event.target instanceof HTMLElement)) return;
+            if (modalOpenRef.current) {
+                lastModalFocusRef.current = event.target;
+            } else if (event.target !== document.body) {
+                lastPageFocusRef.current = event.target;
+            }
+        };
+        document.addEventListener("focusin", trackFocus);
+        return () => document.removeEventListener("focusin", trackFocus);
+    }, []);
+
+    if (isModalOpened !== wasOpenRef.current) {
+        if (isModalOpened && typeof document !== "undefined") {
+            const activeElement =
+                document.activeElement instanceof HTMLElement &&
+                document.activeElement !== document.body
+                    ? document.activeElement
+                    : lastPageFocusRef.current;
+            if (activeElement) openerRef.current = activeElement;
+        }
+        wasOpenRef.current = isModalOpened;
+    }
 
     const [saveError, setSaveError] = useState<Error | null>(null);
     const createProjectMutation = useReactMutation<IProject>(
@@ -90,17 +180,36 @@ const ProjectModal: React.FC = () => {
 
     const [form] = Form.useForm<ProjectFormValues>();
     const onClose = () => {
+        const opener = openerRef.current;
         closeModal();
         form.resetFields();
         setSaveError(null);
+        restoreFocusAfterOverlayUnmount(opener);
     };
     // §2.A.1 — guard the cancel / mask-close paths so a half-filled form
     // isn't discarded without a prompt. A clean (untouched) form still
     // closes immediately.
-    const { requestClose, confirmNode } = useUnsavedChangesGuard({
+    const { requestClose, isPrompting, confirmNode } = useUnsavedChangesGuard({
         isDirty: () => form.isFieldsTouched(),
         onConfirmDiscard: onClose
     });
+    const focusBeforePromptRef = useRef<HTMLElement | null>(null);
+    const wasPromptingRef = useRef(false);
+    useLayoutEffect(() => {
+        const promptClosed = wasPromptingRef.current && !isPrompting;
+        wasPromptingRef.current = isPrompting;
+        if (!promptClosed || !isModalOpened) return;
+
+        restoreFocusAfterOverlayUnmount(focusBeforePromptRef.current);
+    }, [isModalOpened, isPrompting]);
+    const requestProjectClose = () => {
+        focusBeforePromptRef.current =
+            document.activeElement instanceof HTMLElement &&
+            document.activeElement !== document.body
+                ? document.activeElement
+                : lastModalFocusRef.current;
+        requestClose();
+    };
     const onFinish = async (input: {
         projectName: string;
         organization: string;
@@ -198,13 +307,32 @@ const ProjectModal: React.FC = () => {
         ? microcopy.actions.save
         : microcopy.actions.createProject;
 
+    const hydratedProjectIdRef = useRef<string | undefined>(undefined);
+    const wasHydrationOpenRef = useRef(false);
     useEffect(() => {
-        if (editingProject) {
-            form.setFieldsValue(
-                editingProject as unknown as Partial<ProjectFormValues>
-            );
-        }
-    }, [editingProject, form]);
+        const opening = isModalOpened && !wasHydrationOpenRef.current;
+        wasHydrationOpenRef.current = isModalOpened;
+        if (!isModalOpened || !editingProject) return;
+
+        const projectChanged =
+            hydratedProjectIdRef.current !== editingProject._id;
+        const hydrate = () => {
+            if (projectChanged || opening) {
+                form.setFieldsValue(
+                    editingProject as unknown as Partial<ProjectFormValues>
+                );
+                return;
+            }
+
+            if (!form.getFieldValue("managerId")) {
+                form.setFieldsValue({ managerId: editingProject.managerId });
+            }
+        };
+        hydrate();
+        hydratedProjectIdRef.current = editingProject._id;
+        const hydrationTimer = window.setTimeout(hydrate, 0);
+        return () => window.clearTimeout(hydrationTimer);
+    }, [editingProject, form, isModalOpened, isPhoneChrome]);
 
     /*
      * Route the manager dropdown through the shared `useMembersList` hook so
@@ -230,7 +358,7 @@ const ProjectModal: React.FC = () => {
         <div className="flex flex-col justify-end gap-xs sm:flex-row">
             <Button
                 className="w-full sm:w-auto"
-                onClick={requestClose}
+                onClick={requestProjectClose}
                 size="lg"
                 variant="default"
             >
@@ -254,10 +382,11 @@ const ProjectModal: React.FC = () => {
             {confirmNode}
             <ResponsiveFormSheet
                 centered
+                defaultDetent="large"
                 destroyOnHidden={false}
                 footer={footer}
                 forceRender
-                onClose={requestClose}
+                onClose={requestProjectClose}
                 open={isModalOpened}
                 styles={{
                     body: {
@@ -365,7 +494,7 @@ const ProjectModal: React.FC = () => {
                                         }
                                     />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="z-[1200]">
                                     {(members ?? []).map((member) => (
                                         <SelectItem
                                             key={member._id}

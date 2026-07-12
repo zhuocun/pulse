@@ -276,6 +276,35 @@ describe("ProjectCard", () => {
         await user.click(link);
     });
 
+    it("truncates a long organization and preserves its full value", () => {
+        const organization =
+            "international-enterprise-platform-reliability-and-compliance".repeat(
+                3
+            );
+        renderCard({
+            project: { ...sampleProject, organization }
+        });
+
+        const organizationLabel = screen.getByTestId("project-organization");
+        expect(organizationLabel).toHaveClass(
+            "block",
+            "max-w-full",
+            "min-w-0",
+            "truncate"
+        );
+        expect(organizationLabel).toHaveAttribute("title", organization);
+    });
+
+    it("keeps the no-organization fallback without an empty tooltip", () => {
+        renderCard({
+            project: { ...sampleProject, organization: "" }
+        });
+
+        const organizationLabel = screen.getByTestId("project-organization");
+        expect(organizationLabel).toHaveTextContent("No organization");
+        expect(organizationLabel).not.toHaveAttribute("title");
+    });
+
     // Desktop (default mock branch): SwipeableRow is a no-listener
     // passthrough, so a leftward drag over its testid node must NOT fire the
     // delete path — the only delete affordance on desktop is the overflow

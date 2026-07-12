@@ -58,6 +58,12 @@ interface UseLabels {
     labels: ILabel[] | undefined;
     /** True while the list query is in flight. */
     isLoading: boolean;
+    /** True when the list query failed. */
+    isError: boolean;
+    /** The list query error, when present. */
+    error: Error | null;
+    /** Retries the list query without reloading the page. */
+    refetch: () => Promise<unknown>;
     /**
      * Creates a label on the active project (POST `{ projectId, name, color? }`).
      * Resolves with the backend acknowledgement; the list re-fetches on
@@ -90,7 +96,9 @@ interface UseLabels {
 }
 
 const useLabels = (projectId: string | undefined): UseLabels => {
-    const { data, isLoading } = useReactQuery<ILabel[]>(
+    const { data, isLoading, isError, error, refetch } = useReactQuery<
+        ILabel[]
+    >(
         LABELS_ENDPOINT,
         { projectId },
         undefined,
@@ -140,6 +148,9 @@ const useLabels = (projectId: string | undefined): UseLabels => {
     return {
         labels: list,
         isLoading,
+        isError,
+        error,
+        refetch,
         createLabel,
         isCreating,
         updateLabel,

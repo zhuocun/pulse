@@ -158,9 +158,22 @@ describe("ProjectMembersManager", () => {
     });
 
     it("renders a loading skeleton before the roster resolves", () => {
+        setUser(MANAGER_ID);
         setRoster({ isLoading: true, data: undefined });
         renderManager();
         expect(screen.getByTestId("members-loading")).toBeInTheDocument();
+        expect(screen.getAllByTestId("member-skeleton-row")).toHaveLength(3);
+        expect(screen.getByTestId("member-add-skeleton")).toBeInTheDocument();
+    });
+
+    it("omits the add-form skeleton when the resolved role cannot manage", () => {
+        setUser("user-bob");
+        setRoster({ isLoading: true, data: undefined });
+        renderManager();
+        expect(screen.getAllByTestId("member-skeleton-row")).toHaveLength(3);
+        expect(
+            screen.queryByTestId("member-add-skeleton")
+        ).not.toBeInTheDocument();
     });
 
     it("renders a row per member with name, email, and a role control for an owner", () => {

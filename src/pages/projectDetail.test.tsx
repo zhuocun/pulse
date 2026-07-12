@@ -54,6 +54,8 @@ const renderDetail = (route: string) =>
                     <Route index element={<Navigate to="board" replace />} />
                     <Route path="board" element={<div>Board outlet</div>} />
                     <Route path="labels" element={<div>Labels outlet</div>} />
+                    <Route path="members" element={<div>Members outlet</div>} />
+                    <Route path="reports" element={<div>Reports outlet</div>} />
                 </Route>
                 <Route path="*" element={<LocationProbe />} />
             </Routes>
@@ -214,6 +216,7 @@ describe("ProjectDetailPage", () => {
         const desktopMatchMedia = window.matchMedia;
 
         beforeAll(() => {
+            Element.prototype.scrollIntoView = jest.fn();
             Object.defineProperty(window, "matchMedia", {
                 writable: true,
                 value: (query: string) => ({
@@ -255,6 +258,7 @@ describe("ProjectDetailPage", () => {
 
             expect(nav.className).toContain("overflow-x-auto");
             expect(nav.className).toContain("flex-[1_1_100%]");
+            expect(nav.className).toContain("pe-xxs");
         });
 
         it("keeps nav links pan-friendly: fixed-size segments that never wrap", () => {
@@ -263,6 +267,61 @@ describe("ProjectDetailPage", () => {
             const board = screen.getByRole("link", { name: "Board" });
             expect(board.className).toContain("flex-[0_0_auto]");
             expect(board.className).toContain("whitespace-nowrap");
+        });
+
+        it("scrolls the active Reports link fully into the nearest view", () => {
+            const scrollIntoView = jest.fn();
+            Element.prototype.scrollIntoView = scrollIntoView;
+
+            renderDetail("/projects/project-1/reports");
+
+            expect(scrollIntoView).toHaveBeenCalledTimes(1);
+            expect(scrollIntoView).toHaveBeenCalledWith({
+                block: "nearest",
+                inline: "nearest"
+            });
+            expect(
+                screen.getByRole("link", { name: "Reports" })
+            ).toHaveAttribute("aria-current", "page");
+        });
+
+        it("corrects a subpixel Reports overhang after the nearest scroll", () => {
+            const rect = (left: number, right: number) =>
+                ({
+                    bottom: 44,
+                    height: 44,
+                    left,
+                    right,
+                    top: 0,
+                    width: right - left,
+                    x: left,
+                    y: 0,
+                    toJSON: () => ({})
+                }) as DOMRect;
+            const bounds = jest
+                .spyOn(Element.prototype, "getBoundingClientRect")
+                .mockImplementation(function (this: Element) {
+                    if (
+                        this instanceof HTMLElement &&
+                        this.dataset.testid === "project-detail-child-nav"
+                    ) {
+                        return rect(12, 378);
+                    }
+                    if (
+                        this instanceof HTMLAnchorElement &&
+                        this.textContent === "Reports"
+                    ) {
+                        return rect(305.015625, 378.078125);
+                    }
+                    return rect(0, 0);
+                });
+
+            renderDetail("/projects/project-1/reports");
+
+            expect(
+                screen.getByTestId("project-detail-child-nav").scrollLeft
+            ).toBe(1);
+            bounds.mockRestore();
         });
 
         it("still hides the whole chrome on the phone board route", () => {

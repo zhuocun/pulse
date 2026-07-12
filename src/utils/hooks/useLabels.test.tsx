@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -103,6 +103,30 @@ describe("useLabels", () => {
 
         await waitFor(() => expect(result.current.isLoading).toBe(false));
         expect(result.current.labels).toBeUndefined();
+    });
+
+    it("exposes list errors and refetches to recover", async () => {
+        const queryClient = createQueryClient();
+        const loadError = new Error("labels unavailable");
+        apiMock
+            .mockRejectedValueOnce(loadError)
+            .mockResolvedValueOnce([label()]);
+
+        const { result } = renderHook(() => useLabels("project-1"), {
+            wrapper: createWrapper(queryClient)
+        });
+
+        await waitFor(() => expect(result.current.isError).toBe(true));
+        expect(result.current.error).toBe(loadError);
+        expect(result.current.labels).toBeUndefined();
+
+        await act(async () => {
+            await result.current.refetch();
+        });
+
+        await waitFor(() => expect(result.current.isError).toBe(false));
+        expect(result.current.error).toBeNull();
+        expect(result.current.labels).toEqual([label()]);
     });
 
     it("createLabel POSTs { projectId, name, color } and invalidates the list", async () => {

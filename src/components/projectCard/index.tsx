@@ -124,7 +124,11 @@ const ProjectCardComponent: React.FC<ProjectCardProps> = ({
                             className="shrink-0"
                         />
                         <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
-                            <span className="text-xs font-medium text-muted-foreground">
+                            <span
+                                className="block max-w-full min-w-0 truncate text-xs font-medium text-muted-foreground"
+                                data-testid="project-organization"
+                                title={project.organization || undefined}
+                            >
                                 {project.organization ||
                                     microcopy.labels.noOrganization}
                             </span>

@@ -263,11 +263,45 @@ const ProjectMembersManager: React.FC<ProjectMembersManagerProps> = ({
 
     if (rosterLoading && members.length === 0) {
         return (
-            <div className="flex flex-col gap-xs" data-testid="members-loading">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-2/3" />
-            </div>
+            <section
+                className="flex flex-col gap-md"
+                data-testid="members-loading"
+            >
+                <div className="flex flex-col gap-xs">
+                    {[0, 1, 2].map((index) => (
+                        <div
+                            className="flex flex-wrap items-center gap-sm rounded-md border border-border p-sm"
+                            data-testid="member-skeleton-row"
+                            key={index}
+                        >
+                            <Skeleton className="size-10 shrink-0 rounded-md" />
+                            <div className="flex min-w-0 flex-[1_1_12rem] flex-col gap-xxs">
+                                <Skeleton className="h-4 w-28" />
+                                <Skeleton className="h-3 w-40 max-w-full" />
+                            </div>
+                            <div className="ms-auto flex items-center gap-xs">
+                                <Skeleton className="h-10 w-32 rounded-md" />
+                                {canManage ? (
+                                    <Skeleton className="size-9 rounded-md" />
+                                ) : null}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                {canManage ? (
+                    <div
+                        className="flex flex-col gap-xs border-t border-border pt-md"
+                        data-testid="member-add-skeleton"
+                    >
+                        <Skeleton className="h-4 w-32" />
+                        <div className="flex flex-wrap items-center gap-xs">
+                            <Skeleton className="h-10 min-w-[12rem] flex-1 rounded-md" />
+                            <Skeleton className="h-10 w-32 rounded-md" />
+                            <Skeleton className="h-10 w-28 rounded-md" />
+                        </div>
+                    </div>
+                ) : null}
+            </section>
         );
     }
 

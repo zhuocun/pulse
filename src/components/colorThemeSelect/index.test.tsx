@@ -54,6 +54,16 @@ describe("ColorThemeSelect", () => {
         }
     });
 
+    it("keeps every localized palette name visible on narrow controls", () => {
+        renderSelect();
+
+        for (const name of ["Orange", "Blue", "Emerald"]) {
+            const label = screen.getByText(name);
+            expect(label).not.toHaveClass("sr-only");
+            expect(label.closest('[role="radio"]')).toBeInTheDocument();
+        }
+    });
+
     it("reflects the current preference (orange default)", () => {
         renderSelect("orange");
         expect(screen.getByRole("radio", { name: "Orange" })).toBeChecked();

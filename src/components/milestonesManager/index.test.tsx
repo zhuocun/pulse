@@ -168,9 +168,24 @@ describe("MilestonesManager", () => {
     });
 
     it("renders a loading skeleton before the list resolves", () => {
+        setUser(MANAGER_ID);
         setMilestones({ isLoading: true, data: undefined });
         renderManager();
         expect(screen.getByTestId("milestones-loading")).toBeInTheDocument();
+        expect(screen.getAllByTestId("milestone-skeleton-row")).toHaveLength(3);
+        expect(
+            screen.getByTestId("milestone-add-skeleton")
+        ).toBeInTheDocument();
+    });
+
+    it("omits the add-form skeleton for a viewer", () => {
+        setUser("user-vi");
+        setMilestones({ isLoading: true, data: undefined });
+        renderManager();
+        expect(screen.getAllByTestId("milestone-skeleton-row")).toHaveLength(3);
+        expect(
+            screen.queryByTestId("milestone-add-skeleton")
+        ).not.toBeInTheDocument();
     });
 
     it("renders an empty hint when there are no milestones", () => {
