@@ -2,8 +2,6 @@ import { render, screen, within } from "@testing-library/react";
 import { Navigate } from "react-router";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
-import { ruleTextsFor, styledClassFor } from "../testUtils/styleRules";
-
 import ProjectDetailPage from "./projectDetail";
 
 let mockProjectName = "Atlas";
@@ -118,21 +116,6 @@ describe("ProjectDetailPage", () => {
      *   4. data-glass-context="true" marker.
      */
     describe("Liquid Glass chrome recipe (Wave 2 T3)", () => {
-        const sheetText = () =>
-            Array.from(document.styleSheets)
-                .map((sheet) => {
-                    let rules: CSSRuleList;
-                    try {
-                        rules = sheet.cssRules;
-                    } catch {
-                        return "";
-                    }
-                    return Array.from(rules)
-                        .map((rule) => rule.cssText)
-                        .join("\n");
-                })
-                .join("\n");
-
         it('marks the TopBar root with data-glass-context="true"', () => {
             renderDetail("/projects/project-1/board");
             const top = screen.getByTestId("project-detail-chrome");
@@ -141,29 +124,29 @@ describe("ProjectDetailPage", () => {
 
         it("emits a ::before specular-rim layer with --glass-specular-top", () => {
             renderDetail("/projects/project-1/board");
-            const css = sheetText();
-            expect(css).toMatch(
-                /::before[^}]*background:\s*var\(--glass-specular-top\)/
+            const top = screen.getByTestId("project-detail-chrome");
+            expect(top.className).toContain(
+                "before:bg-[image:var(--glass-specular-top)]"
             );
         });
 
         it("emits a ::after companion + scroll-edge dissolve layer", () => {
             renderDetail("/projects/project-1/board");
-            const css = sheetText();
-            expect(css).toMatch(
-                /::after[^}]*background:\s*var\(--glass-specular-bottom\)/
+            const top = screen.getByTestId("project-detail-chrome");
+            expect(top.className).toContain(
+                "after:bg-[image:var(--glass-specular-bottom)]"
             );
             // 12 px scroll-edge mask, same shape the main Header ships
-            expect(css).toMatch(
-                /mask-image:\s*linear-gradient\([^)]*calc\(100% - 12px\)/
+            expect(top.className).toContain(
+                "[mask-image:linear-gradient(to_bottom,black_calc(100%-12px),transparent_100%)]"
             );
         });
 
         it("applies gel-flex transform recipe to ChildNavLink", () => {
             renderDetail("/projects/project-1/board");
-            const css = sheetText();
-            expect(css).toMatch(/transform[^;]*var\(--motion-gel-flex/);
-            expect(css).toMatch(/:active[^}]*transform:\s*scale\(0\.97\)/);
+            const board = screen.getByRole("link", { name: "Board" });
+            expect(board.className).toContain("var(--motion-gel-flex");
+            expect(board.className).toContain("active:scale-[0.97]");
         });
 
         it("declares coarse-pointer touch targets for breadcrumb and child-nav links", () => {
@@ -171,15 +154,10 @@ describe("ProjectDetailPage", () => {
             const board = screen.getByRole("link", { name: "Board" });
             const breadcrumbWrapper = screen.getByTestId("project-breadcrumb");
 
-            const breadcrumbRuleText = ruleTextsFor(
-                styledClassFor(breadcrumbWrapper) ?? ""
-            ).join("\n");
-            const childRuleText = ruleTextsFor(
-                styledClassFor(board) ?? ""
-            ).join("\n");
-
-            expect(breadcrumbRuleText).toContain("min-height: 44px");
-            expect(childRuleText).toContain("min-height: 44px");
+            expect(breadcrumbWrapper.className).toContain(
+                "coarse:[&_a]:min-h-[44px]"
+            );
+            expect(board.className).toContain("coarse:min-h-[44px]");
         });
 
         it("pins the Projects root crumb and ellipsizes the project name when space is tight", () => {
@@ -188,64 +166,29 @@ describe("ProjectDetailPage", () => {
             renderDetail("/projects/project-1/labels");
             const breadcrumbWrapper = screen.getByTestId("project-breadcrumb");
 
-            const breadcrumbRuleText = ruleTextsFor(
-                styledClassFor(breadcrumbWrapper) ?? ""
-            ).join("\n");
-            const styleRules = Array.from(document.styleSheets)
-                .flatMap((sheet) => Array.from(sheet.cssRules))
-                .filter((rule): rule is CSSStyleRule => "selectorText" in rule);
-            const rootCrumbRule = styleRules.find((rule) =>
-                rule.selectorText.includes("li:first-of-type a")
+            // Root crumb ("Projects") never shrinks.
+            expect(breadcrumbWrapper.className).toContain(
+                "[&_li:first-of-type_a]:flex-shrink-0"
             );
-            // Stylis serializes the child combinator without spaces
-            // ("a>span") and may drop the attribute-value quotes, so match
-            // with a whitespace- and quote-tolerant regex.
-            const spanSelector =
-                /data-breadcrumb=["']?middle["']?\] a\s*>\s*span/;
-            const middleAnchorSelector = /data-breadcrumb=["']?middle["']?\] a/;
-            const middleCrumbAnchorRule = styleRules.find(
-                (rule) =>
-                    middleAnchorSelector.test(rule.selectorText) &&
-                    !spanSelector.test(rule.selectorText)
+            // The middle (project-name) anchor stays a clipped inline-flex
+            // box (touch target + clipping)…
+            expect(breadcrumbWrapper.className).toContain(
+                "[&_li[data-breadcrumb=middle]_a]:inline-flex"
             );
-            const middleCrumbSpanRule = styleRules.find((rule) =>
-                spanSelector.test(rule.selectorText)
+            expect(breadcrumbWrapper.className).toContain(
+                "[&_li[data-breadcrumb=middle]_a]:max-w-full"
             );
-
-            expect(breadcrumbRuleText).toContain("li:first-of-type");
-            expect(rootCrumbRule?.style.getPropertyValue("flex-shrink")).toBe(
-                "0"
+            expect(breadcrumbWrapper.className).toContain(
+                "[&_li[data-breadcrumb=middle]_a]:min-w-0"
             );
-            // The anchor stays the sized flex box (touch target +
-            // clipping)…
-            expect(middleCrumbAnchorRule).toBeDefined();
-            expect(
-                middleCrumbAnchorRule?.style.getPropertyValue("display")
-            ).toBe("inline-flex");
-            expect(
-                middleCrumbAnchorRule?.style.getPropertyValue("max-width")
-            ).toBe("100%");
-            expect(
-                middleCrumbAnchorRule?.style.getPropertyValue("min-width")
-            ).toBe("0");
-            expect(
-                middleCrumbAnchorRule?.style.getPropertyValue("overflow")
-            ).toBe("hidden");
+            expect(breadcrumbWrapper.className).toContain(
+                "[&_li[data-breadcrumb=middle]_a]:overflow-hidden"
+            );
             // …while the ellipsis lives on the inner span, because
             // text-overflow cannot ellipsize a flex container's contents.
-            expect(
-                middleCrumbAnchorRule?.style.getPropertyValue("text-overflow")
-            ).toBe("");
-            expect(middleCrumbSpanRule).toBeDefined();
-            expect(
-                middleCrumbSpanRule?.style.getPropertyValue("text-overflow")
-            ).toBe("ellipsis");
-            expect(
-                middleCrumbSpanRule?.style.getPropertyValue("overflow")
-            ).toBe("hidden");
-            expect(
-                middleCrumbSpanRule?.style.getPropertyValue("white-space")
-            ).toBe("nowrap");
+            expect(breadcrumbWrapper.className).toContain(
+                "[&_li[data-breadcrumb=middle]_a>span]:text-ellipsis"
+            );
             // The project-name link wraps its text in the inner span the
             // ellipsis rule targets.
             const projectLink = screen.getByRole("link", {
@@ -256,9 +199,14 @@ describe("ProjectDetailPage", () => {
 
         it("respects prefers-reduced-motion and prefers-reduced-transparency", () => {
             renderDetail("/projects/project-1/board");
-            const css = sheetText();
-            expect(css).toMatch(/prefers-reduced-motion[^}]*reduce/);
-            expect(css).toMatch(/prefers-reduced-transparency[^}]*reduce/);
+            const top = screen.getByTestId("project-detail-chrome");
+            const board = screen.getByRole("link", { name: "Board" });
+            expect(top.className).toContain(
+                "[@media(prefers-reduced-transparency:reduce)]:[backdrop-filter:none]"
+            );
+            expect(board.className).toContain(
+                "motion-reduce:[transition:none]"
+            );
         });
     });
 
@@ -305,22 +253,16 @@ describe("ProjectDetailPage", () => {
                 );
             }
 
-            const navRuleText = ruleTextsFor(styledClassFor(nav) ?? "").join(
-                "\n"
-            );
-            expect(navRuleText).toContain("overflow-x: auto");
-            expect(navRuleText).toContain("flex: 1 1 100%");
+            expect(nav.className).toContain("overflow-x-auto");
+            expect(nav.className).toContain("flex-[1_1_100%]");
         });
 
         it("keeps nav links pan-friendly: fixed-size segments that never wrap", () => {
             renderDetail("/projects/project-1/labels");
 
             const board = screen.getByRole("link", { name: "Board" });
-            const linkRuleText = ruleTextsFor(styledClassFor(board) ?? "").join(
-                "\n"
-            );
-            expect(linkRuleText).toContain("flex: 0 0 auto");
-            expect(linkRuleText).toContain("white-space: nowrap");
+            expect(board.className).toContain("flex-[0_0_auto]");
+            expect(board.className).toContain("whitespace-nowrap");
         });
 
         it("still hides the whole chrome on the phone board route", () => {

@@ -1,4 +1,3 @@
-import styled from "@emotion/styled";
 import { useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router";
 
@@ -8,7 +7,6 @@ import EmptyState from "../components/emptyState";
 import PageContainer from "../components/pageContainer";
 import SettingsSection from "../components/settingsSection";
 import { microcopy, microcopyString } from "../constants/microcopy";
-import { fontSize, fontWeight, lineHeight, space } from "../theme/tokens";
 import { formatRelativeTime } from "../utils/formatRelativeTime";
 import useActivityFeed from "../utils/hooks/useActivityFeed";
 import useNotifications from "../utils/hooks/useNotifications";
@@ -55,131 +53,16 @@ const formatRelative = (then: number, now: number): string =>
         days: microcopyString(microcopy.activityFeed.relativeDays)
     });
 
-const PageHeading = styled(Typography.Title)`
-    && {
-        font-size: ${fontSize.xxl}px;
-        font-weight: ${fontWeight.semibold};
-        line-height: ${lineHeight.tight};
-        margin-bottom: ${space.lg}px;
-    }
-`;
+const PAGE_HEADING = "mb-lg text-xxl font-semibold leading-tight";
 
 /*
- * Single event row, presented inside a `SettingsSection` slot. Matches
- * the activity drawer's row anatomy — a leading kind icon, a stacked
- * body (summary + relative time) — sized to the grouped-table rhythm.
+ * Event / mention rows share the activity drawer's anatomy — a leading
+ * kind icon and a stacked body (summary + relative time) — sized to the
+ * grouped-table rhythm. The mention row is the whole `<Link>` target, so
+ * on coarse pointers it lifts to the 44px touch floor (WCAG 2.5.8).
  */
-const EventRow = styled.div`
-    align-items: flex-start;
-    display: flex;
-    gap: ${space.sm}px;
-    padding: ${space.sm}px ${space.md}px;
-    width: 100%;
-`;
-
-const EventIcon = styled.span`
-    align-items: center;
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-    display: inline-flex;
-    flex: 0 0 auto;
-    font-size: ${fontSize.md}px;
-    height: 24px;
-    justify-content: center;
-    width: 24px;
-`;
-
-const EventBody = styled.div`
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-`;
-
-const EventSummary = styled(Typography.Text)`
-    && {
-        font-size: ${fontSize.sm}px;
-        word-break: break-word;
-    }
-`;
-
-const EventMeta = styled(Typography.Text)`
-    && {
-        color: var(--ant-color-text-tertiary, rgba(15, 23, 42, 0.45));
-        font-size: ${fontSize.xs}px;
-    }
-`;
-
-/*
- * Empty-section body. Triage and Mentions render a single quiet line of
- * copy inside the same rounded group as a real row, so a structurally
- * empty section still reads as a deliberate grouped surface rather than
- * a broken/blank one.
- */
-const SectionEmpty = styled.div`
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-    font-size: ${fontSize.sm}px;
-    line-height: ${lineHeight.normal};
-    padding: ${space.sm}px ${space.md}px;
-    width: 100%;
-`;
-
-/*
- * A single mention row. When the mention carries a `projectId` the whole
- * row is a router `<Link>` to that project's board (the always-valid task
- * landing — the routed task-panel deep link is flag-gated, the board is
- * not); without one it degrades to a plain row. Reuses the activity row's
- * body anatomy (summary + a quiet sub-line) so the two sections share a
- * visual rhythm.
- */
-const mentionRowStyles = `
-    align-items: flex-start;
-    display: flex;
-    gap: ${space.sm}px;
-    padding: ${space.sm}px ${space.md}px;
-    text-decoration: none;
-    width: 100%;
-`;
-
-const MentionRow = styled.div`
-    ${mentionRowStyles}
-`;
-
-const MentionLink = styled(Link)`
-    ${mentionRowStyles}
-    color: inherit;
-
-    &:hover,
-    &:focus-visible {
-        background: var(--ant-color-bg-text-hover, rgba(15, 23, 42, 0.05));
-    }
-
-    /* The whole row is the link target; its single-line body leaves it just
-     * under 44 px. Lift to the touch floor on coarse pointers (WCAG 2.5.8)
-     * so a thumb lands the mention without zoom. */
-    @media (pointer: coarse) {
-        min-height: 44px;
-    }
-`;
-
-const MentionAction = styled.span`
-    color: var(--ant-color-link, #1677ff);
-    flex: 0 0 auto;
-    font-size: ${fontSize.sm}px;
-`;
-
-/*
- * The grouped sections cap their width and centre on desktop so the
- * rows don't sprawl across an ultra-wide monitor — the route is
- * reachable everywhere even though the bottom tab bar that links it is
- * phone-only. `PageContainer` already supplies the page gutters.
- */
-const SectionStack = styled.div`
-    display: flex;
-    flex-direction: column;
-    margin-inline: auto;
-    max-width: 40rem;
-`;
+const ROW_LAYOUT = "flex w-full items-start gap-sm px-md py-sm";
+const MENTION_LINK = `${ROW_LAYOUT} text-inherit no-underline hover:bg-[var(--pulse-bg-text-hover)] focus-visible:bg-[var(--pulse-bg-text-hover)] coarse:min-h-[44px]`;
 
 const InboxPage = () => {
     useTitle(composeBrandedTitle(microcopy.pageTitle.inbox), false);
@@ -242,7 +125,9 @@ const InboxPage = () => {
     if (sortedEvents.length === 0 && mentions.length === 0) {
         return (
             <PageContainer>
-                <PageHeading level={1}>{microcopy.inbox.heading}</PageHeading>
+                <Typography.Title className={PAGE_HEADING} level={1}>
+                    {microcopy.inbox.heading}
+                </Typography.Title>
                 <EmptyState
                     data-testid="inbox-empty-state"
                     description={microcopy.inbox.emptyDescription}
@@ -256,16 +141,27 @@ const InboxPage = () => {
 
     return (
         <PageContainer>
-            <PageHeading level={1}>{microcopy.inbox.heading}</PageHeading>
-            <SectionStack>
+            <Typography.Title className={PAGE_HEADING} level={1}>
+                {microcopy.inbox.heading}
+            </Typography.Title>
+            {/*
+             * The grouped sections cap their width and centre on desktop so
+             * the rows don't sprawl across an ultra-wide monitor — the route
+             * is reachable everywhere even though the bottom tab bar that
+             * links it is phone-only. `PageContainer` supplies the gutters.
+             */}
+            <div className="mx-auto flex max-w-[40rem] flex-col">
                 <SettingsSection
                     data-testid="inbox-section-mentions"
                     header={microcopy.inbox.sections.mentions.title}
                 >
                     {mentions.length === 0 ? (
-                        <SectionEmpty data-testid="inbox-mentions-empty">
+                        <div
+                            className="w-full px-md py-sm text-sm leading-normal text-[color:var(--pulse-text-secondary)]"
+                            data-testid="inbox-mentions-empty"
+                        >
                             {microcopy.inbox.sections.mentions.empty}
-                        </SectionEmpty>
+                        </div>
                     ) : (
                         mentions.map((mention) => {
                             const summary =
@@ -275,42 +171,49 @@ const InboxPage = () => {
                                 );
                             const body = (
                                 <>
-                                    <EventBody>
-                                        <EventSummary>{summary}</EventSummary>
-                                    </EventBody>
+                                    <div className="flex min-w-0 flex-auto flex-col gap-0.5">
+                                        <Typography.Text className="text-sm break-words">
+                                            {summary}
+                                        </Typography.Text>
+                                    </div>
                                     {mention.projectId && (
-                                        <MentionAction aria-hidden>
+                                        <span
+                                            aria-hidden
+                                            className="flex-none text-sm text-[color:var(--pulse-link)]"
+                                        >
                                             {
                                                 microcopy.inbox.sections
                                                     .mentions.viewTask
                                             }
-                                        </MentionAction>
+                                        </span>
                                     )}
                                 </>
                             );
                             return mention.projectId ? (
-                                <MentionLink
+                                <Link
                                     key={mention._id}
                                     aria-label={microcopyString(
                                         microcopy.inbox.sections.mentions
                                             .itemAriaLabel
                                     ).replace("{summary}", summary)}
+                                    className={MENTION_LINK}
                                     data-mention-id={mention._id}
                                     data-ref-id={mention.refId}
                                     data-testid="inbox-mention-row"
                                     to={`/projects/${mention.projectId}/board`}
                                 >
                                     {body}
-                                </MentionLink>
+                                </Link>
                             ) : (
-                                <MentionRow
+                                <div
                                     key={mention._id}
+                                    className={ROW_LAYOUT}
                                     data-mention-id={mention._id}
                                     data-ref-id={mention.refId}
                                     data-testid="inbox-mention-row"
                                 >
                                     {body}
-                                </MentionRow>
+                                </div>
                             );
                         })
                     )}
@@ -320,33 +223,40 @@ const InboxPage = () => {
                     header={microcopy.inbox.sections.activity.title}
                 >
                     {sortedEvents.length === 0 ? (
-                        <SectionEmpty data-testid="inbox-activity-empty">
+                        <div
+                            className="w-full px-md py-sm text-sm leading-normal text-[color:var(--pulse-text-secondary)]"
+                            data-testid="inbox-activity-empty"
+                        >
                             {microcopy.activityFeed.empty}
-                        </SectionEmpty>
+                        </div>
                     ) : (
                         sortedEvents.map((event) => (
-                            <EventRow
+                            <div
                                 key={event.id}
+                                className={ROW_LAYOUT}
                                 data-event-id={event.id}
                                 data-kind={event.kind}
                                 data-testid="inbox-activity-row"
                             >
-                                <EventIcon
+                                <span
+                                    className="inline-flex h-6 w-6 flex-none items-center justify-center text-md text-[color:var(--pulse-text-secondary)]"
                                     data-testid={`inbox-activity-icon-${event.kind}`}
                                 >
                                     {KIND_ICON[event.kind]}
-                                </EventIcon>
-                                <EventBody>
-                                    <EventSummary>{event.summary}</EventSummary>
-                                    <EventMeta>
+                                </span>
+                                <div className="flex min-w-0 flex-auto flex-col gap-0.5">
+                                    <Typography.Text className="text-sm break-words">
+                                        {event.summary}
+                                    </Typography.Text>
+                                    <Typography.Text className="text-xs text-[color:var(--pulse-text-tertiary)]">
                                         {formatRelative(event.timestamp, now)}
-                                    </EventMeta>
-                                </EventBody>
-                            </EventRow>
+                                    </Typography.Text>
+                                </div>
+                            </div>
                         ))
                     )}
                 </SettingsSection>
-            </SectionStack>
+            </div>
         </PageContainer>
     );
 };

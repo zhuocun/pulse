@@ -1,11 +1,9 @@
-import styled from "@emotion/styled";
 import { useParams } from "react-router-dom";
 
 import { Typography } from "@/components/ui/typography";
 import MilestonesManager from "../components/milestonesManager";
 import PageContainer from "../components/pageContainer";
 import { microcopy } from "../constants/microcopy";
-import { fontSize, fontWeight, lineHeight, space } from "../theme/tokens";
 import useReactQuery from "../utils/hooks/useReactQuery";
 import useTitle from "../utils/hooks/useTitle";
 
@@ -27,15 +25,6 @@ import useTitle from "../utils/hooks/useTitle";
 
 const ProjectQuery = "projects" as const;
 
-const PageHeading = styled(Typography.Title)`
-    && {
-        font-size: ${fontSize.xxl}px;
-        font-weight: ${fontWeight.semibold};
-        line-height: ${lineHeight.tight};
-        margin-bottom: ${space.md}px;
-    }
-`;
-
 const MilestonesPage = () => {
     const { projectId } = useParams<{ projectId: string }>();
     const { data: project } = useReactQuery<IProject>(ProjectQuery, {
@@ -52,7 +41,12 @@ const MilestonesPage = () => {
 
     return (
         <PageContainer data-testid="milestones-page">
-            <PageHeading level={1}>{microcopy.milestones.heading}</PageHeading>
+            <Typography.Title
+                className="mb-md text-xxl font-semibold leading-tight"
+                level={1}
+            >
+                {microcopy.milestones.heading}
+            </Typography.Title>
             {projectId ? <MilestonesManager projectId={projectId} /> : null}
         </PageContainer>
     );

@@ -1,4 +1,3 @@
-import styled from "@emotion/styled";
 import {
     Bot,
     ChevronRight,
@@ -9,6 +8,7 @@ import {
     Palette,
     Sun
 } from "lucide-react";
+import { type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -20,14 +20,6 @@ import PageContainer from "../components/pageContainer";
 import SettingsSection, { SettingsRow } from "../components/settingsSection";
 import { microcopy } from "../constants/microcopy";
 import { useLocale, type LocaleCode } from "../i18n";
-import {
-    breakpoints,
-    fontSize,
-    fontWeight,
-    lineHeight,
-    radius,
-    space
-} from "../theme/tokens";
 import useAiEnabled from "../utils/hooks/useAiEnabled";
 import useAuth from "../utils/hooks/useAuth";
 import useColorScheme from "../utils/hooks/useColorScheme";
@@ -58,119 +50,38 @@ import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
  * `aria-label`s) are identical regardless of chassis.
  */
 
-const PageHeading = styled(Typography.Title)`
-    && {
-        font-size: ${fontSize.xxl}px;
-        font-weight: ${fontWeight.semibold};
-        line-height: ${lineHeight.tight};
-        margin-bottom: ${space.xs}px;
-    }
-`;
-
-const PageSubtitle = styled(Typography.Paragraph)`
-    && {
-        color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-        font-size: ${fontSize.md}px;
-        margin-bottom: ${space.xl}px;
-    }
-`;
-
-const SettingsList = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: ${space.md}px;
-    margin-inline: auto;
-    max-width: 48rem;
-    width: 100%;
-`;
-
 /*
- * Settings row layout follows the iOS 26 "grouped table view" idiom:
- * on roomy viewports (>=sm) the label sits inline with the control on
- * the right, separated by `space-between`. Below `sm` the row stacks
- * — label on top, control stretched full-width below — because at
- * iPhone-width (393 px) the Theme row's 3-state toggle group (and to a
- * lesser extent the Language row's toggle group) couldn't fit alongside
- * the label and was forcing the label ("Them\ne") and the option
- * pills ("Li…", "D…", "Syst…") to ellipsize. Stacking is applied
- * uniformly to every row so the four controls feel cut from the same
- * cloth on phone, not three-cards-aligned-one-stacked. The inner
- * `RowLabel` keeps `flex: 1 1 auto` so the desktop branch still
- * pushes the control to the trailing edge; the stacked branch
- * stretches both children full-width via `align-items: stretch`.
+ * Desktop settings row. Follows the iOS 26 "grouped table view" idiom:
+ * on roomy viewports (>=480px) the label sits inline with the control on
+ * the right, separated by space-between. Below 480px the row stacks —
+ * label on top, control stretched full-width below — because at
+ * iPhone-width (393 px) the Theme row's 3-state toggle group couldn't fit
+ * alongside the label and forced both to ellipsize.
  */
-const Row = styled(Card)`
-    && {
-        align-items: stretch;
-        border-radius: ${radius.lg}px;
-        display: flex;
-        flex-direction: column;
-        gap: ${space.sm}px;
-        padding: ${space.md}px ${space.lg}px;
-    }
-    @media (min-width: ${breakpoints.sm}px) {
-        && {
-            align-items: center;
-            flex-direction: row;
-            gap: ${space.md}px;
-            justify-content: space-between;
-        }
-    }
-`;
-
-const RowLabel = styled.div`
-    align-items: center;
-    display: flex;
-    flex: 1 1 auto;
-    gap: ${space.xs}px;
-    min-width: 0;
-`;
-
-const RowText = styled(Typography.Text)`
-    && {
-        font-size: ${fontSize.md}px;
-        font-weight: ${fontWeight.medium};
-    }
-`;
-
-/*
- * Phone-only disclosure for the colour-theme picker. A native
- * `<details>`/`<summary>` gives keyboard + screen-reader-correct
- * expand/collapse for free (replacing the antd ghost `Collapse`); the
- * default marker is hidden in favour of a trailing chevron that rotates
- * open, matching the grouped-table idiom of the surrounding rows.
- */
-const ColorThemeDisclosure = styled.details`
-    & > summary {
-        align-items: center;
-        cursor: pointer;
-        display: flex;
-        gap: ${space.xs}px;
-        justify-content: space-between;
-        list-style: none;
-        min-height: 44px;
-        padding: ${space.sm}px 0;
-    }
-
-    & > summary::-webkit-details-marker {
-        display: none;
-    }
-
-    & > summary .disclosure-chevron {
-        color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-        height: 16px;
-        transition: transform 150ms ease;
-        width: 16px;
-    }
-
-    &[open] > summary .disclosure-chevron {
-        transform: rotate(90deg);
-    }
-
-    & > div {
-        padding-bottom: ${space.sm}px;
-    }
-`;
+const SettingsRowCard = ({
+    icon,
+    label,
+    control,
+    "data-testid": dataTestid
+}: {
+    icon: ReactNode;
+    label: ReactNode;
+    control: ReactNode;
+    "data-testid"?: string;
+}) => (
+    <Card
+        className="flex flex-col items-stretch gap-sm px-lg py-md min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between min-[480px]:gap-md"
+        data-testid={dataTestid}
+    >
+        <div className="flex min-w-0 flex-auto items-center gap-xs">
+            {icon}
+            <Typography.Text className="text-md font-medium">
+                {label}
+            </Typography.Text>
+        </div>
+        {control}
+    </Card>
+);
 
 const SettingsPage = () => {
     useTitle(composeBrandedTitle(microcopy.pageTitle.settings), false);
@@ -289,10 +200,15 @@ const SettingsPage = () => {
     if (isPhone) {
         return (
             <PageContainer>
-                <PageHeading level={1}>
+                <Typography.Title
+                    className="mb-xs text-xxl font-semibold leading-tight"
+                    level={1}
+                >
                     {microcopy.settings.pageTitle}
-                </PageHeading>
-                <PageSubtitle>{microcopy.settings.pageSubtitle}</PageSubtitle>
+                </Typography.Title>
+                <Typography.Paragraph className="mb-xl text-md text-[color:var(--pulse-text-secondary)]">
+                    {microcopy.settings.pageSubtitle}
+                </Typography.Paragraph>
                 <SettingsSection
                     data-testid="settings-section-appearance"
                     footer={microcopy.settings.sections.appearance.footer}
@@ -310,16 +226,27 @@ const SettingsPage = () => {
                         icon={languageIcon}
                         label={microcopy.settings.language}
                     />
-                    <ColorThemeDisclosure data-testid="settings-color-theme-collapse">
-                        <summary>
+                    {/*
+                     * Phone-only disclosure for the colour-theme picker. A
+                     * native `<details>`/`<summary>` gives keyboard +
+                     * screen-reader-correct expand/collapse for free; the
+                     * default marker is hidden in favour of a trailing
+                     * chevron that rotates open, matching the grouped-table
+                     * idiom of the surrounding rows.
+                     */}
+                    <details
+                        className="group"
+                        data-testid="settings-color-theme-collapse"
+                    >
+                        <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between gap-xs py-sm [&::-webkit-details-marker]:hidden">
                             <span>{microcopy.settings.colorTheme}</span>
                             <ChevronRight
                                 aria-hidden
-                                className="disclosure-chevron"
+                                className="size-4 text-[color:var(--pulse-text-secondary)] transition-transform duration-[150ms] ease-[ease] group-open:rotate-90"
                             />
                         </summary>
-                        <div>{colorThemeControl}</div>
-                    </ColorThemeDisclosure>
+                        <div className="pb-sm">{colorThemeControl}</div>
+                    </details>
                 </SettingsSection>
                 {aiAvailable ? (
                     <SettingsSection
@@ -355,47 +282,49 @@ const SettingsPage = () => {
 
     return (
         <PageContainer>
-            <PageHeading level={1}>{microcopy.settings.pageTitle}</PageHeading>
-            <PageSubtitle>{microcopy.settings.pageSubtitle}</PageSubtitle>
-            <SettingsList>
-                <Row data-testid="settings-row-theme">
-                    <RowLabel>
-                        {themeIcon}
-                        <RowText>{microcopy.settings.theme}</RowText>
-                    </RowLabel>
-                    {themeControl}
-                </Row>
-                <Row data-testid="settings-row-language">
-                    <RowLabel>
-                        {languageIcon}
-                        <RowText>{microcopy.settings.language}</RowText>
-                    </RowLabel>
-                    {languageControl}
-                </Row>
-                <Row data-testid="settings-row-color-theme">
-                    <RowLabel>
-                        {colorThemeIcon}
-                        <RowText>{microcopy.settings.colorTheme}</RowText>
-                    </RowLabel>
-                    {colorThemeControl}
-                </Row>
+            <Typography.Title
+                className="mb-xs text-xxl font-semibold leading-tight"
+                level={1}
+            >
+                {microcopy.settings.pageTitle}
+            </Typography.Title>
+            <Typography.Paragraph className="mb-xl text-md text-[color:var(--pulse-text-secondary)]">
+                {microcopy.settings.pageSubtitle}
+            </Typography.Paragraph>
+            <div className="mx-auto flex w-full max-w-[48rem] flex-col gap-md">
+                <SettingsRowCard
+                    control={themeControl}
+                    data-testid="settings-row-theme"
+                    icon={themeIcon}
+                    label={microcopy.settings.theme}
+                />
+                <SettingsRowCard
+                    control={languageControl}
+                    data-testid="settings-row-language"
+                    icon={languageIcon}
+                    label={microcopy.settings.language}
+                />
+                <SettingsRowCard
+                    control={colorThemeControl}
+                    data-testid="settings-row-color-theme"
+                    icon={colorThemeIcon}
+                    label={microcopy.settings.colorTheme}
+                />
                 {aiAvailable ? (
-                    <Row data-testid="settings-row-ai">
-                        <RowLabel>
-                            {copilotIcon}
-                            <RowText>{microcopy.settings.aiEnabled}</RowText>
-                        </RowLabel>
-                        {aiControl}
-                    </Row>
+                    <SettingsRowCard
+                        control={aiControl}
+                        data-testid="settings-row-ai"
+                        icon={copilotIcon}
+                        label={microcopy.settings.aiEnabled}
+                    />
                 ) : null}
-                <Row data-testid="settings-row-logout">
-                    <RowLabel>
-                        {logoutIcon}
-                        <RowText>{microcopy.actions.logOut}</RowText>
-                    </RowLabel>
-                    {logoutControl}
-                </Row>
-            </SettingsList>
+                <SettingsRowCard
+                    control={logoutControl}
+                    data-testid="settings-row-logout"
+                    icon={logoutIcon}
+                    label={microcopy.actions.logOut}
+                />
+            </div>
         </PageContainer>
     );
 };

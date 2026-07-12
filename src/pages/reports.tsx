@@ -1,4 +1,3 @@
-import styled from "@emotion/styled";
 import { useParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -7,7 +6,6 @@ import AiSparkleIcon from "../components/aiSparkleIcon";
 import EmptyState from "../components/emptyState";
 import PageContainer from "../components/pageContainer";
 import { microcopy } from "../constants/microcopy";
-import { fontSize, fontWeight, lineHeight, space } from "../theme/tokens";
 import useReactQuery from "../utils/hooks/useReactQuery";
 import useTitle from "../utils/hooks/useTitle";
 
@@ -47,18 +45,6 @@ import useTitle from "../utils/hooks/useTitle";
 
 const ProjectQuery = "projects" as const;
 
-const PageHeading = styled(Typography.Title)`
-    && {
-        align-items: center;
-        display: inline-flex;
-        font-size: ${fontSize.xxl}px;
-        font-weight: ${fontWeight.semibold};
-        gap: ${space.xs}px;
-        line-height: ${lineHeight.tight};
-        margin-bottom: ${space.sm}px;
-    }
-`;
-
 const ReportsPage = () => {
     const { projectId } = useParams<{ projectId: string }>();
     const { data: project } = useReactQuery<IProject>(ProjectQuery, {
@@ -83,10 +69,13 @@ const ReportsPage = () => {
 
     return (
         <PageContainer data-testid="reports-page">
-            <PageHeading level={1}>
+            <Typography.Title
+                className="mb-sm inline-flex items-center gap-xs text-xxl font-semibold leading-tight"
+                level={1}
+            >
                 <AiSparkleIcon aria-hidden size="md" />
                 {microcopy.reports.heading}
-            </PageHeading>
+            </Typography.Title>
             <EmptyState
                 data-testid="reports-empty-state"
                 description={microcopy.reports.emptyDescription}

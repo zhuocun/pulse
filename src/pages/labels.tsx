@@ -1,11 +1,9 @@
-import styled from "@emotion/styled";
 import { useParams } from "react-router-dom";
 
 import { Typography } from "@/components/ui/typography";
 import LabelsManager from "../components/labelsManager";
 import PageContainer from "../components/pageContainer";
 import { microcopy } from "../constants/microcopy";
-import { fontSize, fontWeight, lineHeight, space } from "../theme/tokens";
 import useReactQuery from "../utils/hooks/useReactQuery";
 import useTitle from "../utils/hooks/useTitle";
 
@@ -27,15 +25,6 @@ import useTitle from "../utils/hooks/useTitle";
 
 const ProjectQuery = "projects" as const;
 
-const PageHeading = styled(Typography.Title)`
-    && {
-        font-size: ${fontSize.xxl}px;
-        font-weight: ${fontWeight.semibold};
-        line-height: ${lineHeight.tight};
-        margin-bottom: ${space.md}px;
-    }
-`;
-
 const LabelsPage = () => {
     const { projectId } = useParams<{ projectId: string }>();
     const { data: project } = useReactQuery<IProject>(ProjectQuery, {
@@ -52,9 +41,12 @@ const LabelsPage = () => {
 
     return (
         <PageContainer data-testid="labels-page">
-            <PageHeading level={1}>
+            <Typography.Title
+                className="mb-md text-xxl font-semibold leading-tight"
+                level={1}
+            >
                 {microcopy.projectLabels.heading}
-            </PageHeading>
+            </Typography.Title>
             {projectId ? <LabelsManager projectId={projectId} /> : null}
         </PageContainer>
     );

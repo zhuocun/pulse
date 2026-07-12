@@ -1,23 +1,13 @@
-import styled from "@emotion/styled";
 import { useState } from "react";
 import { Link, useLocation } from "react-router";
 
 import RegisterForm from "../components/registerForm";
 import { microcopy } from "../constants/microcopy";
 import { AuthSubtitle, AuthTitle } from "../layouts/authLayout";
-import { bodyCopyCoarseFontCss, space } from "../theme/tokens";
 import useTitle, { composeBrandedTitle } from "../utils/hooks/useTitle";
 
-const SwitchRow = styled.p`
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-    ${bodyCopyCoarseFontCss}
-    margin: ${space.lg}px 0 0;
-    text-align: center;
-`;
-
-const SwitchAuthLink = styled(Link)`
-    color: var(--ant-color-link);
-`;
+const SWITCH_ROW_CLASS =
+    "m-0 mt-lg text-center text-sm coarse:text-base [color:var(--pulse-text-secondary,rgba(15,23,42,0.65))]";
 
 const RegisterPage = () => {
     useTitle(composeBrandedTitle(microcopy.pageTitle.register), false);
@@ -29,12 +19,16 @@ const RegisterPage = () => {
             <AuthTitle>{microcopy.auth.registerTitle}</AuthTitle>
             <AuthSubtitle>{microcopy.auth.registerSubtitle}</AuthSubtitle>
             <RegisterForm onError={setError} serverError={error} />
-            <SwitchRow>
+            <p className={SWITCH_ROW_CLASS}>
                 {microcopy.auth.switchToLogin}{" "}
-                <SwitchAuthLink to="/login" state={location.state}>
+                <Link
+                    className="[color:var(--pulse-link)]"
+                    state={location.state}
+                    to="/login"
+                >
                     {microcopy.actions.loginCta}
-                </SwitchAuthLink>
-            </SwitchRow>
+                </Link>
+            </p>
         </>
     );
 };

@@ -1,4 +1,3 @@
-import styled from "@emotion/styled";
 import { Info } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -19,15 +18,6 @@ import EmptyState from "../components/emptyState";
 import PageContainer from "../components/pageContainer";
 import { PageSpin } from "../components/status";
 import { microcopy } from "../constants/microcopy";
-import {
-    breakpoints,
-    fontSize,
-    fontWeight,
-    letterSpacing,
-    lineHeight,
-    radius,
-    space
-} from "../theme/tokens";
 import useAppMessage from "../utils/hooks/useAppMessage";
 import useAuth from "../utils/hooks/useAuth";
 import useReactMutation from "../utils/hooks/useReactMutation";
@@ -63,88 +53,6 @@ import newTaskCallback from "../utils/optimisticUpdate/createTask";
  * scope justifies. GET (URL-encoded) is the simplest contract and
  * already covers ~95 % of share intents (text, title, URL).
  */
-
-const PageHeading = styled(Typography.Title)`
-    && {
-        font-size: ${fontSize.xl}px;
-        font-weight: ${fontWeight.semibold};
-        letter-spacing: ${letterSpacing.tight};
-        line-height: ${lineHeight.tight};
-        margin: 0;
-        min-width: 0;
-    }
-
-    @media (min-width: ${breakpoints.md}px) {
-        && {
-            font-size: ${fontSize.xxl}px;
-        }
-    }
-`;
-
-const PageSubheading = styled.p`
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-    font-size: ${fontSize.base}px;
-    line-height: ${lineHeight.normal};
-    margin: ${space.xxs}px 0 ${space.lg}px;
-    max-width: 56ch;
-`;
-
-const SummaryCard = styled(Card)`
-    && {
-        border-radius: ${radius.lg}px;
-        margin-bottom: ${space.lg}px;
-        padding: ${space.lg}px;
-    }
-`;
-
-const SummaryLabel = styled.div`
-    color: var(--ant-color-text-secondary, rgba(15, 23, 42, 0.6));
-    font-size: ${fontSize.xs}px;
-    font-weight: ${fontWeight.medium};
-    margin-bottom: ${space.xxs}px;
-`;
-
-const SummaryValue = styled.div`
-    color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
-    font-size: ${fontSize.base}px;
-    line-height: ${lineHeight.normal};
-    overflow-wrap: anywhere;
-`;
-
-const SummarySection = styled.div`
-    & + & {
-        margin-top: ${space.sm}px;
-    }
-`;
-
-const FormCard = styled(Card)`
-    && {
-        border-radius: ${radius.lg}px;
-        padding: ${space.lg}px;
-    }
-`;
-
-const FieldLabel = styled.label`
-    color: var(--ant-color-text, rgba(15, 23, 42, 0.92));
-    display: block;
-    font-size: ${fontSize.sm}px;
-    font-weight: ${fontWeight.medium};
-    margin-bottom: ${space.xxs}px;
-`;
-
-const FieldRow = styled.div`
-    & + & {
-        margin-top: ${space.md}px;
-    }
-`;
-
-const ActionsRow = styled.div`
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${space.xs}px;
-    justify-content: flex-end;
-    margin-top: ${space.lg}px;
-`;
 
 /**
  * Only http(s) URLs round-trip through the share UI — `javascript:`,
@@ -426,44 +334,58 @@ const SharePage = () => {
     return (
         <PageContainer>
             <header>
-                <PageHeading level={1}>{microcopy.share.headline}</PageHeading>
-                <PageSubheading>{microcopy.share.summary}</PageSubheading>
+                <Typography.Title
+                    className="m-0 min-w-0 text-xl font-semibold leading-tight tracking-tight md:text-xxl"
+                    level={1}
+                >
+                    {microcopy.share.headline}
+                </Typography.Title>
+                <p className="mb-lg mt-xxs max-w-[56ch] text-base leading-normal text-[color:var(--pulse-text-secondary)]">
+                    {microcopy.share.summary}
+                </p>
             </header>
 
             {hasPayload ? (
-                <SummaryCard
+                <Card
                     aria-label={microcopy.share.headline}
+                    className="mb-lg p-lg"
                     data-testid="share-summary"
                 >
                     {params.title ? (
-                        <SummarySection>
-                            <SummaryLabel>
+                        <div className="[&+&]:mt-sm">
+                            <div className="mb-xxs text-xs font-medium text-[color:var(--pulse-text-secondary)]">
                                 {microcopy.share.summaryTitle}
-                            </SummaryLabel>
-                            <SummaryValue>{params.title}</SummaryValue>
-                        </SummarySection>
+                            </div>
+                            <div className="text-base leading-normal text-page-text [overflow-wrap:anywhere]">
+                                {params.title}
+                            </div>
+                        </div>
                     ) : null}
                     {params.text ? (
-                        <SummarySection>
-                            <SummaryLabel>
+                        <div className="[&+&]:mt-sm">
+                            <div className="mb-xxs text-xs font-medium text-[color:var(--pulse-text-secondary)]">
                                 {microcopy.share.summaryText}
-                            </SummaryLabel>
-                            <SummaryValue>{params.text}</SummaryValue>
-                        </SummarySection>
+                            </div>
+                            <div className="text-base leading-normal text-page-text [overflow-wrap:anywhere]">
+                                {params.text}
+                            </div>
+                        </div>
                     ) : null}
                     {params.url && isSafeShareUrl(params.url) ? (
-                        <SummarySection>
-                            <SummaryLabel>
+                        <div className="[&+&]:mt-sm">
+                            <div className="mb-xxs text-xs font-medium text-[color:var(--pulse-text-secondary)]">
                                 {microcopy.share.summaryUrl}
-                            </SummaryLabel>
-                            <SummaryValue>{params.url}</SummaryValue>
-                        </SummarySection>
+                            </div>
+                            <div className="text-base leading-normal text-page-text [overflow-wrap:anywhere]">
+                                {params.url}
+                            </div>
+                        </div>
                     ) : null}
-                </SummaryCard>
+                </Card>
             ) : (
                 <Alert
+                    className="mb-lg"
                     data-testid="share-nothing"
-                    style={{ marginBottom: space.lg }}
                     variant="info"
                 >
                     <Info aria-hidden />
@@ -474,11 +396,14 @@ const SharePage = () => {
                 </Alert>
             )}
 
-            <FormCard>
-                <FieldRow>
-                    <FieldLabel htmlFor="share-task-name">
+            <Card className="p-lg">
+                <div className="[&+&]:mt-md">
+                    <label
+                        className="mb-xxs block text-sm font-medium text-page-text"
+                        htmlFor="share-task-name"
+                    >
                         {microcopy.fields.taskName}
-                    </FieldLabel>
+                    </label>
                     {/*
                      * Share the primitive `<Input>` so this field picks
                      * up the same enterKeyHint / autoComplete contract
@@ -496,12 +421,15 @@ const SharePage = () => {
                         onChange={(e) => setTaskName(e.target.value)}
                         value={taskName}
                     />
-                </FieldRow>
+                </div>
 
-                <FieldRow>
-                    <FieldLabel htmlFor="share-project">
+                <div className="[&+&]:mt-md">
+                    <label
+                        className="mb-xxs block text-sm font-medium text-page-text"
+                        htmlFor="share-project"
+                    >
                         {microcopy.share.projectLabel}
-                    </FieldLabel>
+                    </label>
                     <Select
                         onValueChange={(value) => setSelectedProjectId(value)}
                         value={selectedProjectId}
@@ -523,12 +451,15 @@ const SharePage = () => {
                             ))}
                         </SelectContent>
                     </Select>
-                </FieldRow>
+                </div>
 
-                <FieldRow>
-                    <FieldLabel htmlFor="share-column">
+                <div className="[&+&]:mt-md">
+                    <label
+                        className="mb-xxs block text-sm font-medium text-page-text"
+                        htmlFor="share-column"
+                    >
                         {microcopy.share.columnLabel}
-                    </FieldLabel>
+                    </label>
                     <Select
                         onValueChange={(value) => setSelectedColumnId(value)}
                         value={selectedColumnId}
@@ -550,9 +481,9 @@ const SharePage = () => {
                             ))}
                         </SelectContent>
                     </Select>
-                </FieldRow>
+                </div>
 
-                <ActionsRow>
+                <div className="mt-lg flex flex-wrap justify-end gap-xs">
                     <Button onClick={onCancel}>
                         {microcopy.actions.cancel}
                     </Button>
@@ -564,8 +495,8 @@ const SharePage = () => {
                     >
                         {microcopy.actions.createTask}
                     </Button>
-                </ActionsRow>
-            </FormCard>
+                </div>
+            </Card>
         </PageContainer>
     );
 };
