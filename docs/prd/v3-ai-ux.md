@@ -9,6 +9,8 @@
 | Document scope    | AI UX audit (94 component-level issues + 25 product-level issues), competitive analysis, industry best practices, redesigned AI surfaces, implementation requirements, trust & transparency patterns, onboarding, accessibility, and phased rollout.  |
 | Companion docs    | [`v2.1-agent.md`](v2.1-agent.md) (backend contract), [`core-collaboration.md`](core-collaboration.md) (non-AI product core), [`../todo/product-done.md`](../todo/product-done.md), [`../todo/ui-todo.md`](../todo/ui-todo.md) |
 
+> **Stack note (historical).** This draft was written against the original Ant Design + Emotion UI. The frontend has since been rebuilt on **Tailwind CSS + shadcn/ui** (Ant Design and Emotion removed). Read the AntD-specific mechanisms below as intent, not implementation: `allowClear` → the shadcn `Input` with `type="search"` (native clear); AntD `Drawer`/`Modal` → the shadcn `Sheet`/`Dialog` primitives. See [`../design-tokens.md`](../design-tokens.md) for the current design system.
+
 ---
 
 ## 1. Executive Summary

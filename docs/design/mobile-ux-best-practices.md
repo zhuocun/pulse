@@ -630,8 +630,9 @@ catalogued in `mobile-native-best-practices.md §2.D`. Principles:
 - **Validate inline, recover gracefully.** Errors appear next to the field,
   not only in a top summary; the keyboard type and error copy must match the
   expected input (don't demand a number in a text keyboard).
-- **Search inputs get a clear affordance.** `type="search"` or the framework's
-  `allowClear` — never both stacked.
+- **Search inputs get a clear affordance.** `type="search"` on the shadcn
+  `Input` gives the native browser clear button — never stack a second custom
+  clear control on top of it.
 
 **Checklist**
 

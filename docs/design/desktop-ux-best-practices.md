@@ -3,7 +3,7 @@
 A reference-grade guide for the desktop web surface of PM / kanban /
 collaboration SaaS: how a wide, freely-resizable, keyboard-and-mouse
 viewport should behave. It is a **general reference with actionable
-checklists**, not an audit — Pulse (React 19 + Ant Design + Emotion)
+checklists**, not an audit — Pulse (React 19 + Tailwind CSS + shadcn/ui)
 appears only as clearly marked `Example (Pulse)` callouts.
 
 This is the desktop half of a two-doc system. Its principles sibling is
@@ -684,12 +684,12 @@ and this section only summarizes it. The rule: any surface that addresses a
 **single resource**, could be shared by URL, makes sense to open in a new
 tab, or hosts its own scroll/keyboard/forms is **routed** (it owns a URL, the
 page stays mounted, back closes it). A **Dialog / confirm** — an ephemeral,
-non-deep-linkable yes/no interaction (delete, discard edits) — stays an AntD
-`Modal.confirm`. If any of the first four decision-matrix questions is "yes,"
-route it; never re-derive the reasons here.
+non-deep-linkable yes/no interaction (delete, discard edits) — stays a shadcn
+`Dialog` (Radix) confirmation. If any of the first four decision-matrix questions
+is "yes," route it; never re-derive the reasons here.
 
 - [ ] Single-resource, shareable, new-tab-able, or form-hosting surfaces are routed, not modal.
-- [ ] Ephemeral yes/no interactions use `Modal.confirm`, not a routed surface.
+- [ ] Ephemeral yes/no interactions use a shadcn `Dialog` confirmation, not a routed surface.
 - [ ] The decision was checked against the policy's matrix, not guessed.
 
 ### 9.2 Drawer & dialog mechanics
