@@ -25,10 +25,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
  *   - `clearAiLedger()` — drops every entry.
  */
 export type AiLedgerSurface =
-    | "task-assist"
-    | "task-draft"
-    | "mutation-proposal"
-    | (string & {});
+    "task-assist" | "task-draft" | "mutation-proposal" | (string & {});
 
 export interface AiLedgerEntryState {
     id: string;

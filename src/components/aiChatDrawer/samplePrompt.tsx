@@ -19,7 +19,7 @@ interface SamplePromptProps {
  * keyboard users expect. `checked` paints the selected (primary) fill.
  */
 const SamplePrompt = forwardRef<HTMLSpanElement, SamplePromptProps>(
-    function SamplePrompt(
+    function SamplePromptImpl(
         {
             children,
             checked,

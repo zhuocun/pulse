@@ -540,11 +540,9 @@ function FormItem({
         const child = children as React.ReactElement<InjectableProps>;
         const childProps = child.props;
         const originalTrigger = childProps[trigger] as
-            | ((...args: unknown[]) => void)
-            | undefined;
+            ((...args: unknown[]) => void) | undefined;
         const originalBlur = childProps.onBlur as
-            | ((event: React.FocusEvent) => void)
-            | undefined;
+            ((event: React.FocusEvent) => void) | undefined;
         const injected: InjectableProps = {
             id: controlId,
             [valuePropName]: state.values[name] ?? "",

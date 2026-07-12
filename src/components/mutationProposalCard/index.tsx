@@ -151,12 +151,7 @@ const buildRows = (proposal: MutationProposal): DiffRow[] => {
  * the caller substitutes `microcopy.actions.apply` in that case.
  */
 type ProposalApplyKind =
-    | "create"
-    | "update"
-    | "delete"
-    | "move"
-    | "reassign"
-    | "renameColumn";
+    "create" | "update" | "delete" | "move" | "reassign" | "renameColumn";
 
 const inferApplyKind = (
     proposal: MutationProposal

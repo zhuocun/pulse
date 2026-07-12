@@ -36,11 +36,7 @@ export interface ShortcutToken {
 export type ShortcutSegment = readonly ShortcutToken[];
 
 export type ShortcutScope =
-    | "global"
-    | "projectPage"
-    | "board"
-    | "taskCard"
-    | "overlay";
+    "global" | "projectPage" | "board" | "taskCard" | "overlay";
 
 export interface ShortcutEntry {
     /** Stable id; also the key into `microcopy.shortcuts.descriptions`. */

@@ -130,8 +130,7 @@ export interface SwipeDecisionInput {
 }
 
 export type SwipeDecision =
-    | { kind: "commit"; action: "leading" | "trailing" }
-    | { kind: "snap-back" };
+    { kind: "commit"; action: "leading" | "trailing" } | { kind: "snap-back" };
 
 /**
  * Pure swipe-release resolver. Decides whether a release at the given

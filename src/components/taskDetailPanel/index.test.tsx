@@ -9,7 +9,12 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
-import { Outlet, RouterProvider, createMemoryRouter } from "react-router-dom";
+import {
+    Outlet,
+    RouterProvider,
+    createBrowserRouter,
+    createMemoryRouter
+} from "react-router-dom";
 
 import { microcopy } from "../../constants/microcopy";
 import { store } from "../../store";
@@ -160,6 +165,59 @@ const installCoarsePointerMock = () => {
     });
 };
 
+const installReducedMotionCoarsePointerMock = () => {
+    Object.defineProperty(window, "matchMedia", {
+        writable: true,
+        value: (query: string) => ({
+            addEventListener: jest.fn(),
+            addListener: jest.fn(),
+            dispatchEvent: jest.fn(),
+            matches:
+                query === "(pointer: coarse)" ||
+                query === "(prefers-reduced-motion: reduce)" ||
+                query.includes("max-width: 767px"),
+            media: query,
+            onchange: null,
+            removeEventListener: jest.fn(),
+            removeListener: jest.fn()
+        })
+    });
+};
+
+const installViewTransitionSpy = () => {
+    const original = Object.getOwnPropertyDescriptor(
+        document,
+        "startViewTransition"
+    );
+    const spy = jest.fn((update: () => void | Promise<void>) => {
+        const updateCallbackDone = Promise.resolve().then(update);
+        return {
+            finished: updateCallbackDone,
+            ready: Promise.resolve(),
+            skipTransition: jest.fn(),
+            updateCallbackDone
+        };
+    });
+    Object.defineProperty(document, "startViewTransition", {
+        configurable: true,
+        value: spy
+    });
+    return {
+        restore: () => {
+            if (original) {
+                Object.defineProperty(
+                    document,
+                    "startViewTransition",
+                    original
+                );
+            } else {
+                Reflect.deleteProperty(document, "startViewTransition");
+            }
+        },
+        spy
+    };
+};
+
 /*
  * Desktop-lg viewport mock for the Phase 3 A2 docked rail. The panel's
  * `isDesktopRail` predicate is `!isPhone && screens.lg`, so we need:
@@ -278,6 +336,51 @@ const renderPanelAt = (path: string, options: RenderOptions = {}) => {
     };
 };
 
+const renderPanelInBrowserRouter = () => {
+    window.history.replaceState(
+        null,
+        "",
+        "/projects/project-1/board/task/task-1"
+    );
+    const queryClient = seedQueryClient([task()]);
+    const router = createBrowserRouter(
+        [
+            {
+                path: "/projects/:projectId/board",
+                element: (
+                    <div>
+                        <div data-testid="board-mock">Kanban board</div>
+                        <Outlet />
+                    </div>
+                ),
+                children: [
+                    {
+                        path: "task/:taskId",
+                        element: (
+                            <TaskDetailPanel
+                                boardAiOn={false}
+                                projectId="project-1"
+                                taskId="task-1"
+                            />
+                        )
+                    }
+                ]
+            }
+        ],
+        { window }
+    );
+    return {
+        router,
+        ...render(
+            <Provider store={store}>
+                <QueryClientProvider client={queryClient}>
+                    <RouterProvider router={router} />
+                </QueryClientProvider>
+            </Provider>
+        )
+    };
+};
+
 describe("TaskDetailPanel", () => {
     const fetchMock = jest.spyOn(global, "fetch");
 
@@ -362,6 +465,85 @@ describe("TaskDetailPanel", () => {
         expect(document.querySelector(".ant-drawer-bottom")).toBeNull();
         // Restore default mock for subsequent tests.
         installAntdBrowserMocks();
+    });
+
+    it("closes to the board without a View Transition under reduced motion and restores opener focus", async () => {
+        installReducedMotionCoarsePointerMock();
+        const viewTransition = installViewTransitionSpy();
+        const opener = document.createElement("button");
+        opener.textContent = "Open task";
+        document.body.append(opener);
+        opener.focus();
+        let rendered: ReturnType<typeof renderPanelInBrowserRouter> | undefined;
+        try {
+            rendered = renderPanelInBrowserRouter();
+            const navigateSpy = jest.spyOn(rendered.router, "navigate");
+            await screen.findByText(/edit task · build task/i);
+            viewTransition.spy.mockClear();
+
+            fireEvent.click(
+                screen.getByRole("button", {
+                    name: microcopy.actions.cancel as string
+                })
+            );
+
+            await waitFor(() => {
+                expect(rendered?.router.state.location.pathname).toBe(
+                    "/projects/project-1/board"
+                );
+                expect(
+                    screen.queryByTestId("task-detail-panel")
+                ).not.toBeInTheDocument();
+                expect(opener).toHaveFocus();
+            });
+            expect(navigateSpy).toHaveBeenCalledWith(
+                "/projects/project-1/board",
+                expect.objectContaining({ viewTransition: false })
+            );
+            expect(viewTransition.spy).not.toHaveBeenCalled();
+        } finally {
+            rendered?.unmount();
+            rendered?.router.dispose();
+            opener.remove();
+            viewTransition.restore();
+            window.history.replaceState(null, "", "/");
+            installAntdBrowserMocks();
+        }
+    });
+
+    it("retains the View Transition option when normal motion is enabled", async () => {
+        installAntdBrowserMocks();
+        const viewTransition = installViewTransitionSpy();
+        let rendered: ReturnType<typeof renderPanelInBrowserRouter> | undefined;
+        try {
+            rendered = renderPanelInBrowserRouter();
+            const navigateSpy = jest.spyOn(rendered.router, "navigate");
+            await screen.findByText(/edit task · build task/i);
+            viewTransition.spy.mockClear();
+
+            fireEvent.click(
+                screen.getByRole("button", {
+                    name: microcopy.actions.cancel as string
+                })
+            );
+
+            await waitFor(() =>
+                expect(rendered?.router.state.location.pathname).toBe(
+                    "/projects/project-1/board"
+                )
+            );
+            expect(navigateSpy).toHaveBeenCalledWith(
+                "/projects/project-1/board",
+                expect.objectContaining({ viewTransition: true })
+            );
+            expect(viewTransition.spy).toHaveBeenCalledTimes(1);
+        } finally {
+            rendered?.unmount();
+            rendered?.router.dispose();
+            viewTransition.restore();
+            window.history.replaceState(null, "", "/");
+            installAntdBrowserMocks();
+        }
     });
 
     it("submits a changed task via the same PUT mutation as TaskModal", async () => {

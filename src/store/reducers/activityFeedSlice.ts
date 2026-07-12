@@ -29,11 +29,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 export type ActivityEventKind = "task" | "column" | "project" | "ai";
 export type ActivityEventAction =
-    | "create"
-    | "update"
-    | "delete"
-    | "move"
-    | "rename";
+    "create" | "update" | "delete" | "move" | "rename";
 
 export interface ActivityEventState {
     id: string;
