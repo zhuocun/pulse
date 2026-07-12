@@ -155,7 +155,7 @@ const TASK_CONTAINER_CLASS = cn(
  */
 const TASK_ROW_DRAG_SHELL_CLASS = cn(
     "w-full",
-    "[&_.task-card-lift-surface]:transition-[border-color,box-shadow,transform] [&_.task-card-lift-surface]:duration-[120ms] [&_.task-card-lift-surface]:ease-out",
+    "[&_.task-card-lift-surface]:transition-[border-color,box-shadow,transform] [&_.task-card-lift-surface]:duration-short [&_.task-card-lift-surface]:ease-out",
     "motion-safe:data-[optimistic=true]:animate-in motion-safe:data-[optimistic=true]:fade-in motion-safe:data-[optimistic=true]:slide-in-from-top-2",
     "data-[dragging=true]:[&_.task-card-lift-surface]:shadow-[0_6px_16px_rgba(15,23,42,0.12),0_0_0_1px_rgba(15,23,42,0.06)]",
     "motion-safe:data-[dragging=true]:[&_.task-card-lift-surface]:scale-[1.02]"
@@ -776,7 +776,7 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
                 }
                 className={cn(
                     "block w-full rounded-md border border-border bg-card text-left text-card-foreground",
-                    "shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-[border-color,box-shadow,transform] duration-[120ms] ease-out",
+                    "shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-[border-color,box-shadow,transform] duration-short ease-out",
                     "[padding:var(--density-card-padding-y,12px)_var(--density-card-padding-x,16px)]",
                     "hover:enabled:-translate-y-px hover:enabled:border-[color:var(--glass-border-strong)] hover:enabled:shadow-md",
                     "focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",

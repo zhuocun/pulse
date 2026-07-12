@@ -242,7 +242,7 @@ const SettingsPage = () => {
                             <span>{microcopy.settings.colorTheme}</span>
                             <ChevronRight
                                 aria-hidden
-                                className="size-4 text-[color:var(--pulse-text-secondary)] transition-transform duration-[150ms] ease-[ease] group-open:rotate-90"
+                                className="size-4 text-[color:var(--pulse-text-secondary)] transition-transform duration-short ease-standard group-open:rotate-90"
                             />
                         </summary>
                         <div className="pb-sm">{colorThemeControl}</div>
