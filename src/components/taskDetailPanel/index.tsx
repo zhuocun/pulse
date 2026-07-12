@@ -483,9 +483,9 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         // outside the app. Going to the board URL works both for
         // freshly-loaded sessions and within-app opens.
         navigate(`/projects/${projectId}/board`, {
-            viewTransition: !reducedMotion
+            viewTransition: !reducedMotion && !isPhone
         });
-    }, [form, navigate, projectId, reducedMotion]);
+    }, [form, isPhone, navigate, projectId, reducedMotion]);
 
     /*
      * Dirty-state guard via React Router 7's `useBlocker`. Returns

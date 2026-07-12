@@ -165,17 +165,14 @@ const installCoarsePointerMock = () => {
     });
 };
 
-const installReducedMotionCoarsePointerMock = () => {
+const installReducedMotionMock = () => {
     Object.defineProperty(window, "matchMedia", {
         writable: true,
         value: (query: string) => ({
             addEventListener: jest.fn(),
             addListener: jest.fn(),
             dispatchEvent: jest.fn(),
-            matches:
-                query === "(pointer: coarse)" ||
-                query === "(prefers-reduced-motion: reduce)" ||
-                query.includes("max-width: 767px"),
+            matches: query === "(prefers-reduced-motion: reduce)",
             media: query,
             onchange: null,
             removeEventListener: jest.fn(),
@@ -467,8 +464,8 @@ describe("TaskDetailPanel", () => {
         installAntdBrowserMocks();
     });
 
-    it("closes to the board without a View Transition under reduced motion and restores opener focus", async () => {
-        installReducedMotionCoarsePointerMock();
+    it("closes a normal-motion phone without a View Transition, removes the panel, and restores opener focus", async () => {
+        installCoarsePointerMock();
         const viewTransition = installViewTransitionSpy();
         const opener = document.createElement("button");
         opener.textContent = "Open task";
@@ -511,7 +508,42 @@ describe("TaskDetailPanel", () => {
         }
     });
 
-    it("retains the View Transition option when normal motion is enabled", async () => {
+    it("closes without a View Transition under reduced motion", async () => {
+        installReducedMotionMock();
+        const viewTransition = installViewTransitionSpy();
+        let rendered: ReturnType<typeof renderPanelInBrowserRouter> | undefined;
+        try {
+            rendered = renderPanelInBrowserRouter();
+            const navigateSpy = jest.spyOn(rendered.router, "navigate");
+            await screen.findByText(/edit task · build task/i);
+            viewTransition.spy.mockClear();
+
+            fireEvent.click(
+                screen.getByRole("button", {
+                    name: microcopy.actions.cancel as string
+                })
+            );
+
+            await waitFor(() =>
+                expect(rendered?.router.state.location.pathname).toBe(
+                    "/projects/project-1/board"
+                )
+            );
+            expect(navigateSpy).toHaveBeenCalledWith(
+                "/projects/project-1/board",
+                expect.objectContaining({ viewTransition: false })
+            );
+            expect(viewTransition.spy).not.toHaveBeenCalled();
+        } finally {
+            rendered?.unmount();
+            rendered?.router.dispose();
+            viewTransition.restore();
+            window.history.replaceState(null, "", "/");
+            installAntdBrowserMocks();
+        }
+    });
+
+    it("retains the View Transition option on a normal-motion non-phone", async () => {
         installAntdBrowserMocks();
         const viewTransition = installViewTransitionSpy();
         let rendered: ReturnType<typeof renderPanelInBrowserRouter> | undefined;
