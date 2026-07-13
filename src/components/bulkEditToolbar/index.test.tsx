@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
+import { ABOVE_BOTTOM_TAB_BAR } from "../ui/toast";
 import {
     resetApiRateLimitForTests,
     resetInFlightApiCallsForTests
@@ -10,8 +11,30 @@ import {
 import useBulkSelection, {
     BulkSelectionProvider
 } from "../../utils/hooks/useBulkSelection";
+import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 
 import BulkEditToolbar from ".";
+
+jest.mock("../../utils/hooks/useIsPhoneChrome");
+
+jest.mock("../../constants/env", () => ({
+    __esModule: true,
+    default: {
+        apiBaseUrl: "/api/v1",
+        aiBaseUrl: "",
+        aiEnabled: false,
+        aiUseLocalEngine: true,
+        bottomNavEnabled: true
+    }
+}));
+
+const mockedUseIsPhoneChrome = useIsPhoneChrome as jest.MockedFunction<
+    typeof useIsPhoneChrome
+>;
+
+const envMod = jest.requireMock("../../constants/env") as {
+    default: { bottomNavEnabled: boolean };
+};
 
 const PROJECT_ID = "p1";
 const TASK_KEY = ["tasks", { projectId: PROJECT_ID }];
@@ -114,10 +137,50 @@ describe("BulkEditToolbar", () => {
         fetchMock.mockReset();
         resetApiRateLimitForTests();
         resetInFlightApiCallsForTests();
+        mockedUseIsPhoneChrome.mockReturnValue(false);
+        envMod.default.bottomNavEnabled = true;
     });
 
     afterAll(() => {
         fetchMock.mockRestore();
+    });
+
+    it("clears the phone bottom tab bar and paints above it", () => {
+        mockedUseIsPhoneChrome.mockReturnValue(true);
+        envMod.default.bottomNavEnabled = true;
+
+        renderToolbar(makeClient());
+        fireEvent.click(screen.getByText("select-two"));
+
+        const toolbar = screen.getByTestId("bulk-edit-toolbar");
+        // jsdom's CSSOM mangles nested `max(..., calc(...))` commas when the
+        // value is assigned to `style.bottom`, so read the React style prop
+        // (same string the component passes) rather than the computed CSSOM.
+        const reactPropsKey = Object.keys(toolbar).find((key) =>
+            key.startsWith("__reactProps$")
+        );
+        expect(reactPropsKey).toBeDefined();
+        const reactProps = (
+            toolbar as unknown as Record<
+                string,
+                { style: { bottom: string } }
+            >
+        )[reactPropsKey as string];
+        expect(reactProps.style.bottom).toBe(ABOVE_BOTTOM_TAB_BAR);
+        expect(toolbar.className).toContain("z-20");
+    });
+
+    it("uses the legacy safe-area bottom when bottom nav is off", () => {
+        mockedUseIsPhoneChrome.mockReturnValue(true);
+        envMod.default.bottomNavEnabled = false;
+
+        renderToolbar(makeClient());
+        fireEvent.click(screen.getByText("select-two"));
+
+        const toolbar = screen.getByTestId("bulk-edit-toolbar");
+        expect(toolbar.style.bottom).toBe(
+            "max(16px, env(safe-area-inset-bottom))"
+        );
     });
 
     it("stays hidden until at least one task is selected", () => {
