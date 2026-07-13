@@ -14,7 +14,9 @@ describe("labelTagProps", () => {
     it("derives light-dark fill, border, and ink for hex labels", () => {
         const { style } = labelTagProps("#2f54eb");
         expect(style?.color).toContain("light-dark(#2f54eb");
-        expect(style?.color).toContain("color-mix(in srgb, #2f54eb 55%, white)");
+        expect(style?.color).toContain(
+            "color-mix(in srgb, #2f54eb 55%, white)"
+        );
         expect(style?.backgroundColor).toContain("light-dark(");
         expect(style?.backgroundColor).toContain(
             "color-mix(in srgb, #2f54eb 18%, transparent)"

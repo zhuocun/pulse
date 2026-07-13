@@ -161,10 +161,7 @@ describe("BulkEditToolbar", () => {
         );
         expect(reactPropsKey).toBeDefined();
         const reactProps = (
-            toolbar as unknown as Record<
-                string,
-                { style: { bottom: string } }
-            >
+            toolbar as unknown as Record<string, { style: { bottom: string } }>
         )[reactPropsKey as string];
         expect(reactProps.style.bottom).toBe(ABOVE_BOTTOM_TAB_BAR);
         expect(toolbar.className).toContain("z-20");

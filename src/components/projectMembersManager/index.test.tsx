@@ -352,9 +352,7 @@ describe("ProjectMembersManager", () => {
         const trigger = within(rowFor("user-unknown")).getByTestId(
             "member-role-select"
         );
-        expect(trigger).toHaveTextContent(
-            microcopy.members.addRolePlaceholder
-        );
+        expect(trigger).toHaveTextContent(microcopy.members.addRolePlaceholder);
         expect(
             within(rowFor("user-unknown")).queryByText("coordinator")
         ).not.toBeInTheDocument();
