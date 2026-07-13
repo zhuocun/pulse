@@ -88,12 +88,13 @@ const CopilotAboutPopover: React.FC = () => {
             }
             const {
                 rate_limit: rate,
-                allowed_autonomy: levels,
+                allowed_autonomy: rawLevels,
                 recursion_limit: recursionLimit,
                 tags,
                 context_schema: contextSchema,
                 monthly_token_budget_cap: budgetCap
             } = chatMeta.data;
+            const levels = Array.isArray(rawLevels) ? rawLevels : [];
             const budgetLine =
                 typeof budgetCap === "number" &&
                 Number.isFinite(budgetCap) &&

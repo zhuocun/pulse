@@ -270,13 +270,11 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
     const surfaceVisible = dockOpen && (tabActive ?? true);
     const remoteAiConsentGranted = useRemoteAiConsent(environment.aiBaseUrl);
     const chatMeta = useChatAgentMetadata(remoteAiConsentGranted);
-    const allowedAutonomy = useMemo(
-        () =>
-            chatMeta.status === "ready"
-                ? chatMeta.data.allowed_autonomy
-                : undefined,
-        [chatMeta]
-    );
+    const allowedAutonomy = useMemo(() => {
+        if (chatMeta.status !== "ready") return undefined;
+        const raw = chatMeta.data.allowed_autonomy;
+        return Array.isArray(raw) ? raw : undefined;
+    }, [chatMeta]);
     const autonomySelectorOptions = useMemo(() => {
         const base: Array<{
             value: AutonomyLevel;
@@ -292,10 +290,8 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
             }
         ];
         const visible =
-            chatMeta.status === "ready"
-                ? base.filter((o) =>
-                      chatMeta.data.allowed_autonomy.includes(o.value)
-                  )
+            allowedAutonomy && allowedAutonomy.length > 0
+                ? base.filter((o) => allowedAutonomy.includes(o.value))
                 : base;
         return visible.map((o) => {
             if (o.value !== "auto") {
@@ -306,7 +302,7 @@ const ChatTabBodyInner: React.FC<ChatTabBodyProps> = ({
                 disabled: true
             };
         });
-    }, [chatMeta]);
+    }, [allowedAutonomy]);
     const { level: autonomyLevel, setLevel: setAutonomyLevel } =
         useAutonomyLevel(allowedAutonomy);
     const remoteHealthEnabled =
