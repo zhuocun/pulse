@@ -21,6 +21,12 @@ describe("initialsOf", () => {
         expect(initialsOf("john quincy adams")).toBe("JA");
     });
 
+    it("skips punctuation / parenthetical tokens so monograms stay alphabetic", () => {
+        expect(initialsOf("Mobile native polish (Q2)")).toBe("MP");
+        expect(initialsOf("Apps (beta)")).toBe("A");
+        expect(initialsOf("Roadmap — Phase 2")).toBe("RP");
+    });
+
     it("trims surrounding whitespace before splitting", () => {
         expect(initialsOf("   Carla   Diaz  ")).toBe("CD");
     });

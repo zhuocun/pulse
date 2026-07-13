@@ -23,14 +23,22 @@ export const gradientFor = (id: string): string => {
 
 /**
  * Initials from a username. Picks the first letter of the first and last
- * whitespace-separated parts (e.g. "Alice Smith" → "AS"). Falls back to
- * the first character of the input or a literal `?` for empty strings.
+ * whitespace-separated parts that start with a letter (e.g. "Alice Smith" →
+ * "AS", "Mobile native polish (Q2)" → "MP"). Skips punctuation /
+ * parenthetical tokens so monograms stay alphabetic. Falls back to the
+ * first character of the input or a literal `?` for empty strings.
  */
 export const initialsOf = (name: string | undefined | null): string => {
     if (!name) return "?";
-    const parts = name.trim().split(/\s+/);
-    const head = parts[0]?.[0] ?? "";
-    const tail = parts.length > 1 ? parts[parts.length - 1][0] : "";
+    const parts = name
+        .trim()
+        .split(/\s+/)
+        .filter((part) => /^\p{L}/u.test(part));
+    if (parts.length === 0) {
+        return name.trim()[0]?.toUpperCase() || "?";
+    }
+    const head = parts[0][0] ?? "";
+    const tail = parts.length > 1 ? (parts[parts.length - 1][0] ?? "") : "";
     return (head + tail).toUpperCase() || name[0].toUpperCase();
 };
 

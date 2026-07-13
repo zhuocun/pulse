@@ -27,14 +27,22 @@ const buttonVariants = cva(
     {
         variants: {
             variant: {
-                primary:
+                primary: cn(
                     "bg-primary text-primary-foreground hover:bg-primary/90",
-                default:
+                    "forced-colors:border forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText]"
+                ),
+                default: cn(
                     "bg-secondary text-secondary-foreground border border-input hover:bg-muted",
-                destructive:
+                    "forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText]"
+                ),
+                destructive: cn(
                     "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-                outline:
+                    "forced-colors:border forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText]"
+                ),
+                outline: cn(
                     "border border-input bg-background hover:bg-muted hover:text-foreground",
+                    "forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText]"
+                ),
                 ghost: "hover:bg-muted hover:text-foreground",
                 link: "text-primary underline-offset-4 hover:underline"
             },

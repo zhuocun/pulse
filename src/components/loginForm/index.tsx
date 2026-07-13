@@ -236,7 +236,7 @@ const LoginForm: React.FC<{
             </Form.Item>
             <div className="mb-md text-right">
                 <Link
-                    className="text-sm text-primary underline-offset-4 hover:underline coarse:inline-flex coarse:min-h-[44px] coarse:items-center"
+                    className="text-sm [color:var(--pulse-link)] underline-offset-4 hover:underline coarse:inline-flex coarse:min-h-[44px] coarse:items-center"
                     to="/auth/forgot-password"
                 >
                     {microcopy.auth.forgotPassword}

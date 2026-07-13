@@ -52,6 +52,18 @@ describe("Button", () => {
         expect(button).toHaveClass("coarse:min-w-[44px]");
     });
 
+    it("keeps visible chrome under forced-colors for primary and default", () => {
+        const { rerender } = render(<Button variant="primary">Log in</Button>);
+        const primary = screen.getByRole("button", { name: "Log in" });
+        expect(primary.className).toMatch(/forced-colors:border-\[ButtonText\]/);
+        expect(primary.className).toMatch(/forced-colors:bg-\[ButtonFace\]/);
+
+        rerender(<Button variant="default">Cancel</Button>);
+        const secondary = screen.getByRole("button", { name: "Cancel" });
+        expect(secondary.className).toMatch(/forced-colors:border-\[ButtonText\]/);
+        expect(secondary.className).toMatch(/forced-colors:bg-\[ButtonFace\]/);
+    });
+
     it("has no axe violations across variants", async () => {
         const { container } = render(
             <div>
