@@ -101,6 +101,22 @@ describe("ProjectDetailPage", () => {
         expect(screen.getByText("Board outlet")).toBeInTheDocument();
     });
 
+    it("omits the section leaf crumb when child-nav already shows the section", () => {
+        renderDetail("/projects/project-1/members");
+
+        const crumb = screen.getByTestId("project-breadcrumb");
+        expect(
+            within(crumb).getByRole("link", { name: "Atlas" })
+        ).toHaveAttribute("href", "/projects/project-1");
+        expect(within(crumb).queryByText("Members")).toBeNull();
+        expect(
+            within(screen.getByTestId("project-detail-child-nav")).getByRole(
+                "link",
+                { name: "Members" }
+            )
+        ).toHaveAttribute("aria-current", "page");
+    });
+
     it("no longer renders a Tabs row inside the project detail chrome", () => {
         renderDetail("/projects/project-1/board");
 

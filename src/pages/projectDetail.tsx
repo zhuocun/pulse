@@ -169,25 +169,20 @@ const ProjectDetailPage = () => {
     const isNotFound = pSuccess && !project;
 
     /*
-     * Detect the active child route from the URL so the breadcrumb
-     * can append a third crumb for sibling surfaces. Board is the
-     * project's index destination — keeping "Projects > Atlas" as
-     * the full crumb there avoids redundant chrome. Reports (and
-     * any future non-board surface) gets its own leaf crumb so the
-     * user can see exactly where they are.
+     * Detect the active child route from the URL. Board is the project's
+     * index destination — breadcrumb stays "Projects > Atlas". Section
+     * routes (members / milestones / labels / reports) reuse the same
+     * two-crumb trail with the project name linking back to the board;
+     * the in-page child-nav already marks the active section, so a third
+     * leaf crumb would duplicate that label beside the tabs.
      */
     const segments = pathname.split("/").filter(Boolean);
     const activeChild = segments[segments.length - 1];
-    const childCrumbTitle =
-        activeChild === "reports"
-            ? microcopy.breadcrumb.reports
-            : activeChild === "members"
-              ? microcopy.labels.members
-              : activeChild === "milestones"
-                ? microcopy.labels.milestones
-                : activeChild === "labels"
-                  ? microcopy.labels.labels
-                  : null;
+    const onSectionRoute =
+        activeChild === "reports" ||
+        activeChild === "members" ||
+        activeChild === "milestones" ||
+        activeChild === "labels";
 
     /*
      * Browser tab title mirrors the current project. Leaf child
@@ -203,11 +198,7 @@ const ProjectDetailPage = () => {
      * Reports route skips so its own `useTitle("Reports · {project}")`
      * commits last and sticks.
      */
-    const shellOwnsTitle =
-        activeChild !== "reports" &&
-        activeChild !== "members" &&
-        activeChild !== "milestones" &&
-        activeChild !== "labels";
+    const shellOwnsTitle = !onSectionRoute;
     const shellTitle = project?.projectName ?? microcopy.labels.project;
     useEffect(() => {
         if (!shellOwnsTitle) return;
@@ -241,13 +232,11 @@ const ProjectDetailPage = () => {
         </Link>,
         pLoading && !project ? (
             <Skeleton key="project" style={{ height: 16, width: 160 }} />
-        ) : childCrumbTitle ? (
+        ) : onSectionRoute ? (
             /*
-             * When a child route is active, the project name becomes a
-             * link back to the project root (which declaratively
-             * redirects to /board) so the user can navigate up from
-             * Reports back to the board via the breadcrumb. The leaf
-             * crumb carries `aria-current="page"`.
+             * Section routes: project name links back to the project root
+             * (declaratively redirects to /board). Child-nav owns the
+             * active-section affordance — no leaf crumb here.
              */
             <Link key="project" to={`/projects/${projectId}`} viewTransition>
                 <span>{project?.projectName ?? microcopy.labels.project}</span>
@@ -256,14 +245,7 @@ const ProjectDetailPage = () => {
             <span key="project" aria-current="page">
                 {project?.projectName ?? microcopy.labels.project}
             </span>
-        ),
-        ...(childCrumbTitle
-            ? [
-                  <span key="child" aria-current="page">
-                      {childCrumbTitle}
-                  </span>
-              ]
-            : [])
+        )
     ];
 
     return (
@@ -285,10 +267,9 @@ const ProjectDetailPage = () => {
                                 const position =
                                     index === 0
                                         ? "root"
-                                        : childCrumbTitle &&
-                                            index === crumbs.length - 1
-                                          ? "current"
-                                          : "middle";
+                                        : onSectionRoute
+                                          ? "middle"
+                                          : "current";
                                 return (
                                     <li key={index} data-breadcrumb={position}>
                                         {index > 0 ? (

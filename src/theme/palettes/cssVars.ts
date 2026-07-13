@@ -238,8 +238,14 @@ html[data-color-scheme="light"] {
     --color-copilot-grad-end: ${p.aurora.light};
     --color-copilot-bg-subtle: rgba(${p.accent.rgb}, 0.04);
     --color-copilot-bg-medium: rgba(${p.accent.rgb}, 0.14);
-    --color-copilot-badge: ${p.brand.primary};
-    --color-copilot-badge-bg: rgba(${p.accent.rgb}, 0.12);
+    /*
+     * Badge ink uses primaryHover (AA normal-text on white / pale wash),
+     * not primary — primary on the 10% accent wash sits ~3:1 and fails
+     * the Remote AI / engine pill. Keep the wash light so the chip stays
+     * a tint, not a solid brand fill.
+     */
+    --color-copilot-badge: ${p.brand.primaryHover};
+    --color-copilot-badge-bg: rgba(${p.accent.rgb}, 0.10);
     --color-copilot-pulse: rgba(${p.accent.rgb}, 0.45);
 
     --glass-surface: rgba(255, 255, 255, 0.68);

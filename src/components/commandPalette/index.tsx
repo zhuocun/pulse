@@ -106,10 +106,15 @@ interface PaletteEntry {
 
 /**
  * Results list. `50dvh` cap keeps the list from jumping when the iOS
- * Safari URL bar collapses.
+ * Safari URL bar collapses. Bottom padding + thin scrollbar so the last
+ * row isn't flush-clipped against the modal edge with no scroll cue.
  */
-const LIST_CONTAINER_CLASS =
-    "m-0 max-h-[50dvh] list-none overflow-y-auto overscroll-contain p-0";
+const LIST_CONTAINER_CLASS = cn(
+    "m-0 max-h-[50dvh] list-none overflow-y-auto overscroll-contain p-0 pb-sm",
+    "[scrollbar-width:thin] [scrollbar-color:var(--pulse-fill-secondary)_transparent]",
+    "[&::-webkit-scrollbar]:w-[8px]",
+    "[&::-webkit-scrollbar-thumb]:rounded-pill [&::-webkit-scrollbar-thumb]:bg-[var(--pulse-fill-secondary)]"
+);
 
 const KIND_GROUP_CLASS = cn(
     "mb-xxs mt-xs px-sm text-xs font-semibold",

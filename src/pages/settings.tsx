@@ -183,6 +183,12 @@ const SettingsPage = () => {
         />
     );
 
+    /*
+     * Icon-only control: the row already labels the action on the left
+     * (phone chassis uses a single full-row activator). Repeating the
+     * same "Log out" + exit icon on the right read as a duplicate.
+     * `aria-label` keeps the control name for assistive tech.
+     */
     const logoutControl = (
         <Button
             aria-label={microcopy.actions.logOut}
@@ -190,10 +196,10 @@ const SettingsPage = () => {
             onClick={() => {
                 logout();
             }}
+            size="icon"
             variant="ghost"
         >
             <LogOut aria-hidden />
-            {microcopy.actions.logOut}
         </Button>
     );
 

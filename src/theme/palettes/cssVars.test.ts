@@ -202,6 +202,23 @@ describe("paletteToCss", () => {
         );
     });
 
+    it("light --color-copilot-badge uses primaryHover for AA on the badge wash", () => {
+        const css = paletteToCss(orangePalette);
+        expect(lightBlockOf(css)).toContain(
+            `--color-copilot-badge: ${orangePalette.brand.primaryHover};`
+        );
+        expect(lightBlockOf(css)).toContain(
+            `--color-copilot-badge-bg: rgba(${orangePalette.accent.rgb}, 0.10);`
+        );
+    });
+
+    it("dark --color-copilot-badge keeps primaryDark for AA on dark fills", () => {
+        const css = paletteToCss(orangePalette);
+        expect(darkBlockOf(css)).toContain(
+            `--color-copilot-badge: ${orangePalette.brand.primaryDark};`
+        );
+    });
+
     it("dark gradient start swaps to brand.primaryDark (AA on dark)", () => {
         const css = paletteToCss(orangePalette);
         const dark = darkBlockOf(css);
