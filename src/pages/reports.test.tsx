@@ -80,14 +80,11 @@ describe("ReportsPage", () => {
         );
     });
 
-    it("renders the breadcrumb crumb 'Projects > Project Name > Reports'", () => {
+    it("renders Projects > Project Name breadcrumb without a Reports leaf", () => {
         renderReportsRoute();
 
-        // The breadcrumb lives in the project detail shell — assert
-        // all three crumbs are present and the Reports crumb carries
-        // `aria-current="page"`. The middle (project) crumb becomes
-        // a link back to the project root once a child route is
-        // active so users can navigate up via the breadcrumb.
+        // B12: section leaf crumb removed — child-nav owns "Reports".
+        // Breadcrumb is Projects link + project middle crumb only.
         const crumb = screen.getByTestId("project-breadcrumb");
         expect(crumb).toBeTruthy();
         const region = within(crumb);
@@ -98,8 +95,13 @@ describe("ReportsPage", () => {
             "href",
             "/projects/project-1"
         );
-        const reportsCrumb = region.getByText(microcopy.breadcrumb.reports);
-        expect(reportsCrumb).toHaveAttribute("aria-current", "page");
+        expect(region.queryByText(microcopy.breadcrumb.reports)).toBeNull();
+        expect(
+            within(screen.getByTestId("project-detail-child-nav")).getByRole(
+                "link",
+                { name: microcopy.labels.reports }
+            )
+        ).toHaveAttribute("aria-current", "page");
     });
 
     it("highlights the Reports entry in the project detail nav with aria-current=page", () => {
