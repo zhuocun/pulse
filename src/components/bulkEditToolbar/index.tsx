@@ -2,9 +2,7 @@ import { X } from "lucide-react";
 import React from "react";
 import { useParams } from "react-router-dom";
 
-import useAppMessage, {
-    ABOVE_BOTTOM_TAB_BAR
-} from "../../components/ui/toast";
+import useAppMessage, { ABOVE_BOTTOM_TAB_BAR } from "../../components/ui/toast";
 import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { shadow } from "../../theme/tokens";

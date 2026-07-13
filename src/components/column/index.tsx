@@ -608,6 +608,12 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
         // Shared normalizer keeps the card's Task/Bug coercion in
         // lockstep with the task modal's select + title tag.
         const isBug = normalizeTaskType(task.type) === "Bug";
+        // Epic chips use the same hex wash path as project labels so dark
+        // mode lifts ink via `light-dark()` (hardcoded Tailwind hex/10
+        // washes stay ~1.7:1 on near-black cards).
+        const epicTagStyle = task.epic
+            ? labelTagProps(isBug ? "#DB2777" : "#2f54eb").style
+            : undefined;
         // Resolve the task's label ids to the project's label objects (name
         // + colour). Unknown ids (a label deleted since the task was tagged)
         // are dropped rather than rendered as a blank chip.
@@ -805,12 +811,8 @@ const TaskCard = React.forwardRef<HTMLButtonElement, TaskCardProps>(
             >
                 {task.epic ? (
                     <Badge
-                        className={cn(
-                            "mb-xs max-w-full whitespace-normal border-transparent px-xs text-xs font-medium [word-break:break-word]",
-                            isBug
-                                ? "bg-[#DB2777]/10 text-[#DB2777]"
-                                : "bg-[#2f54eb]/10 text-[#2f54eb]"
-                        )}
+                        className="mb-xs max-w-full whitespace-normal border-transparent bg-transparent px-xs text-xs font-medium text-foreground [word-break:break-word]"
+                        style={epicTagStyle}
                     >
                         {task.epic}
                     </Badge>

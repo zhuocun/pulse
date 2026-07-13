@@ -12,6 +12,7 @@ import { BulkSelectionProvider } from "../../utils/hooks/useBulkSelection";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import useTaskModal from "../../utils/hooks/useTaskModal";
 import useTaskPanelNavigation from "../../utils/hooks/useTaskPanelNavigation";
+import * as labelTagColor from "../../utils/labelTagColor";
 import { TaskSearchParam } from "../taskSearchPanel";
 import { declaresTouchTarget } from "../ui/testHelpers";
 
@@ -1421,6 +1422,33 @@ describe("Column", () => {
 
             expect(screen.getByText("Backend")).toBeInTheDocument();
             expect(screen.getByText("Urgent")).toBeInTheDocument();
+        });
+
+        it("paints epic chips via labelTagProps (dark-aware hex washes)", () => {
+            // jsdom drops unsupported `light-dark()` from the style attribute;
+            // pin the wiring by spying the shared util instead.
+            const spy = jest.spyOn(labelTagColor, "labelTagProps");
+            renderColumn({
+                tasks: [task({ epic: "Sign-up flow", type: "Task" })]
+            });
+            expect(spy).toHaveBeenCalledWith("#2f54eb");
+            const epicChip = screen.getByText("Sign-up flow");
+            expect(epicChip.className).toContain("bg-transparent");
+            expect(epicChip.className).not.toContain("bg-[#2f54eb]");
+            expect(epicChip.className).not.toContain("text-[#2f54eb]");
+            spy.mockRestore();
+        });
+
+        it("paints bug epic chips with the magenta seed through labelTagProps", () => {
+            const spy = jest.spyOn(labelTagColor, "labelTagProps");
+            renderColumn({
+                tasks: [task({ epic: "Backend", type: "Bug" })]
+            });
+            expect(spy).toHaveBeenCalledWith("#DB2777");
+            expect(screen.getByText("Backend").className).not.toContain(
+                "bg-[#DB2777]"
+            );
+            spy.mockRestore();
         });
 
         it("drops unknown label ids instead of rendering a blank chip", () => {

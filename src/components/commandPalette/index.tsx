@@ -105,16 +105,20 @@ interface PaletteEntry {
 /* -- Surface class recipes --------------------------------------------- */
 
 /**
- * Results list. `50dvh` cap keeps the list from jumping when the iOS
- * Safari URL bar collapses. Bottom padding + thin scrollbar so the last
- * row isn't flush-clipped against the modal edge with no scroll cue.
+ * Results list. Cap sits under 50dvh so dialog chrome + `RESULTS_REGION`
+ * bottom inset stay visible at default scrollTop (padding *inside* the
+ * scrollport only helps after scroll-end and looks flush-clipped).
+ * Thin scrollbar remains the scroll cue.
  */
 const LIST_CONTAINER_CLASS = cn(
-    "m-0 max-h-[50dvh] list-none overflow-y-auto overscroll-contain p-0 pb-sm",
+    "m-0 max-h-[42dvh] list-none overflow-y-auto overscroll-contain p-0",
     "[scrollbar-width:thin] [scrollbar-color:var(--pulse-fill-secondary)_transparent]",
     "[&::-webkit-scrollbar]:w-[8px]",
     "[&::-webkit-scrollbar-thumb]:rounded-pill [&::-webkit-scrollbar-thumb]:bg-[var(--pulse-fill-secondary)]"
 );
+
+/** Structural pad under the scrollport — visible gap vs dialog chrome. */
+const RESULTS_REGION_CLASS = "relative pb-md";
 
 const KIND_GROUP_CLASS = cn(
     "mb-xxs mt-xs px-sm text-xs font-semibold",
@@ -637,7 +641,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
     );
 
     const renderResults = () => (
-        <>
+        <div className={RESULTS_REGION_CLASS}>
             <SrOnlyLive id={announcerId}>
                 {aiMode
                     ? microcopy.a11y.boardCopilotModeAnnouncement
@@ -772,7 +776,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose }) => {
                     ))}
                 </ul>
             )}
-        </>
+        </div>
     );
 
     const titleNode = (
