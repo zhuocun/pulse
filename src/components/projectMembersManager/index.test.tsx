@@ -336,6 +336,28 @@ describe("ProjectMembersManager", () => {
         ).toBeInTheDocument();
     });
 
+    it("shows a role placeholder when a member's role is not a known ProjectRole", () => {
+        setRoster({
+            data: [
+                ...roster,
+                {
+                    _id: "user-unknown",
+                    username: "uma",
+                    email: "u@x.io",
+                    role: "coordinator"
+                }
+            ]
+        });
+        renderManager();
+        const trigger = within(rowFor("user-unknown")).getByTestId(
+            "member-role-select"
+        );
+        expect(trigger).toHaveTextContent(microcopy.members.addRolePlaceholder);
+        expect(
+            within(rowFor("user-unknown")).queryByText("coordinator")
+        ).not.toBeInTheDocument();
+    });
+
     it("only offers directory users who aren't already on the roster", async () => {
         const menuUser = userEvent.setup();
         renderManager();

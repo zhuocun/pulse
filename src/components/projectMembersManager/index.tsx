@@ -394,7 +394,12 @@ const ProjectMembersManager: React.FC<ProjectMembersManagerProps> = ({
                                                     className="w-32"
                                                     data-testid="member-role-select"
                                                 >
-                                                    <SelectValue />
+                                                    <SelectValue
+                                                        placeholder={microcopyString(
+                                                            microcopy.members
+                                                                .addRolePlaceholder
+                                                        )}
+                                                    />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {roleOptions.map(

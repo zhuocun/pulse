@@ -19,8 +19,8 @@ export const aiTokens = {
     gradEnd: `var(--color-copilot-grad-end, ${palette.aurora.light})`,
     bgSubtle: `var(--color-copilot-bg-subtle, rgba(${palette.accent.rgb}, 0.04))`,
     bgMedium: `var(--color-copilot-bg-medium, rgba(${palette.accent.rgb}, 0.14))`,
-    badge: `var(--color-copilot-badge, ${palette.brand.primary})`,
-    badgeBg: `var(--color-copilot-badge-bg, rgba(${palette.accent.rgb}, 0.12))`,
+    badge: `var(--color-copilot-badge, ${palette.brand.primaryHover})`,
+    badgeBg: `var(--color-copilot-badge-bg, rgba(${palette.accent.rgb}, 0.10))`,
     pulse: `var(--color-copilot-pulse, rgba(${palette.accent.rgb}, 0.45))`
 } as const;
 

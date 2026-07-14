@@ -134,6 +134,11 @@ describe("CommandPalette", () => {
         expect(combo).toBeInTheDocument();
         const list = screen.getByRole("listbox");
         expect(list).toBeInTheDocument();
+        // Structural inset: shorter scrollport + pad under the list region
+        // so the last visible row isn't flush to dialog chrome.
+        expect(list.className).toContain("max-h-[42dvh]");
+        expect(list.className).not.toContain("pb-sm");
+        expect(list.parentElement?.className).toContain("pb-md");
         // Project names surface both as the project entry's label and as
         // its section entries' sublabels.
         expect(screen.getAllByText("Roadmap").length).toBeGreaterThan(0);

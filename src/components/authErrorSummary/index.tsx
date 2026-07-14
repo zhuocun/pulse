@@ -82,7 +82,7 @@ const AuthErrorSummaryBody = ({
                 {fieldErrors.map(({ meta, message }) => (
                     <li className="my-xxs" key={meta.name}>
                         <a
-                            className="text-primary underline-offset-4 hover:underline"
+                            className="[color:var(--pulse-link)] underline-offset-4 hover:underline"
                             href={`#${meta.id}`}
                             onClick={(event) => {
                                 event.preventDefault();

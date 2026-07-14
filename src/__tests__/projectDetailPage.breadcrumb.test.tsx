@@ -78,7 +78,7 @@ describe("ProjectDetailPage breadcrumb", () => {
         );
     });
 
-    it("lets only the long project crumb shrink while preserving the current leaf", () => {
+    it("lets only the long project crumb shrink", () => {
         mockProjectName =
             "International enterprise platform reliability and compliance roadmap";
         renderAt("/projects/project-1/members");
@@ -94,7 +94,16 @@ describe("ProjectDetailPage breadcrumb", () => {
         const middle = breadcrumb.querySelector('[data-breadcrumb="middle"]');
         const current = breadcrumb.querySelector('[data-breadcrumb="current"]');
         expect(middle).toHaveTextContent(mockProjectName);
-        expect(current).toHaveTextContent("Members");
-        expect(current).toHaveTextContent(/^\/Members$/);
+        expect(
+            within(breadcrumb).getByRole("link", { name: mockProjectName })
+        ).toHaveAttribute("href", "/projects/project-1");
+        expect(current).toBeNull();
+        expect(within(breadcrumb).queryByText("Members")).toBeNull();
+        expect(
+            within(screen.getByTestId("project-detail-child-nav")).getByRole(
+                "link",
+                { name: "Members" }
+            )
+        ).toHaveAttribute("aria-current", "page");
     });
 });

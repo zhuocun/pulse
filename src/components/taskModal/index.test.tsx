@@ -919,11 +919,13 @@ describe("TaskModal", () => {
         expect(saveIdx).toBeGreaterThan(cancelIdx);
     });
 
-    it("renders the bottom Sheet (medium detent) with Cancel + Save in the footer and Delete in the overflow menu on phone chrome", async () => {
+    it("renders the bottom Sheet (large detent) with Cancel + Save in the footer and Delete in the overflow menu on phone chrome", async () => {
         // Phone migration (ResponsiveFormSheet). With coarse-pointer chrome
         // the editor renders the animated bottom Sheet instead of the
-        // Modal. Delete moves to the title-row overflow menu so the
-        // footer stays Cancel → Save in the thumb zone.
+        // Modal. Opens at large so the flex-none footer (Save/Cancel) is
+        // in the exposed viewport — medium leaves it below the fold.
+        // Delete moves to the title-row overflow menu so the footer stays
+        // Cancel → Save in the thumb zone.
         mockedUseIsPhoneChrome.mockReturnValue(true);
         let resolvePut: (value: Response) => void = () => undefined;
         fetchMock.mockImplementation(
@@ -936,7 +938,7 @@ describe("TaskModal", () => {
 
         const surface = await screen.findByTestId("task-modal-surface");
         expect(surface).toHaveAttribute("role", "dialog");
-        expect(surface).toHaveAttribute("data-detent", "medium");
+        expect(surface).toHaveAttribute("data-detent", "large");
         expect(screen.getByTestId("task-modal-body")).toBeInTheDocument();
         expect(
             within(surface).getByDisplayValue("Build task")

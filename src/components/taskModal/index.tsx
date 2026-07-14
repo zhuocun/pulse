@@ -1257,6 +1257,7 @@ const TaskModal: React.FC<{
             {confirmNode}
             <ResponsiveFormSheet
                 centered
+                defaultDetent="large"
                 forceRender
                 footer={footerNode}
                 onClose={requestClose}

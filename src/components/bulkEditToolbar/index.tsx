@@ -2,10 +2,12 @@ import { X } from "lucide-react";
 import React from "react";
 import { useParams } from "react-router-dom";
 
+import useAppMessage, { ABOVE_BOTTOM_TAB_BAR } from "../../components/ui/toast";
+import environment from "../../constants/env";
 import { microcopy } from "../../constants/microcopy";
 import { shadow } from "../../theme/tokens";
-import useAppMessage from "../../components/ui/toast";
 import useBulkSelection from "../../utils/hooks/useBulkSelection";
+import useIsPhoneChrome from "../../utils/hooks/useIsPhoneChrome";
 import useReactMutation from "../../utils/hooks/useReactMutation";
 import bulkUpdateTasksCallback from "../../utils/optimisticUpdate/bulkUpdateTasks";
 import { Button } from "../ui/button";
@@ -38,8 +40,9 @@ import {
  * path deliberately can't make.
  *
  * The bar is `position: fixed` bottom-centre (the Gmail / Linear idiom) so
- * it never shifts the board layout; it sits below overlays (`zIndex.navBar`)
- * so an open modal/drawer still covers it.
+ * it never shifts the board layout. On phone chrome it clears the floating
+ * tab bar (same offset as mobile toasts) and paints above it (`z-20`); it
+ * still sits below modal/drawer overlays so an open sheet covers it.
  */
 const PRIORITY_VALUES: TaskPriorityLevel[] = [
     "none",
@@ -61,6 +64,8 @@ const BulkEditToolbar: React.FC<BulkEditToolbarProps> = ({
     const { projectId } = useParams<{ projectId: string }>();
     const message = useAppMessage();
     const { selectedIds, count, clear } = useBulkSelection();
+    const isPhoneChrome = useIsPhoneChrome();
+    const clearBottomNav = environment.bottomNavEnabled && isPhoneChrome;
 
     const [priority, setPriority] = React.useState<
         TaskPriorityLevel | undefined
@@ -148,11 +153,13 @@ const BulkEditToolbar: React.FC<BulkEditToolbarProps> = ({
         <TooltipProvider>
             <div
                 aria-label={microcopy.bulkEdit.toolbarAriaLabel}
-                className="fixed left-1/2 z-[15] flex max-w-[calc(100vw-48px)] -translate-x-1/2 flex-wrap items-center justify-center gap-sm rounded-full border border-border bg-popover px-md py-sm max-md:left-md max-md:right-md max-md:translate-x-0 max-md:rounded-lg"
+                className="fixed left-1/2 z-20 flex max-w-[calc(100vw-48px)] -translate-x-1/2 flex-wrap items-center justify-center gap-sm rounded-full border border-border bg-popover px-md py-sm max-md:left-md max-md:right-md max-md:translate-x-0 max-md:rounded-lg"
                 data-testid="bulk-edit-toolbar"
                 role="toolbar"
                 style={{
-                    bottom: "max(16px, env(safe-area-inset-bottom))",
+                    bottom: clearBottomNav
+                        ? ABOVE_BOTTOM_TAB_BAR
+                        : "max(16px, env(safe-area-inset-bottom))",
                     boxShadow: shadow.lift
                 }}
             >

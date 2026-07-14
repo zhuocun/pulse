@@ -5,7 +5,7 @@ exports[`CopilotChip matches the variant snapshot for every supported variant: v
   class="inline-flex items-center gap-xxs rounded-pill border font-semibold px-xs py-[1px] text-xs transition-colors motion-safe:transition-shadow motion-safe:hover:shadow-[0_0_0_3px_var(--color-copilot-pulse)]"
   data-copilot-chip-tone="purple"
   data-copilot-chip-variant="badge"
-  style="background-color: var(--color-copilot-badge-bg, rgba(234, 88, 12, 0.12)); border-color: var(--color-copilot-bg-medium, rgba(234, 88, 12, 0.14)); color: var(--color-copilot-badge, #EA580C);"
+  style="background-color: var(--color-copilot-badge-bg, rgba(234, 88, 12, 0.10)); border-color: var(--color-copilot-bg-medium, rgba(234, 88, 12, 0.14)); color: var(--color-copilot-badge, #C2410C);"
 >
   label
 </span>
@@ -16,7 +16,7 @@ exports[`CopilotChip matches the variant snapshot for every supported variant: v
   class="inline-flex items-center gap-xxs rounded-pill border font-semibold px-xs py-[1px] text-xs transition-colors motion-safe:transition-shadow motion-safe:hover:shadow-[0_0_0_3px_var(--color-copilot-pulse)]"
   data-copilot-chip-tone="purple"
   data-copilot-chip-variant="citation"
-  style="background-color: var(--color-copilot-badge-bg, rgba(234, 88, 12, 0.12)); border-color: var(--color-copilot-bg-medium, rgba(234, 88, 12, 0.14)); color: var(--color-copilot-badge, #EA580C);"
+  style="background-color: var(--color-copilot-badge-bg, rgba(234, 88, 12, 0.10)); border-color: var(--color-copilot-bg-medium, rgba(234, 88, 12, 0.14)); color: var(--color-copilot-badge, #C2410C);"
 >
   label
 </span>
@@ -37,7 +37,7 @@ exports[`CopilotChip matches the variant snapshot for every supported variant: v
   class="inline-flex items-center gap-xxs rounded-pill border font-semibold px-xs py-[1px] text-xs transition-colors motion-safe:transition-shadow motion-safe:hover:shadow-[0_0_0_3px_var(--color-copilot-pulse)]"
   data-copilot-chip-tone="purple"
   data-copilot-chip-variant="engine"
-  style="background-color: var(--color-copilot-badge-bg, rgba(234, 88, 12, 0.12)); border-color: var(--color-copilot-bg-medium, rgba(234, 88, 12, 0.14)); color: var(--color-copilot-badge, #EA580C);"
+  style="background-color: var(--color-copilot-badge-bg, rgba(234, 88, 12, 0.10)); border-color: var(--color-copilot-bg-medium, rgba(234, 88, 12, 0.14)); color: var(--color-copilot-badge, #C2410C);"
 >
   label
 </span>
@@ -68,7 +68,7 @@ exports[`CopilotChip matches the variant snapshot for every supported variant: v
   class="inline-flex items-center gap-xxs rounded-pill border font-semibold px-xs py-[1px] text-xs transition-colors motion-safe:transition-shadow motion-safe:hover:shadow-[0_0_0_3px_var(--color-copilot-pulse)]"
   data-copilot-chip-tone="purple"
   data-copilot-chip-variant="suggested"
-  style="background-color: var(--color-copilot-badge-bg, rgba(234, 88, 12, 0.12)); border-color: var(--color-copilot-bg-medium, rgba(234, 88, 12, 0.14)); color: var(--color-copilot-badge, #EA580C);"
+  style="background-color: var(--color-copilot-badge-bg, rgba(234, 88, 12, 0.10)); border-color: var(--color-copilot-bg-medium, rgba(234, 88, 12, 0.14)); color: var(--color-copilot-badge, #C2410C);"
 >
   label
 </span>

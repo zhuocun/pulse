@@ -217,4 +217,31 @@ describe("CopilotAboutPopover", () => {
             ).toBeInTheDocument();
         });
     });
+
+    it("does not crash when allowed_autonomy is omitted from wire metadata", async () => {
+        jest.spyOn(
+            agentClient,
+            "getSessionCachedAgentMetadata"
+        ).mockResolvedValue({
+            name: "chat-agent",
+            version: "1.1.0",
+            description: "chat",
+            status: "active"
+        } as unknown as Awaited<
+            ReturnType<typeof agentClient.getSessionCachedAgentMetadata>
+        >);
+        setLocal(false);
+        setAiBaseUrl("https://agents.example");
+        render(<CopilotAboutPopover />);
+        fireEvent.click(
+            screen.getByRole("button", { name: "About Board Copilot" })
+        );
+        await waitFor(() => {
+            expect(
+                screen.getByText(
+                    "Server did not publish additional limit details."
+                )
+            ).toBeInTheDocument();
+        });
+    });
 });

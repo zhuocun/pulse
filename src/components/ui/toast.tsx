@@ -156,8 +156,12 @@ const useAppMessage = (): MessageApi => message;
 
 export type ToasterProps = React.ComponentProps<typeof SonnerToaster>;
 
+/** Tab-bar height (66px) + bar outset + 8px gap — shared phone chrome clearance. */
+export const ABOVE_BOTTOM_TAB_BAR =
+    "calc(66px + max(24px, calc(env(safe-area-inset-bottom) + 12px)) + 8px)";
+
 const MOBILE_TOAST_OFFSET = {
-    bottom: "calc(66px + max(24px, calc(env(safe-area-inset-bottom) + 12px)) + 8px)"
+    bottom: ABOVE_BOTTOM_TAB_BAR
 };
 
 /**

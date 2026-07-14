@@ -233,13 +233,17 @@ describe("SettingsPage", () => {
             logout
         });
         renderPage();
+        // Icon-only control keeps aria-label; row label supplies the visible copy.
         const logoutButtons = screen.getAllByRole("button", {
             name: microcopy.actions.logOut
         });
-        // There are two: the aria-labeled button and its inner span — click
-        // the first which is the host button.
         fireEvent.click(logoutButtons[0]!);
         expect(logout).toHaveBeenCalledTimes(1);
+        // Desktop control must not repeat the visible "Log out" label.
+        const row = screen.getByTestId("settings-row-logout");
+        expect(within(row).getAllByText(microcopy.actions.logOut)).toHaveLength(
+            1
+        );
     });
 });
 
