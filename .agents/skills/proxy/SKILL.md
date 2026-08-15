@@ -217,15 +217,15 @@ Spell out terms. Don't use arrow chains, hyphen-stacked compounds, or labels you
 made up mid-run. When you mention files, commits, flags, or other identifiers,
 give each one its own plain-language clause.
 
-Take the same order every time. The outcome, in one sentence on what happened
-or what was found. The task, in one or two bullets naming what the user asked
-for in their words rather than the chain's. The definition of done as a
+Take the same order every time. The task, in one or two bullets naming what
+the reader asked for in their words rather than the chain's. The outcome, in
+one sentence on what happened or what was found. The definition of done as a
 checklist — the one the orchestrator-consultant set before the work started,
-not one written afterwards to fit the result — with every ticked item naming
-the evidence that proves it, and every unticked item saying what is missing and
-why. What is next, and separately the one or two things you need from the
-reader, each explained as if new. Then any risk the checklist does not already
-carry.
+ticked as the final-gate reviewer left it rather than by your own assessment —
+with every ticked item naming the evidence that proves it, and every unticked
+item saying what is missing and why. What is next, and separately the one or
+two things you need from the reader, each explained as if new. Then any risk
+the checklist does not already carry.
 
 ## Self-check
 
@@ -247,6 +247,6 @@ Before declaring the task done, confirm:
   prescribed order, complete sentences, no chain-internal shorthand or labels
   (see **Final summary**).
 - [ ] The checklist in the report is the definition of done the
-  orchestrator-consultant set before the work started, not one written to fit
-  the result; every ticked item names its evidence, and every unticked item
-  says what is missing.
+  orchestrator-consultant set before the work started, ticked as the final-gate
+  reviewer left it; every ticked item names its evidence, and every unticked
+  item says what is missing.
