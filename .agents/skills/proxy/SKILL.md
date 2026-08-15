@@ -217,10 +217,12 @@ Spell out terms. Don't use arrow chains, hyphen-stacked compounds, or labels you
 made up mid-run. When you mention files, commits, flags, or other identifiers,
 give each one its own plain-language clause.
 
-Take one order every time. The outcome, in one sentence on what happened or
-what was found. The goal restated. What is finished. What is next, with the one
-or two things you need from the user, each explained as if new. Then any
-unresolved risk, skipped check, or known gap you are carrying.
+Take the same order every time. The outcome, in one sentence on what happened
+or what was found. The goal restated — what the user asked for, in their words
+rather than the chain's. What is finished, and what that rests on. What is
+next, and separately the one or two things you need from the user, each
+explained as if new. Then any unresolved risk, skipped check, or known gap you
+are carrying.
 
 ## Self-check
 
@@ -238,6 +240,6 @@ Before declaring the task done, confirm:
   instructed.
 - [ ] You relayed briefs, artifacts, and verdicts verbatim, and limited yourself
   to executing what the subagents directed.
-- [ ] The closing report follows the one order **Final summary** sets and
-  re-grounds a reader who saw none of the chain — complete sentences, no
-  chain-internal shorthand or labels.
+- [ ] The closing report re-grounds a reader who saw none of the chain — in the
+  prescribed order, complete sentences, no chain-internal shorthand or labels
+  (see **Final summary**).

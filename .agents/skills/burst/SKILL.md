@@ -127,7 +127,7 @@ When the run has gone on without the user watching — overnight, across many di
 
 In the summary itself, drop the working shorthand. Write complete sentences. Spell out terms. Don't use arrow chains, hyphen-stacked compounds, or labels you made up mid-run. When you mention files, commits, flags, or other identifiers, give each one its own plain-language clause.
 
-Take one order every time. The outcome, in one sentence on what happened or what was found. The goal restated. What is finished. What is next, with the one or two things you need from the user, each explained as if new. Then any unresolved risk, skipped check, or known gap you are carrying.
+Take the same order every time. The outcome, in one sentence on what happened or what was found. The goal restated — what the user asked for, in their words rather than the run's. What is finished, and what that rests on. What is next, and separately the one or two things you need from the user, each explained as if new. Then any unresolved risk, skipped check, or known gap you are carrying.
 
 ## Self-check
 
@@ -142,4 +142,4 @@ Before declaring a burst task done, confirm:
 - [ ] Orchestrator final gate ran — each subtask checked against its goal, cross-subtask conflicts reconciled, and the quality gates (typecheck, lint, tests, smoke) executed by the orchestrator, not deferred to the reviewer.
 - [ ] Judgment grounded in the source of truth — subagent output treated as reference to verify rather than fact to adopt, and the integrated result checked against the DoD from the sources themselves.
 - [ ] Any stretch of the run you know only through a summary, rather than the thread you actually ran, was rebuilt from ground truth before the next dispatch or acceptance (see **Stay grounded**).
-- [ ] Final summary reports milestones in the one order **Final summary** sets, surfaces unresolved risks / skipped checks / known gaps, notes any platform-cap config exceptions, and re-grounds a reader who saw none of the working thread — complete sentences, no run-internal shorthand.
+- [ ] Final summary reports milestones, surfaces unresolved risks / skipped checks / known gaps, notes any platform-cap config exceptions, and re-grounds a reader who saw none of the working thread — in the prescribed order, complete sentences, no run-internal shorthand (see **Final summary**).
