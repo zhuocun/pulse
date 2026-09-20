@@ -6,55 +6,55 @@ name: skills-drift
 # and weekly (catching canonical moving ahead of this repo).
 
 on:
-  pull_request:
-    paths:
-      - ".agents/skills/**"
-  schedule:
-    - cron: "23 6 * * 1"
-  workflow_dispatch:
+    pull_request:
+        paths:
+            - ".agents/skills/**"
+    schedule:
+        - cron: "23 6 * * 1"
+    workflow_dispatch:
 
 permissions:
-  contents: read
+    contents: read
 
 jobs:
-  drift:
-    name: drift
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    drift:
+        name: drift
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
 
-      - name: Check out canonical skills
-        uses: actions/checkout@v4
-        with:
-          repository: zhuocun/agent-skills
-          ref: main
-          path: .canonical
+            - name: Check out canonical skills
+              uses: actions/checkout@v4
+              with:
+                  repository: zhuocun/agent-skills
+                  ref: main
+                  path: .canonical
 
-      - name: Compare shared skills against canonical
-        run: |
-          status=0
-          shared=0
-          for dir in .agents/skills/*/; do
-            [ -d "$dir" ] || continue
-            name=$(basename "$dir")
-            canonical=".canonical/.agents/skills/$name"
-            if [ ! -d "$canonical" ]; then
-              echo "skip   $name — not in canonical"
-              continue
-            fi
-            shared=$((shared + 1))
-            if out=$(diff -r -q "$dir" "$canonical" 2>&1); then
-              echo "ok     $name"
-            else
-              echo "DRIFT  $name"
-              echo "$out" | sed 's/^/         /'
-              status=1
-            fi
-          done
-          echo "compared $shared shared skill(s) against zhuocun/agent-skills@main"
-          if [ "$status" -ne 0 ]; then
-            echo
-            echo "A skill here differs from canonical. Edit it in agent-skills and copy the"
-            echo "result back, rather than fixing it here — this repo is downstream."
-          fi
-          exit $status
+            - name: Compare shared skills against canonical
+              run: |
+                  status=0
+                  shared=0
+                  for dir in .agents/skills/*/; do
+                    [ -d "$dir" ] || continue
+                    name=$(basename "$dir")
+                    canonical=".canonical/.agents/skills/$name"
+                    if [ ! -d "$canonical" ]; then
+                      echo "skip   $name — not in canonical"
+                      continue
+                    fi
+                    shared=$((shared + 1))
+                    if out=$(diff -r -q "$dir" "$canonical" 2>&1); then
+                      echo "ok     $name"
+                    else
+                      echo "DRIFT  $name"
+                      echo "$out" | sed 's/^/         /'
+                      status=1
+                    fi
+                  done
+                  echo "compared $shared shared skill(s) against zhuocun/agent-skills@main"
+                  if [ "$status" -ne 0 ]; then
+                    echo
+                    echo "A skill here differs from canonical. Edit it in agent-skills and copy the"
+                    echo "result back, rather than fixing it here — this repo is downstream."
+                  fi
+                  exit $status
