@@ -4,7 +4,6 @@ on:
     push:
         branches:
             - main
-            - "claude/**"
         paths:
             - "backend/**"
             - ".github/workflows/backend-ci.yml"
