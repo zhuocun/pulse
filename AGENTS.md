@@ -75,6 +75,15 @@ concrete rule plus the canonical anchor that demonstrates it.
   never restate blockers in `README.md` or PR bodies — link to the
   entry. Orchestrator scratch (`.orchestrate/`), verifier logs, and
   dated status snapshots belong in `.gitignore`, not the repo.
+- **Skill files are deliberately outside CI** — `.agents/**` and
+  `.claude/**` are intentionally absent from the `paths:` filters in
+  `backend-ci.yml` and `frontend-ci.yml`, so editing a skill runs no
+  checks. This is correct, not an oversight: backend CI runs ruff and
+  pytest over Python, frontend CI lints `src` plus a fixed list of
+  configs and runs tsc/jest/build, and none of them reads a `SKILL.md`.
+  Adding the path would run both suites on a Markdown edit for zero
+  signal. Skills are canonical in the `agent-skills` repo; validation
+  belongs there, not here.
 - **Deprecation discipline** — A compat shim ships with a removal date.
   After sunset: delete on both sides. Don't preserve "for older
   clients" indefinitely.
