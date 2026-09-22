@@ -18,7 +18,6 @@ from app.agents.catalog.search import SearchAgent, SearchRanking, polish_search
 from app.agents.llm import make_stub_chat_model
 from tests.conftest import structured_model
 
-
 _DETERMINISTIC = {
     "ids": ["t-1", "t-2"],
     "rationale": "Deterministic Jaccard ranking.",

@@ -2,12 +2,13 @@ import asyncio
 import json
 import sys
 import textwrap
+from collections.abc import Iterable
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from http import HTTPStatus
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Iterable, Optional
+from typing import Any, ClassVar
 
 import pytest
 from fastapi.testclient import TestClient
@@ -22,8 +23,7 @@ from langgraph.store.memory import InMemoryStore
 from pydantic import BaseModel
 from typing_extensions import TypedDict
 
-from app import main
-from app import security
+from app import main, security
 from app.agents import (
     AgentAlreadyRegisteredError,
     AgentConfigurationError,
@@ -36,22 +36,28 @@ from app.agents import (
     AgentRuntime,
     AgentState,
     BaseAgent,
-    registry as global_registry,
 )
-from app.agents.context import ChatContext
 from app.agents import catalog as agent_catalog
 from app.agents import checkpointing as agent_checkpointing
+from app.agents import (
+    registry as global_registry,
+)
 from app.agents import stores as agent_stores
 from app.agents.checkpointing import (
     SUPPORTED_BACKENDS as SUPPORTED_CHECKPOINT_BACKENDS,
+)
+from app.agents.checkpointing import (
     PostgresCheckpointerSpec,
     _resolve_agent_postgres_uri,
     build_checkpointer,
     enter_agent_postgres_pool,
     open_checkpointer,
 )
+from app.agents.context import ChatContext
 from app.agents.stores import (
     SUPPORTED_BACKENDS as SUPPORTED_STORE_BACKENDS,
+)
+from app.agents.stores import (
     PostgresStoreSpec,
     build_store,
     open_store,
@@ -92,8 +98,8 @@ class EchoAgent(BaseAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         def bump(state: EchoState, runtime: Runtime[EchoContext]) -> dict[str, Any]:
             ctx = runtime.context or EchoContext()
@@ -119,8 +125,8 @@ class PlainContextAgent(EchoAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         def bump(state: EchoState, runtime: Runtime[dict[str, str]]) -> dict[str, Any]:
             ctx = runtime.context or {"suffix": "!"}
@@ -142,8 +148,8 @@ class ModelContextAgent(PlainContextAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         def bump(
             state: EchoState,
@@ -182,8 +188,8 @@ class LoopAgent(BaseAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         def step(state: LoopState) -> dict[str, Any]:
             return {"count": (state.get("count") or 0) + 1}
@@ -203,8 +209,8 @@ class BoomAgent(BaseAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         def explode(state: EchoState) -> dict[str, Any]:
             raise RuntimeError("kaboom")
@@ -222,8 +228,8 @@ class MissingMetadataAgent(BaseAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         raise NotImplementedError
 
@@ -742,7 +748,7 @@ class _FakeAsyncPostgresHandle:
         if isinstance(pool_or_conn_string, str):
             # Legacy from_conn_string path.
             self.conn_string = pool_or_conn_string
-            self.pool: Optional[_FakeAsyncConnectionPool] = None
+            self.pool: _FakeAsyncConnectionPool | None = None
         elif pool_or_conn_string is not None:
             # New pooled constructor path: argument is a _FakeAsyncConnectionPool.
             self.pool = pool_or_conn_string
@@ -1515,7 +1521,7 @@ def test_signed_thread_key_rejects_prefix_injection(
     ``_try_verify_signed_thread_key`` raises ``ValueError`` rather than
     silently re-scoping the thread.
     """
-    from app.agents.runtime import sign_thread_key, _try_verify_signed_thread_key
+    from app.agents.runtime import _try_verify_signed_thread_key, sign_thread_key
 
     # Create a valid token for "other-agent" and "other-user".
     token = sign_thread_key("other-agent", "other-user", "my-thread")
@@ -1592,7 +1598,7 @@ def test_try_verify_returns_none_for_non_signed_token() -> None:
 
 def test_try_verify_returns_none_for_malformed_base64() -> None:
     """_try_verify_signed_thread_key returns None for invalid base64 after prefix."""
-    from app.agents.runtime import _try_verify_signed_thread_key, _SIGNED_PREFIX
+    from app.agents.runtime import _SIGNED_PREFIX, _try_verify_signed_thread_key
 
     result = _try_verify_signed_thread_key(f"{_SIGNED_PREFIX}!!!not_base64!!!", "echo", "u1")
     assert result is None
@@ -1601,7 +1607,8 @@ def test_try_verify_returns_none_for_malformed_base64() -> None:
 def test_try_verify_returns_none_for_wrong_field_count() -> None:
     """_try_verify_signed_thread_key returns None when payload has wrong NUL field count."""
     import base64
-    from app.agents.runtime import _try_verify_signed_thread_key, _SIGNED_PREFIX, _SEP
+
+    from app.agents.runtime import _SEP, _SIGNED_PREFIX, _try_verify_signed_thread_key
 
     # Only 2 NUL-separated fields (need 4)
     payload = f"echo{_SEP}u1"
@@ -1618,7 +1625,8 @@ def test_try_verify_returns_none_on_invalid_hmac() -> None:
     digest does not match (e.g. because the signing key was rotated).
     """
     import base64
-    from app.agents.runtime import _try_verify_signed_thread_key, _SIGNED_PREFIX, _SEP
+
+    from app.agents.runtime import _SEP, _SIGNED_PREFIX, _try_verify_signed_thread_key
 
     # Build a payload with the right fields but a bogus digest.
     payload = f"echo{_SEP}u1{_SEP}my-thread{_SEP}0000000000000000000000000000000000000000000000000000000000000000"
@@ -1654,7 +1662,7 @@ def test_tampered_signed_thread_key_rejected(
     import base64
 
     from app.agents.errors import InvalidThreadKeyError
-    from app.agents.runtime import sign_thread_key, _SEP, _SIGNED_PREFIX
+    from app.agents.runtime import _SEP, _SIGNED_PREFIX, sign_thread_key
 
     fresh_registry.register(EchoAgent())
     runtime = AgentRuntime(registry=fresh_registry)
@@ -2250,8 +2258,8 @@ def test_arun_with_events_captures_custom_stream_events(
         def build(
             self,
             *,
-            checkpointer: Optional[BaseCheckpointSaver],
-            store: Optional[BaseStore],
+            checkpointer: BaseCheckpointSaver | None,
+            store: BaseStore | None,
         ) -> Pregel:
             def emit_node(
                 state: _CustomEventState,
@@ -2273,7 +2281,7 @@ def test_arun_with_events_captures_custom_stream_events(
     async def run() -> tuple[Any, list[Any]]:
         return await runtime.arun_with_events("custom-emitter", {})
 
-    final_state, events = asyncio.run(run())
+    _final_state, events = asyncio.run(run())
     # The custom payload must appear in events_out.
     custom_pings = [e for e in events if isinstance(e, dict) and e.get("kind") == "custom-ping"]
     assert custom_pings, f"expected custom-ping in events, got {events}"
@@ -2298,8 +2306,8 @@ def test_build_context_injects_autonomy_level(
         def build(
             self,
             *,
-            checkpointer: Optional[BaseCheckpointSaver],
-            store: Optional[BaseStore],
+            checkpointer: BaseCheckpointSaver | None,
+            store: BaseStore | None,
         ) -> Pregel:
             def record(state: _AutonomyState) -> dict[str, Any]:
                 rt = get_runtime(ChatContext)
@@ -2457,7 +2465,7 @@ def test_compiled_state_atomic_tuple() -> None:
 
     state = agent._compiled_state  # noqa: SLF001
     assert state is not None
-    compiled, cp, st = state
+    _compiled, cp, st = state
     assert cp is saver
     assert st is None  # no store passed
 
@@ -2480,8 +2488,8 @@ def test_arun_with_events_custom_suggestion_validation(
         def build(
             self,
             *,
-            checkpointer: Optional[BaseCheckpointSaver],
-            store: Optional[BaseStore],
+            checkpointer: BaseCheckpointSaver | None,
+            store: BaseStore | None,
         ) -> Pregel:
             def emit_node(
                 state: EchoState,
@@ -2524,8 +2532,8 @@ def test_arun_with_events_custom_mutation_proposal_validation(
         def build(
             self,
             *,
-            checkpointer: Optional[BaseCheckpointSaver],
-            store: Optional[BaseStore],
+            checkpointer: BaseCheckpointSaver | None,
+            store: BaseStore | None,
         ) -> Pregel:
             def emit_node(
                 state: EchoState,
@@ -2873,8 +2881,8 @@ class _InterruptingAgent(BaseAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         from langgraph.types import interrupt
 
@@ -3237,7 +3245,7 @@ def test_async_resolve_project_id_reads_sync_checkpoint_tuple() -> None:
     from app.routers.agents import _async_resolve_project_id_for_turn
 
     class _CheckpointTuple:
-        metadata = {"project_id": "p-from-sync-checkpoint"}
+        metadata: ClassVar[dict[str, str]] = {"project_id": "p-from-sync-checkpoint"}
 
     class _SyncOnlyCheckpointer:
         def get_tuple(self, _config: dict[str, Any]) -> _CheckpointTuple:
@@ -3254,7 +3262,7 @@ def test_async_resolve_project_id_reads_sync_checkpoint_tuple() -> None:
         ) -> dict[str, Any]:
             return {"configurable": {"thread_id": thread_id, "user_id": user_id}}
 
-    async def _run() -> Optional[str]:
+    async def _run() -> str | None:
         return await _async_resolve_project_id_for_turn(
             _StubRuntime(),  # type: ignore[arg-type]
             "echo",
@@ -3284,7 +3292,7 @@ def test_async_resolve_project_id_sync_checkpoint_without_get_tuple() -> None:
         ) -> dict[str, Any]:
             return {"configurable": {"thread_id": thread_id, "user_id": user_id}}
 
-    async def _run() -> Optional[str]:
+    async def _run() -> str | None:
         return await _async_resolve_project_id_for_turn(
             _StubRuntime(),  # type: ignore[arg-type]
             "echo",
@@ -3315,7 +3323,7 @@ def test_async_resolve_project_id_sync_checkpoint_lookup_failure() -> None:
         ) -> dict[str, Any]:
             return {"configurable": {"thread_id": thread_id, "user_id": user_id}}
 
-    async def _run() -> Optional[str]:
+    async def _run() -> str | None:
         return await _async_resolve_project_id_for_turn(
             _StubRuntime(),  # type: ignore[arg-type]
             "echo",
@@ -3346,7 +3354,7 @@ def test_async_resolve_project_id_sync_checkpoint_returns_none_tuple() -> None:
         ) -> dict[str, Any]:
             return {"configurable": {"thread_id": thread_id, "user_id": user_id}}
 
-    async def _run() -> Optional[str]:
+    async def _run() -> str | None:
         return await _async_resolve_project_id_for_turn(
             _StubRuntime(),  # type: ignore[arg-type]
             "echo",
@@ -3380,7 +3388,7 @@ def test_async_resolve_project_id_ignores_empty_checkpoint_metadata() -> None:
         ) -> dict[str, Any]:
             return {"configurable": {"thread_id": thread_id, "user_id": user_id}}
 
-    async def _run() -> Optional[str]:
+    async def _run() -> str | None:
         return await _async_resolve_project_id_for_turn(
             _StubRuntime(),  # type: ignore[arg-type]
             "echo",
@@ -3597,13 +3605,13 @@ class _CapturingAgent(BaseAgent):
     """Records the inputs the graph receives so tests can assert on redaction."""
 
     metadata = AgentMetadata(name="capturing")
-    captured: dict[str, Any] = {}
+    captured: ClassVar[dict[str, Any]] = {}
 
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         def record(state: _CapturingState) -> dict:
             type(self).captured = dict(state)
@@ -3856,8 +3864,8 @@ def test_arun_with_events_deduplicates_custom_event_already_in_state(
         def build(
             self,
             *,
-            checkpointer: Optional[BaseCheckpointSaver],
-            store: Optional[BaseStore],
+            checkpointer: BaseCheckpointSaver | None,
+            store: BaseStore | None,
         ) -> Pregel:
             def emit_node(
                 state: _DedupeState,
@@ -3908,8 +3916,8 @@ def test_aggregate_astream_tokens_covers_messages_loop(
         def build(
             self,
             *,
-            checkpointer: Optional[BaseCheckpointSaver],
-            store: Optional[BaseStore],
+            checkpointer: BaseCheckpointSaver | None,
+            store: BaseStore | None,
         ) -> Pregel:
             from langchain_core.messages import AIMessage
 

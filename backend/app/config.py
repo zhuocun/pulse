@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import Field, dataclass, field
 import os
 import secrets
+from collections.abc import Callable
+from dataclasses import Field, dataclass, field
 
 from dotenv import load_dotenv
-
 
 load_dotenv()
 
@@ -250,7 +249,7 @@ class Settings:
     agent_vector_dimensions: int = _env_int_field("AGENT_VECTOR_DIMENSIONS", "16")
     # ``project_id:model_id`` pairs; model ids must also appear in
     # ``AGENT_CHAT_MODEL_ALLOWLIST`` when that allowlist is non-empty.
-    agent_project_chat_model_map: dict[str, str] = _env_dict_field(
+    agent_project_chat_model_map: dict[str, str] = _env_dict_field(  # noqa: RUF009 -- helper returns field(default_factory=...)
         "AGENT_PROJECT_CHAT_MODEL_MAP",
         parse_project_chat_model_map,
     )

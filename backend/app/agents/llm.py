@@ -37,19 +37,20 @@ are responsible for adding ``cache_control`` markers where appropriate.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import importlib
 import itertools
 import json
 import logging
 import time
-from typing import Any, Optional
+from dataclasses import dataclass
+from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
 
-from app.config import Settings, settings as default_settings
+from app.config import Settings
+from app.config import settings as default_settings
 from app.deploy_env import (
     HOSTED_PLATFORM_ENV_MARKERS,
     detected_hosted_platform,
@@ -148,7 +149,7 @@ def _detect_provider(settings: Settings) -> str:
 
 
 def resolve_chat_model_spec(
-    settings: Optional[Settings] = None,
+    settings: Settings | None = None,
 ) -> ChatModelSpec:
     """Translate :class:`Settings` into a :class:`ChatModelSpec`.
 
@@ -192,13 +193,13 @@ def resolve_chat_model_spec(
     )
 
 
-def resolved_chat_model_id(settings: Optional[Settings] = None) -> str:
+def resolved_chat_model_id(settings: Settings | None = None) -> str:
     """Provider model id for logging / OTel (no network I/O)."""
 
     return resolve_chat_model_spec(settings).model
 
 
-def is_chat_model_allowed(model_id: str, settings: Optional[Settings] = None) -> bool:
+def is_chat_model_allowed(model_id: str, settings: Settings | None = None) -> bool:
     """Return ``True`` when ``model_id`` is in the configured allowlist.
 
     Used by router-level handlers that read the ``X-Pulse-Model`` request
@@ -216,7 +217,7 @@ def is_chat_model_allowed(model_id: str, settings: Optional[Settings] = None) ->
 def make_chat_model_for_id(
     model_id: str,
     *,
-    settings: Optional[Settings] = None,
+    settings: Settings | None = None,
 ) -> BaseChatModel:
     """Build a chat model for ``model_id`` using the configured provider.
 
@@ -259,9 +260,9 @@ def make_stub_chat_model(purpose: str = "stub") -> GenericFakeChatModel:
 
 
 def make_chat_model(
-    spec: Optional[ChatModelSpec] = None,
+    spec: ChatModelSpec | None = None,
     *,
-    settings: Optional[Settings] = None,
+    settings: Settings | None = None,
 ) -> BaseChatModel:
     """Build a :class:`BaseChatModel` for ``spec`` (or the resolved default).
 
@@ -350,7 +351,7 @@ def _failover_exception_types() -> tuple[type[BaseException], ...]:
 
 def _failover_secondary_spec(
     primary: ChatModelSpec, cfg: Settings
-) -> Optional[ChatModelSpec]:
+) -> ChatModelSpec | None:
     mode = (cfg.agent_chat_model_failover or "auto").strip().lower()
     if mode in {"", "none", "off", "false", "0"}:
         return None
@@ -476,9 +477,9 @@ def _is_production_like_env() -> bool:
 
 
 def assert_provider_available(
-    spec: Optional[ChatModelSpec] = None,
+    spec: ChatModelSpec | None = None,
     *,
-    settings: Optional[Settings] = None,
+    settings: Settings | None = None,
 ) -> None:
     """Fail fast at boot when the configured provider's package is missing.
 
@@ -703,7 +704,7 @@ _PROBE_CACHE_TTL_SECONDS = 30.0
 _probe_cache: dict[tuple[str, str, int], tuple[float, ProviderConnectivityResult]] = {}
 
 
-def _probe_cache_key(spec: "ChatModelSpec") -> tuple[str, str, int]:
+def _probe_cache_key(spec: ChatModelSpec) -> tuple[str, str, int]:
     """Stable cache key that does NOT leak the API key value.
 
     We hash the key with the built-in :func:`hash` (process-local
@@ -714,7 +715,7 @@ def _probe_cache_key(spec: "ChatModelSpec") -> tuple[str, str, int]:
     return (spec.provider, spec.base_url, hash(spec.api_key))
 
 
-def _cached_probe_result(spec: "ChatModelSpec") -> ProviderConnectivityResult | None:
+def _cached_probe_result(spec: ChatModelSpec) -> ProviderConnectivityResult | None:
     """Return a still-fresh cached result for ``spec``, else ``None``."""
 
     cached = _probe_cache.get(_probe_cache_key(spec))
@@ -727,7 +728,7 @@ def _cached_probe_result(spec: "ChatModelSpec") -> ProviderConnectivityResult | 
 
 
 def _store_probe_result(
-    spec: "ChatModelSpec", result: ProviderConnectivityResult
+    spec: ChatModelSpec, result: ProviderConnectivityResult
 ) -> None:
     _probe_cache[_probe_cache_key(spec)] = (time.monotonic(), result)
 
@@ -743,7 +744,7 @@ def _reset_probe_cache_for_tests() -> None:
 
 
 async def probe_provider_connectivity(
-    spec: Optional["ChatModelSpec"] = None,
+    spec: ChatModelSpec | None = None,
     *,
     timeout_seconds: float = 5.0,
 ) -> ProviderConnectivityResult:

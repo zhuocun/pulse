@@ -30,8 +30,8 @@ from typing import Any
 import pytest
 
 from app.eval import (
-    EvalFixture,
     RUBRICS,
+    EvalFixture,
     StubJudge,
     judge_output,
     load_fixtures,

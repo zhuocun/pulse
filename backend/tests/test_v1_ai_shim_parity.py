@@ -34,11 +34,9 @@ import pytest
 from fastapi.testclient import TestClient
 from pytest import FixtureRequest
 
-from app import main
-from app import security
+from app import main, security
 from app.security import create_token
 from tests.conftest import FakeStore, seed_agent_test_projects_if_absent
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

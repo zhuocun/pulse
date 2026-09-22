@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from app.database import COLUMNS, ORGANIZATIONS, PROJECTS, TASKS, USERS, now
 from app.repositories import repository
@@ -37,8 +37,8 @@ ROLE_RANK = {ROLE_GUEST: 0, ROLE_VIEWER: 1, ROLE_EDITOR: 2, ROLE_OWNER: 3}
 
 
 def _resolve_project(
-    project_id_or_doc: Union[str, Dict[str, Any], None],
-) -> Optional[Dict[str, Any]]:
+    project_id_or_doc: str | dict[str, Any] | None,
+) -> dict[str, Any] | None:
     """Accept either a project id or an already-fetched doc.
 
     Passing the doc through avoids a redundant lookup when the caller has
@@ -53,7 +53,7 @@ def _resolve_project(
     return repository.find_by_id(PROJECTS, str(project_id_or_doc))
 
 
-def _member_role(project: Dict[str, Any], user_id: Optional[str]) -> Optional[str]:
+def _member_role(project: dict[str, Any], user_id: str | None) -> str | None:
     """Role recorded for ``user_id`` in ``memberIds`` (None if not a member).
 
     ``memberIds`` is optional on read, so legacy manager-only documents
@@ -68,8 +68,8 @@ def _member_role(project: Dict[str, Any], user_id: Optional[str]) -> Optional[st
 
 
 def can_access(
-    project_id_or_doc: Union[str, Dict[str, Any], None],
-    user_id: Optional[str],
+    project_id_or_doc: str | dict[str, Any] | None,
+    user_id: str | None,
     min_role: str = ROLE_VIEWER,
 ) -> bool:
     """True if ``user_id`` holds at least ``min_role`` on the project.
@@ -106,7 +106,7 @@ def _viewer_org_ids(viewer_id: str) -> set[str]:
     }
 
 
-def _org_visible(project: Dict[str, Any], viewer_org_ids: set[str]) -> bool:
+def _org_visible(project: dict[str, Any], viewer_org_ids: set[str]) -> bool:
     org_id = project.get("organizationId")
     if org_id is None:
         return True   # null-org / legacy / personal project: visible to its
@@ -116,14 +116,14 @@ def _org_visible(project: Dict[str, Any], viewer_org_ids: set[str]) -> bool:
     return str(org_id) in viewer_org_ids
 
 
-def is_project_manager(project_id: Optional[str], user_id: Optional[str]) -> bool:
+def is_project_manager(project_id: str | None, user_id: str | None) -> bool:
     # Owner-level gate. Delegates to ``can_access`` but the manager check
     # inside it remains True even when ``memberIds`` is absent, so the
     # historical "managerId == user" behaviour is preserved exactly.
     return can_access(project_id, user_id, ROLE_OWNER)
 
 
-def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
+def create(data: dict[str, Any], user_id: str) -> str | None:
     # The body used to allow specifying ``managerId``; it had to equal
     # the caller for the request to succeed, so the field was attack
     # surface with no upside. We now derive the manager from the JWT
@@ -133,7 +133,7 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
     # to that tenant, when absent it stays a legacy / personal project
     # exactly as before. We are in a dual-write window, so the ``organization``
     # string above is still written unconditionally and must not break.
-    document: Dict[str, Any] = {
+    document: dict[str, Any] = {
         "projectName": data["projectName"],
         "organization": data["organization"],
         "managerId": user_id,
@@ -166,14 +166,14 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
 
 
 def get(
-    project_id: Optional[str],
-    project_name: Optional[str],
-    manager_id: Optional[str],
+    project_id: str | None,
+    project_name: str | None,
+    manager_id: str | None,
     *,
     viewer_id: str,
     include_archived: bool = False,
     include_trashed: bool = False,
-) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]], str]]:
+) -> dict[str, Any] | list[dict[str, Any]] | str | None:
     """Return projects visible to ``viewer_id`` (the authenticated caller).
 
     A project is visible when the caller owns it (``managerId``) or holds
@@ -230,7 +230,7 @@ def get(
     return repository.serialize_documents(projects)
 
 
-def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
+def update(data: dict[str, Any], user_id: str) -> str | None:
     project_id = data.get("_id")
     if not project_id:
         return "Bad request"
@@ -252,8 +252,8 @@ def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
 
 
 def remove(
-    project_id: Optional[str], user_id: str, purge: bool = False
-) -> Optional[str]:
+    project_id: str | None, user_id: str, purge: bool = False
+) -> str | None:
     # Project deletion is MANAGER-ONLY (the historical gate): only the
     # ``managerId`` may delete, restore, or archive -- not an editor member.
     if project_id is None:
@@ -282,7 +282,7 @@ def remove(
     return "Project deleted"
 
 
-def restore(project_id: Optional[str], user_id: str) -> Optional[str]:
+def restore(project_id: str | None, user_id: str) -> str | None:
     """Un-trash / un-archive a project (PRD §5.4/§5.5). MANAGER-ONLY.
 
     Clears BOTH ``deletedAt`` and ``archivedAt`` so a restore from trash
@@ -303,7 +303,7 @@ def restore(project_id: Optional[str], user_id: str) -> Optional[str]:
     return "Project restored"
 
 
-def archive(project_id: Optional[str], user_id: str, archived: Any) -> Optional[str]:
+def archive(project_id: str | None, user_id: str, archived: Any) -> str | None:
     """Archive / unarchive a project (PRD §5.4). MANAGER-ONLY.
 
     Stamps ``archivedAt`` (archive) or clears it (unarchive) based on the
@@ -340,10 +340,10 @@ def archive(project_id: Optional[str], user_id: str, archived: Any) -> Optional[
 # ---------------------------------------------------------------------------
 
 
-def _normalized_members(project: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _normalized_members(project: dict[str, Any]) -> list[dict[str, Any]]:
     """Copy of ``memberIds`` keeping only well-formed ``{userId, role}`` rows."""
 
-    members: List[Dict[str, Any]] = []
+    members: list[dict[str, Any]] = []
     for entry in project.get("memberIds") or []:
         if not isinstance(entry, dict):
             continue
@@ -356,11 +356,11 @@ def _normalized_members(project: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def add_member(
-    project_id: Optional[str],
+    project_id: str | None,
     actor_id: str,
-    target_user_id: Optional[str],
-    role: Optional[str],
-) -> Optional[str]:
+    target_user_id: str | None,
+    role: str | None,
+) -> str | None:
     project = repository.find_by_id(PROJECTS, project_id or "")
     if project is None:
         return "Project not found"
@@ -389,11 +389,11 @@ def add_member(
 
 
 def update_member_role(
-    project_id: Optional[str],
+    project_id: str | None,
     actor_id: str,
-    target_user_id: Optional[str],
-    role: Optional[str],
-) -> Optional[str]:
+    target_user_id: str | None,
+    role: str | None,
+) -> str | None:
     project = repository.find_by_id(PROJECTS, project_id or "")
     if project is None:
         return "Project not found"
@@ -418,10 +418,10 @@ def update_member_role(
 
 
 def remove_member(
-    project_id: Optional[str],
+    project_id: str | None,
     actor_id: str,
-    target_user_id: Optional[str],
-) -> Optional[str]:
+    target_user_id: str | None,
+) -> str | None:
     project = repository.find_by_id(PROJECTS, project_id or "")
     if project is None:
         return "Project not found"
@@ -445,9 +445,9 @@ def remove_member(
 
 
 def list_members(
-    project_id: Optional[str],
+    project_id: str | None,
     actor_id: str,
-) -> Optional[Union[List[Dict[str, Any]], str]]:
+) -> list[dict[str, Any]] | str | None:
     project = repository.find_by_id(PROJECTS, project_id or "")
     if project is None:
         return "Project not found"
@@ -455,7 +455,7 @@ def list_members(
     if not can_access(project, actor_id, ROLE_VIEWER):
         return "Forbidden"
 
-    members: List[Dict[str, Any]] = []
+    members: list[dict[str, Any]] = []
     for entry in _normalized_members(project):
         user = repository.find_by_id(USERS, entry["userId"])
         # Skip dangling references (a user deleted out from under the

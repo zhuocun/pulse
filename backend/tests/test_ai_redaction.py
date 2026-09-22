@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, ClassVar
 
 from langchain_core.messages import HumanMessage
 
 from app.agents.catalog.task_estimation import polish_rationale, polish_readiness
 from app.agents.llm import make_stub_chat_model
 from app.tools.redaction import redact, redact_task_fields
-
 
 # ---------------------------------------------------------------------------
 # Unit tests: redact_task_fields
@@ -207,7 +206,7 @@ def test_redact_inputs_consults_metadata_text_fields() -> None:
 
     class _RequestStub:
         class _State:
-            redaction_spans: list[Any] = []
+            redaction_spans: ClassVar[list[Any]] = []
 
         state = _State()
 
@@ -230,7 +229,7 @@ def test_redact_inputs_consults_metadata_dict_fields() -> None:
 
     class _RequestStub:
         class _State:
-            redaction_spans: list[Any] = []
+            redaction_spans: ClassVar[list[Any]] = []
 
         state = _State()
 
@@ -258,7 +257,7 @@ def test_redact_inputs_handles_tool_result_string_content() -> None:
 
     class _RequestStub:
         class _State:
-            redaction_spans: list[Any] = []
+            redaction_spans: ClassVar[list[Any]] = []
 
         state = _State()
 
@@ -290,7 +289,7 @@ def test_redact_inputs_recurses_into_nested_tool_result_blocks() -> None:
 
     class _RequestStub:
         class _State:
-            redaction_spans: list[Any] = []
+            redaction_spans: ClassVar[list[Any]] = []
 
         state = _State()
 
@@ -326,7 +325,7 @@ def test_redact_inputs_passes_through_unknown_block_shapes() -> None:
 
     class _RequestStub:
         class _State:
-            redaction_spans: list[Any] = []
+            redaction_spans: ClassVar[list[Any]] = []
 
         state = _State()
 
@@ -364,7 +363,7 @@ def test_redact_inputs_handles_list_content_blocks() -> None:
 
     class _RequestStub:
         class _State:
-            redaction_spans: list[Any] = []
+            redaction_spans: ClassVar[list[Any]] = []
 
         state = _State()
 

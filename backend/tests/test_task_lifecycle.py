@@ -18,7 +18,7 @@ we only assert presence vs ``None`` and visibility in/out of the default
 read.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -27,7 +27,7 @@ from app.services import task_service
 from tests.conftest import FakeStore
 
 
-def auth_headers(token: str) -> Dict[str, str]:
+def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -35,7 +35,7 @@ def register_and_login(
     client: TestClient,
     username: str,
     email: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Register + login a user; return the login body plus a bearer token."""
 
     response = client.post(
@@ -69,7 +69,7 @@ def create_project(client: TestClient, token: str, name: str = "Pulse") -> str:
     )
 
 
-def first_column(client: TestClient, token: str, project_id: str) -> Dict[str, Any]:
+def first_column(client: TestClient, token: str, project_id: str) -> dict[str, Any]:
     columns = client.get(
         f"/api/v1/boards/?projectId={project_id}", headers=auth_headers(token)
     ).json()
@@ -96,8 +96,8 @@ def make_task(
     project_id: str,
     column_id: str,
     **extra: Any,
-) -> Dict[str, Any]:
-    body: Dict[str, Any] = {
+) -> dict[str, Any]:
+    body: dict[str, Any] = {
         "projectId": project_id,
         "columnId": column_id,
         "coordinatorId": user_id,
@@ -137,17 +137,17 @@ def create_task(
 _STORE: FakeStore
 
 
-def store_tasks(project_id: str, _column_id: str = "") -> List[Dict[str, Any]]:
+def store_tasks(project_id: str, _column_id: str = "") -> list[dict[str, Any]]:
     return _STORE.find_many(TASKS, {"projectId": project_id})
 
 
-def stored_task(task_id: str) -> Dict[str, Any]:
+def stored_task(task_id: str) -> dict[str, Any]:
     task = _STORE.find_by_id(TASKS, task_id)
     assert task is not None
     return task
 
 
-def visible_ids(project_id: str, user_id: str, **flags: bool) -> List[str]:
+def visible_ids(project_id: str, user_id: str, **flags: bool) -> list[str]:
     """The ids ``task_service.get`` returns for ``project_id`` (default read
     unless ``include_trashed`` / ``include_archived`` flags widen it)."""
 
@@ -156,7 +156,7 @@ def visible_ids(project_id: str, user_id: str, **flags: bool) -> List[str]:
     return [task["_id"] for task in result]
 
 
-def bootstrap(client: TestClient, store: FakeStore) -> Dict[str, Any]:
+def bootstrap(client: TestClient, store: FakeStore) -> dict[str, Any]:
     """Owner + project + "To Do" column; wire the module store handle."""
 
     global _STORE

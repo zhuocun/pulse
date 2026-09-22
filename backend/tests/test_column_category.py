@@ -11,7 +11,7 @@ accepted on POST/PUT /boards, and the board read echoes a derived
 editor level, mirroring the WIP-limit suite.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -21,7 +21,7 @@ from app.tools.be_tools import _is_done_column
 from tests.conftest import FakeStore
 
 
-def auth_headers(token: str) -> Dict[str, str]:
+def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -29,7 +29,7 @@ def register_and_login(
     client: TestClient,
     username: str,
     email: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Register a user and return the login body plus a bearer token.
 
     The REST JWT rides an HttpOnly ``Token`` cookie; because every login
@@ -76,7 +76,7 @@ def board(client: TestClient, token: str, project_id: str) -> list:
 
 def column_by_name(
     client: TestClient, token: str, project_id: str, name: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     return next(
         column
         for column in board(client, token, project_id)
@@ -84,7 +84,7 @@ def column_by_name(
     )
 
 
-def first_column(client: TestClient, token: str, project_id: str) -> Dict[str, Any]:
+def first_column(client: TestClient, token: str, project_id: str) -> dict[str, Any]:
     return column_by_name(client, token, project_id, "To Do")
 
 

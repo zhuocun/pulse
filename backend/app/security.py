@@ -1,14 +1,13 @@
-from datetime import datetime, timedelta, timezone
-from hashlib import md5, pbkdf2_hmac
 import hmac
 import secrets
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime, timedelta
+from hashlib import md5, pbkdf2_hmac
+from typing import Any
 
 import jwt
 from fastapi import Cookie, Header, HTTPException, status
 
 from app.config import settings
-
 
 # Name of the HttpOnly REST session cookie issued by ``/auth/login``.
 # Same value the FE used for its prior JS-set cookie, so any historical
@@ -87,7 +86,7 @@ def jwt_secret() -> str:
 
 
 def create_token(user_id: str) -> str:
-    issued_at = datetime.now(timezone.utc)
+    issued_at = datetime.now(UTC)
     payload = {
         "sub": user_id,
         "iat": issued_at,
@@ -100,7 +99,7 @@ def create_token(user_id: str) -> str:
 def create_ai_proxy_token(user_id: str) -> str:
     """Short-lived JWT accepted only by AI/agent routes."""
 
-    issued_at = datetime.now(timezone.utc)
+    issued_at = datetime.now(UTC)
     payload = {
         "sub": user_id,
         "iat": issued_at,
@@ -110,7 +109,7 @@ def create_ai_proxy_token(user_id: str) -> str:
     return jwt.encode(payload, jwt_secret(), algorithm="HS256")
 
 
-def decode_token(token: str) -> Dict[str, Any]:
+def decode_token(token: str) -> dict[str, Any]:
     return jwt.decode(
         token,
         jwt_secret(),
@@ -119,7 +118,7 @@ def decode_token(token: str) -> Dict[str, Any]:
     )
 
 
-def token_scope(payload: Dict[str, Any]) -> str:
+def token_scope(payload: dict[str, Any]) -> str:
     """Return scope; missing ``scp`` means a pre-scope token (full REST access)."""
 
     raw = payload.get("scp")
@@ -128,7 +127,7 @@ def token_scope(payload: Dict[str, Any]) -> str:
     return raw.strip()
 
 
-def _extract_bearer(authorization: str, cookie_token: Optional[str]) -> str:
+def _extract_bearer(authorization: str, cookie_token: str | None) -> str:
     """Pick the request's JWT off the ``Authorization`` header or session cookie.
 
     Two transports are supported because the FE moved to an HttpOnly
@@ -153,8 +152,8 @@ def _extract_bearer(authorization: str, cookie_token: Optional[str]) -> str:
 
 def current_user_payload(
     authorization: str = Header(default=""),
-    session_cookie: Optional[str] = Cookie(default=None, alias=SESSION_COOKIE_NAME),
-) -> Dict[str, Any]:
+    session_cookie: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME),
+) -> dict[str, Any]:
     token = _extract_bearer(authorization, session_cookie)
     if not token:
         raise HTTPException(
@@ -178,8 +177,8 @@ def current_user_payload(
 
 def current_user_payload_for_ai(
     authorization: str = Header(default=""),
-    session_cookie: Optional[str] = Cookie(default=None, alias=SESSION_COOKIE_NAME),
-) -> Dict[str, Any]:
+    session_cookie: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME),
+) -> dict[str, Any]:
     """Accept primary REST tokens and narrow ``ai_proxy`` tokens."""
 
     token = _extract_bearer(authorization, session_cookie)
@@ -204,7 +203,7 @@ def current_user_payload_for_ai(
     return payload
 
 
-def current_user_id(payload: Dict[str, Any]) -> str:
+def current_user_id(payload: dict[str, Any]) -> str:
     user_id = payload.get("sub")
     if not isinstance(user_id, str) or not user_id:
         raise HTTPException(

@@ -42,8 +42,7 @@ import json
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, Literal, Optional, Protocol, Tuple, runtime_checkable
-
+from typing import Any, Literal, Protocol, runtime_checkable
 
 DEFAULT_TTL_SECONDS = 86_400
 
@@ -111,7 +110,7 @@ class CachedResponse:
 
     status_code: int
     body: Any
-    headers: Dict[str, str]
+    headers: dict[str, str]
     fingerprint: str
 
 
@@ -130,14 +129,14 @@ class IdempotencyBackend(Protocol):
 
     def reserve(
         self, key: str, fingerprint: str
-    ) -> Tuple[
-        Optional[CachedResponse],
+    ) -> tuple[
+        CachedResponse | None,
         Literal["fresh", "in_flight", "completed", "mismatch_pending"],
     ]: ...
 
     def store(self, key: str, response: CachedResponse) -> bool: ...
 
-    def release(self, key: str, fingerprint: Optional[str] = None) -> bool: ...
+    def release(self, key: str, fingerprint: str | None = None) -> bool: ...
 
     def reset(self) -> None: ...
 
@@ -163,8 +162,8 @@ class _Slot:
     """In-memory cache entry; either a pending reservation or a stored response."""
 
     expires_at: float
-    pending: Optional[_Pending] = None
-    response: Optional[CachedResponse] = None
+    pending: _Pending | None = None
+    response: CachedResponse | None = None
 
 
 @dataclass
@@ -188,13 +187,13 @@ class InMemoryIdempotencyBackend:
     """
 
     ttl_seconds: int = DEFAULT_TTL_SECONDS
-    _slots: Dict[str, _Slot] = field(default_factory=dict)
+    _slots: dict[str, _Slot] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
     def reserve(
         self, key: str, fingerprint: str
-    ) -> Tuple[
-        Optional[CachedResponse],
+    ) -> tuple[
+        CachedResponse | None,
         Literal["fresh", "in_flight", "completed", "mismatch_pending"],
     ]:
         now = time.monotonic()
@@ -234,7 +233,7 @@ class InMemoryIdempotencyBackend:
             )
             return True
 
-    def release(self, key: str, fingerprint: Optional[str] = None) -> bool:
+    def release(self, key: str, fingerprint: str | None = None) -> bool:
         with self._lock:
             if fingerprint is None:
                 return self._slots.pop(key, None) is not None

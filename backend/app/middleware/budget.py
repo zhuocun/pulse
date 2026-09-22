@@ -19,8 +19,8 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Optional, Protocol, runtime_checkable
+from datetime import UTC, datetime
+from typing import Protocol, runtime_checkable
 
 from fastapi import Request
 
@@ -29,8 +29,8 @@ from app.config import settings
 DEFAULT_MONTHLY_TOKEN_CAP = 1_000_000
 
 
-def _current_month_key(now: Optional[datetime] = None) -> str:
-    moment = now or datetime.now(timezone.utc)
+def _current_month_key(now: datetime | None = None) -> str:
+    moment = now or datetime.now(UTC)
     return f"{moment.year:04d}-{moment.month:02d}"
 
 
@@ -52,7 +52,7 @@ class BudgetBackend(Protocol):
     monthly_cap: int
 
     def remaining(
-        self, project_id: str, month: Optional[str] = None
+        self, project_id: str, month: str | None = None
     ) -> int: ...
 
     def can_spend(self, project_id: str, tokens: int = 1) -> bool: ...
@@ -88,7 +88,7 @@ class InMemoryBudgetBackend:
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
     def remaining(
-        self, project_id: str, month: Optional[str] = None
+        self, project_id: str, month: str | None = None
     ) -> int:
         """Return the tokens still available for ``project_id`` this month."""
 
@@ -212,8 +212,8 @@ def build_budget_backend(
     backend: str,
     *,
     monthly_cap: int = DEFAULT_MONTHLY_TOKEN_CAP,
-    redis_client: Optional[object] = None,
-    postgres_pool: Optional[object] = None,
+    redis_client: object | None = None,
+    postgres_pool: object | None = None,
 ) -> BudgetBackend:
     """Construct a :class:`BudgetBackend` for ``backend``.
 

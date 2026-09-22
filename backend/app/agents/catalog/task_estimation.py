@@ -12,18 +12,18 @@ fallback without breaking the FE contract.
 from __future__ import annotations
 
 import json
-from typing import Any, Optional
+from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
+from langgraph.runtime import get_runtime
 from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
-from app.agents.pipeline import linear_graph
 from app.agents.catalog._schemas import (
     ESTIMATION_RATIONALE_MAX,
     READINESS_FIELD_MAX,
@@ -43,10 +43,10 @@ from app.agents.catalog._shared import (
 from app.agents.context import ChatContext
 from app.agents.identity import COPILOT_IDENTITY
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
+from app.agents.pipeline import linear_graph
 from app.agents.polish import PolishStep
 from app.agents.state import TaskEstimationState
 from app.agents.tool_envelope import wrap_tool_result
-from langgraph.runtime import get_runtime
 from app.domain.story_points import FIBONACCI_STORY_POINTS
 from app.tools import be_tools
 from app.tools.fe_tool_names import FE_SIMILAR_TASKS
@@ -84,7 +84,7 @@ def estimate_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
         sum(clamp_fibonacci(point) for point in (3, 5, 3)) / 3 if top else 3
     )
     points = clamp_fibonacci(
-        int(round((len(description) / 80) + avg_neighbour_points))
+        round((len(description) / 80) + avg_neighbour_points)
     )
     confidence = 0.7 if top else 0.45
     return {
@@ -388,8 +388,8 @@ class TaskEstimationAgent(BaseAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         _default_model = self.chat_model  # captured for fallback
 
@@ -430,10 +430,10 @@ class TaskEstimationAgent(BaseAgent):
             # balanced provider can't drift between two HTTP round-trips
             # and produce vectors in slightly different embedding spaces
             # (which would silently corrupt cosine scores).
-            vectors = await be_tools.embed_async([query_text] + corpus_texts)
+            vectors = await be_tools.embed_async([query_text, *corpus_texts])
             query_vec = vectors[0]
             corpus_vectors = vectors[1:]
-            corpus = list(zip(corpus_ids, corpus_vectors))
+            corpus = list(zip(corpus_ids, corpus_vectors, strict=False))
             neighbours = (
                 be_tools.embedding_neighbors(query_vec, corpus, k=3) if corpus else []
             )

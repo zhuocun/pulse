@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Query, status
 
@@ -6,15 +6,14 @@ from app.security import current_user_id, current_user_payload
 from app.services import comment_service
 from app.validation import api_error, required_body_errors, validation_errors
 
-
 router = APIRouter()
 
 
 @router.get("/", status_code=status.HTTP_200_OK)
 def get_comments(
-    taskId: Optional[str] = Query(default=None),
-    payload: Dict[str, Any] = Depends(current_user_payload),
-) -> Union[list, str]:
+    taskId: str | None = Query(default=None),
+    payload: dict[str, Any] = Depends(current_user_payload),
+) -> list | str:
     if taskId is None:
         api_error(status.HTTP_404_NOT_FOUND, "Task not found")
 
@@ -28,8 +27,8 @@ def get_comments(
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 def create_comment(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     errors = required_body_errors(
         data,
@@ -53,8 +52,8 @@ def create_comment(
 
 @router.put("/", status_code=status.HTTP_200_OK)
 def update_comment(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     result = comment_service.update(data, current_user_id(payload))
     if result == "Comment updated":
@@ -68,8 +67,8 @@ def update_comment(
 
 @router.delete("/", status_code=status.HTTP_200_OK)
 def remove_comment(
-    commentId: Optional[str] = Query(default=None),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    commentId: str | None = Query(default=None),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     if commentId is None:
         api_error(status.HTTP_400_BAD_REQUEST, "Lack of comment information")

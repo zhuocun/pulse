@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator, Mapping, Sequence
-from contextlib import AbstractContextManager
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import logging
 import math
 import re
-from typing import Optional, Protocol, cast
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from contextlib import AbstractContextManager
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Protocol, cast
 
 from langchain_core.embeddings import Embeddings
 
-from app.config import Settings, settings as default_settings
+from app.config import Settings
+from app.config import settings as default_settings
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +30,9 @@ class TaskVectorBackfillError(RuntimeError):
 
 
 class MongoTaskCursor(Protocol):
-    def sort(self, key_or_list: str, direction: int) -> "MongoTaskCursor": ...
+    def sort(self, key_or_list: str, direction: int) -> MongoTaskCursor: ...
 
-    def batch_size(self, batch_size: int) -> "MongoTaskCursor": ...
+    def batch_size(self, batch_size: int) -> MongoTaskCursor: ...
 
     def __iter__(self) -> Iterator[Mapping[str, object]]: ...
 
@@ -69,9 +70,9 @@ class PgConnection(Protocol):
 class TaskEmbeddingBackfillOptions:
     """Operator-controlled knobs for the pgvector backfill."""
 
-    project_id: Optional[str] = None
+    project_id: str | None = None
     batch_size: int = DEFAULT_BATCH_SIZE
-    limit: Optional[int] = None
+    limit: int | None = None
     dry_run: bool = True
     force: bool = False
     allow_stub_embeddings: bool = False
@@ -84,7 +85,7 @@ class TaskEmbeddingSource:
     task_id: str
     label: str
     embedding_text: str
-    updated_at: Optional[datetime]
+    updated_at: datetime | None
 
 
 @dataclass(frozen=True)
@@ -102,7 +103,7 @@ class TaskEmbeddingBackfillSummary:
     written: int
     pruned_deleted: int
     batches: int
-    last_task_id: Optional[str]
+    last_task_id: str | None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -134,7 +135,7 @@ class _MutableSummary:
     written: int = 0
     pruned_deleted: int = 0
     batches: int = 0
-    last_task_id: Optional[str] = None
+    last_task_id: str | None = None
 
     def freeze(
         self,
@@ -207,7 +208,7 @@ def task_embedding_text(task: Mapping[str, object]) -> str:
 
 def task_embedding_source(
     task: Mapping[str, object],
-) -> Optional[TaskEmbeddingSource]:
+) -> TaskEmbeddingSource | None:
     task_key = _task_key(task)
     label_raw = task.get("taskName")
     if task_key is None:
@@ -233,7 +234,7 @@ def task_embedding_source(
     )
 
 
-def _task_key(task: Mapping[str, object]) -> Optional[tuple[str, str]]:
+def _task_key(task: Mapping[str, object]) -> tuple[str, str] | None:
     task_id_raw = task.get("_id")
     project_id_raw = task.get("projectId")
     if task_id_raw is None or project_id_raw is None:
@@ -247,8 +248,8 @@ def _task_key(task: Mapping[str, object]) -> Optional[tuple[str, str]]:
 
 def _normalise_datetime(value: datetime) -> datetime:
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _dimensions(cfg: Settings) -> int:
@@ -317,7 +318,7 @@ def _resolve_embeddings_provider(
     *,
     cfg: Settings,
     options: TaskEmbeddingBackfillOptions,
-) -> tuple[str, Optional[Embeddings]]:
+) -> tuple[str, Embeddings | None]:
     from app.agents.embeddings import (
         is_stub_embeddings,
         make_embeddings,
@@ -382,7 +383,7 @@ def _fetch_task_embeddings_dimension(conn: PgConnection) -> int:
 def _existing_task_updated_at(
     conn: PgConnection,
     sources: Sequence[TaskEmbeddingSource],
-) -> dict[tuple[str, str], Optional[datetime]]:
+) -> dict[tuple[str, str], datetime | None]:
     if not sources:
         return {}
     task_ids = [source.task_id for source in sources]
@@ -394,7 +395,7 @@ def _existing_task_updated_at(
             (project_ids, task_ids),
         )
         rows = cur.fetchall()
-    existing: dict[tuple[str, str], Optional[datetime]] = {}
+    existing: dict[tuple[str, str], datetime | None] = {}
     for row in rows:
         if len(row) < 3:
             continue
@@ -411,7 +412,7 @@ def _existing_task_updated_at(
 
 def _needs_backfill(
     source: TaskEmbeddingSource,
-    existing: Mapping[tuple[str, str], Optional[datetime]],
+    existing: Mapping[tuple[str, str], datetime | None],
     *,
     force: bool,
 ) -> bool:
@@ -453,7 +454,7 @@ def _write_embeddings(
     written = 0
     with conn.cursor() as cur:
         for source, vector in zip(sources, vectors, strict=True):
-            updated_at = source.updated_at or datetime.now(timezone.utc)
+            updated_at = source.updated_at or datetime.now(UTC)
             cur.execute(
                 sql,
                 (
@@ -472,7 +473,7 @@ def _write_embeddings(
 def _embedding_keys(
     conn: PgConnection,
     *,
-    project_id: Optional[str],
+    project_id: str | None,
 ) -> set[tuple[str, str]]:
     if project_id is None:
         sql = "SELECT project_id, task_id FROM task_embeddings"
@@ -511,7 +512,7 @@ def _delete_embeddings(
     return pruned
 
 
-def _task_query(project_id: Optional[str]) -> dict[str, object]:
+def _task_query(project_id: str | None) -> dict[str, object]:
     if project_id is None:
         return {}
     return {"projectId": project_id}
@@ -534,7 +535,7 @@ def _iter_batches(
     rows: Iterable[Mapping[str, object]],
     *,
     batch_size: int,
-    limit: Optional[int],
+    limit: int | None,
     summary: _MutableSummary,
     seen_task_keys: set[tuple[str, str]],
 ) -> Iterator[list[TaskEmbeddingSource]]:
@@ -562,9 +563,9 @@ def _iter_batches(
 
 def backfill_task_embeddings(
     *,
-    settings: Optional[Settings] = None,
+    settings: Settings | None = None,
     options: TaskEmbeddingBackfillOptions = TaskEmbeddingBackfillOptions(),
-    collection: Optional[MongoTaskCollection] = None,
+    collection: MongoTaskCollection | None = None,
 ) -> TaskEmbeddingBackfillSummary:
     """Backfill Mongo tasks into pgvector with dry-run and resume support."""
 

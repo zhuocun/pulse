@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Mapping
+from collections.abc import Mapping
 
 HOSTED_PLATFORM_ENV_MARKERS: tuple[str, ...] = (
     "VERCEL",

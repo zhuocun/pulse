@@ -10,31 +10,33 @@ opted-in routes that wire idempotency into their handlers.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterable
 from dataclasses import replace
 from http import HTTPStatus
-from typing import Any, Iterable, Optional
+from typing import Any
 
 import fakeredis
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from pytest import FixtureRequest
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore
+from pytest import FixtureRequest
 from typing_extensions import TypedDict
 
-from app import main
-from app import security
+from app import main, security
 from app.agents import AgentMetadata, BaseAgent
 from app.agents.registry import registry as global_registry
+from app.auth import project_access as project_access_module
 from app.config import settings as app_settings
 from app.middleware import budget as budget_module
 from app.middleware import idempotency as _idempotency
 from app.middleware import rate_limit as rate_limit_module
 from app.middleware import redis_backends
+from app.middleware.budget import BudgetTracker
 from app.middleware.idempotency import (
     DEFAULT_TTL_SECONDS,
     CachedResponse,
@@ -49,12 +51,9 @@ from app.middleware.idempotency_guard import (
     IdempotencyContext,
     check_idempotency,
 )
-from app.security import create_token
-from app.auth import project_access as project_access_module
 from app.routers import ai as ai_router_module
-from app.middleware.budget import BudgetTracker
+from app.security import create_token
 from tests.conftest import FakeStore, seed_agent_test_projects_if_absent
-
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -286,11 +285,11 @@ def test_in_memory_ttl_expiry_treats_slot_as_fresh(
 
     monkeypatch.setattr(_idempotency.time, "monotonic", _fake_monotonic)
     backend = InMemoryIdempotencyBackend(ttl_seconds=10)
-    cached, state = backend.reserve("k", "fp")
+    _cached, state = backend.reserve("k", "fp")
     assert state == "fresh"
     # Second reserve: time has advanced past TTL; the entry is dropped
     # and the slot becomes fresh again.
-    cached, state = backend.reserve("k", "fp")
+    _cached, state = backend.reserve("k", "fp")
     assert state == "fresh"
 
 
@@ -518,7 +517,7 @@ def test_redis_idempotency_reset_only_clears_own_prefix(
     backend.reset()
     assert fake_redis.get("budget:p-a:1999-01") == "untouched"
     assert fake_redis.get("ratelimit:foo:bar") == "untouched"
-    cached, state = backend.reserve("k", "fp")
+    _cached, state = backend.reserve("k", "fp")
     assert state == "fresh"
 
 
@@ -965,8 +964,8 @@ class _IdemAgent(BaseAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         def speak(state: _IdemProbe) -> dict[str, Any]:
             writer = get_stream_writer()

@@ -41,7 +41,8 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
@@ -102,7 +103,7 @@ def clamp_fibonacci(value: int) -> int:
 # ---------------------------------------------------------------------------
 
 
-def make_usage_message(tokens_in: int, tokens_out: int) -> Optional[AIMessage]:
+def make_usage_message(tokens_in: int, tokens_out: int) -> AIMessage | None:
     """Return an ``AIMessage`` carrying ``usage_metadata``, or ``None`` if both zero.
 
     Callers include it in the node's ``messages`` return value so budget
@@ -135,8 +136,9 @@ def resolve_chat_model(default_model: BaseChatModel) -> BaseChatModel:
     ``ChatContext.chat_model``; if the context is absent or the key is not
     set, ``default_model`` (captured at build time) is returned.
     """
-    from app.agents.context import ChatContext
     from langgraph.runtime import get_runtime
+
+    from app.agents.context import ChatContext
 
     _rt = get_runtime(ChatContext)
     return (_rt.context or {}).get("chat_model") or default_model
@@ -152,7 +154,7 @@ def emit_suggestion_terminal(
     surface: str,
     payload: dict,
     *,
-    extra_events: Optional[list[dict]] = None,
+    extra_events: list[dict] | None = None,
 ) -> dict:
     """Return a ``{messages, events}`` dict for a terminal suggestion node.
 
@@ -217,7 +219,7 @@ def filter_to_allowed_ids(
 
 def unpack_structured_response(
     response: Any,
-) -> tuple[Any, Any, Optional[Exception]]:
+) -> tuple[Any, Any, Exception | None]:
     """Return ``(raw, parsed, parsing_error)`` from a structured-output call.
 
     LangChain's ``model.with_structured_output(Schema, include_raw=True)``
@@ -354,8 +356,8 @@ def build_citation_refs(
     source: str,
     *,
     max_items: int = 3,
-    get_id: Optional[Callable[[dict], Any]] = None,
-    get_quote: Optional[Callable[[dict], str]] = None,
+    get_id: Callable[[dict], Any] | None = None,
+    get_quote: Callable[[dict], str] | None = None,
 ) -> list[dict]:
     """Build a validated, redacted list of citation refs from ``items``.
 

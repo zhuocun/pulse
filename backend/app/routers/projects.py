@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Query, status
 
@@ -6,14 +6,13 @@ from app.security import current_user_id, current_user_payload
 from app.services import project_service
 from app.validation import api_error, required_body_errors, validation_errors
 
-
 router = APIRouter()
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 def create_project(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     errors = required_body_errors(
         data,
@@ -39,13 +38,13 @@ def create_project(
 
 @router.get("/", status_code=status.HTTP_200_OK)
 def get_projects(
-    projectName: Optional[str] = Query(default=None),
-    managerId: Optional[str] = Query(default=None),
-    projectId: Optional[str] = Query(default=None),
+    projectName: str | None = Query(default=None),
+    managerId: str | None = Query(default=None),
+    projectId: str | None = Query(default=None),
     includeArchived: bool = Query(default=False),
     includeTrashed: bool = Query(default=False),
-    payload: Dict[str, Any] = Depends(current_user_payload),
-) -> Union[Dict[str, Any], list]:
+    payload: dict[str, Any] = Depends(current_user_payload),
+) -> dict[str, Any] | list:
     # Archived/trashed projects are excluded from the LISTING by default
     # (PRD §5.4/§5.5); the opt-in flags widen the enumeration so the
     # archive/trash views can show them. A direct-by-id read is never
@@ -67,8 +66,8 @@ def get_projects(
 
 @router.put("/", status_code=status.HTTP_200_OK)
 def update_project(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     result = project_service.update(data, current_user_id(payload))
     if result == "Bad request":
@@ -82,9 +81,9 @@ def update_project(
 
 @router.delete("/", status_code=status.HTTP_200_OK)
 def remove_project(
-    projectId: Optional[str] = Query(default=None),
+    projectId: str | None = Query(default=None),
     purge: bool = Query(default=False),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     # Default DELETE soft-deletes (moves the project to trash, PRD §5.5);
     # ``?purge=true`` keeps the legacy hard cascade (delete the project plus
@@ -102,8 +101,8 @@ def remove_project(
 
 @router.put("/restore", status_code=status.HTTP_200_OK)
 def restore_project(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     # Un-trash / un-archive a project (PRD §5.4/§5.5): clears both markers so
     # a restore from trash brings the project all the way back to the active
@@ -119,8 +118,8 @@ def restore_project(
 
 @router.put("/archive", status_code=status.HTTP_200_OK)
 def archive_project(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     # Archive / unarchive a project (PRD §5.4). MANAGER-ONLY. Existence +
     # access are checked inside the service BEFORE ``archived`` is validated
@@ -150,9 +149,9 @@ def archive_project(
 
 @router.get("/members", status_code=status.HTTP_200_OK)
 def list_project_members(
-    projectId: Optional[str] = Query(default=None),
-    payload: Dict[str, Any] = Depends(current_user_payload),
-) -> Union[list, str]:
+    projectId: str | None = Query(default=None),
+    payload: dict[str, Any] = Depends(current_user_payload),
+) -> list | str:
     result = project_service.list_members(projectId, current_user_id(payload))
     if result == "Forbidden":
         api_error(status.HTTP_403_FORBIDDEN, result)
@@ -163,8 +162,8 @@ def list_project_members(
 
 @router.post("/members", status_code=status.HTTP_201_CREATED)
 def add_project_member(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     errors = required_body_errors(
         data,
@@ -197,8 +196,8 @@ def add_project_member(
 
 @router.put("/members", status_code=status.HTTP_200_OK)
 def update_project_member(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     errors = required_body_errors(
         data,
@@ -231,9 +230,9 @@ def update_project_member(
 
 @router.delete("/members", status_code=status.HTTP_200_OK)
 def remove_project_member(
-    projectId: Optional[str] = Query(default=None),
-    userId: Optional[str] = Query(default=None),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    projectId: str | None = Query(default=None),
+    userId: str | None = Query(default=None),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     result = project_service.remove_member(
         projectId,

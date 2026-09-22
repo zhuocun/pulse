@@ -24,7 +24,6 @@ from langgraph.types import Command
 
 from app.agents.catalog.search import SearchAgent
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -468,7 +467,7 @@ def test_matches_ids_align_with_ranking_ids() -> None:
     ranking = final["ranking"]
     ids = ranking["ids"]
     matches = ranking["matches"]
-    for idx, (id_, match) in enumerate(zip(ids, matches)):
+    for idx, (id_, match) in enumerate(zip(ids, matches, strict=False)):
         assert match["id"] == id_, (
             f"matches[{idx}].id '{match['id']}' != ids[{idx}] '{id_}'"
         )
@@ -544,7 +543,9 @@ def test_polish_search_rerank_preserves_matches_alignment() -> None:
     """When the LLM reranks, ``matches`` must still align 1:1 with new ``ids``."""
 
     import asyncio as _asyncio
+
     from langchain_core.messages import AIMessage as _AIMessage
+
     from app.agents.catalog.search import SearchRanking, polish_search
     from tests.conftest import structured_model
 
@@ -583,7 +584,7 @@ def test_polish_search_rerank_preserves_matches_alignment() -> None:
     assert result["ids"] == ["t-3", "t-2", "t-1"]
     # matches must align with the new ids order.
     assert len(result["matches"]) == len(result["ids"])
-    for id_, match in zip(result["ids"], result["matches"]):
+    for id_, match in zip(result["ids"], result["matches"], strict=True):
         assert match["id"] == id_
     # Strengths come from original score_map (derived from old matches).
     id_to_strength = {m["id"]: m["strength"] for m in result["matches"]}

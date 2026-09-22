@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import random
 from http import HTTPStatus
-from typing import Any, Dict, List
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -45,7 +45,6 @@ from tests.test_api_features import (
     seed_ordering_data,
 )
 
-
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
@@ -53,7 +52,7 @@ from tests.test_api_features import (
 
 def _make_task(
     client: TestClient,
-    headers: Dict[str, str],
+    headers: dict[str, str],
     *,
     project_id: str,
     column_id: str,
@@ -82,24 +81,24 @@ def _make_task(
 
 
 def _list_tasks(
-    client: TestClient, headers: Dict[str, str], project_id: str
-) -> List[Dict[str, Any]]:
+    client: TestClient, headers: dict[str, str], project_id: str
+) -> list[dict[str, Any]]:
     response = client.get(f"/api/v1/tasks/?projectId={project_id}", headers=headers)
     assert response.status_code == 200
     return response.json()
 
 
 def _list_columns(
-    client: TestClient, headers: Dict[str, str], project_id: str
-) -> List[Dict[str, Any]]:
+    client: TestClient, headers: dict[str, str], project_id: str
+) -> list[dict[str, Any]]:
     response = client.get(f"/api/v1/boards/?projectId={project_id}", headers=headers)
     assert response.status_code == 200
     return response.json()
 
 
 def _list_projects(
-    client: TestClient, headers: Dict[str, str]
-) -> List[Dict[str, Any]]:
+    client: TestClient, headers: dict[str, str]
+) -> list[dict[str, Any]]:
     response = client.get("/api/v1/projects/", headers=headers)
     assert response.status_code == 200
     return response.json()
@@ -231,7 +230,7 @@ def test_repeated_logins_issue_independent_usable_tokens(client: TestClient) -> 
     """
 
     register_and_login(client)
-    tokens: List[str] = []
+    tokens: list[str] = []
     for _ in range(10):
         response = client.post(
             "/api/v1/auth/login",
@@ -258,7 +257,7 @@ def test_register_validation_matrix_returns_400_for_every_case(
     leak slipped through.
     """
 
-    cases: List[Dict[str, Any]] = [
+    cases: list[dict[str, Any]] = [
         {},
         {"username": "ab"},
         {"username": "ab", "email": "x@example.com", "password": "secret"},
@@ -648,7 +647,7 @@ def test_many_users_each_only_see_their_own_projects(client: TestClient) -> None
 
     user_count = 6
     projects_per_user = 4
-    tokens: List[Dict[str, Any]] = []
+    tokens: list[dict[str, Any]] = []
     for index in range(user_count):
         info = register_and_login_user(
             client,
@@ -1295,7 +1294,7 @@ def test_repeated_column_delete_cascades_each_columns_tasks(
     ids = create_project_board_and_task(client, logged_in["jwt"], logged_in["_id"])
     headers = auth_headers(logged_in["jwt"])
 
-    extras: List[str] = []
+    extras: list[str] = []
     for index in range(3):
         response = client.post(
             "/api/v1/boards/",
@@ -1421,7 +1420,7 @@ def test_request_without_auth_token_is_rejected_across_every_protected_route(
     time this test runs.
     """
 
-    protected: List[tuple[str, str, Dict[str, Any] | None]] = [
+    protected: list[tuple[str, str, dict[str, Any] | None]] = [
         ("GET", "/api/v1/users/", None),
         ("PUT", "/api/v1/users/", {"username": "x"}),
         ("GET", "/api/v1/users/members", None),
@@ -1451,7 +1450,7 @@ def test_request_with_garbage_token_is_rejected_across_every_protected_route(
     """A junk bearer token must 401 -- not 403, not 500 -- on every route."""
 
     headers = {"Authorization": "Bearer not-a-real-jwt"}
-    routes: List[tuple[str, str]] = [
+    routes: list[tuple[str, str]] = [
         ("GET", "/api/v1/users/"),
         ("GET", "/api/v1/users/members"),
         ("GET", "/api/v1/projects/"),
@@ -1476,7 +1475,7 @@ def test_validation_envelope_shape_is_consistent_across_post_endpoints(
 
     logged_in = register_and_login(client)
     headers = auth_headers(logged_in["jwt"])
-    endpoints: List[str] = [
+    endpoints: list[str] = [
         "/api/v1/projects/",
         "/api/v1/boards/",
         "/api/v1/tasks/",
@@ -1637,7 +1636,7 @@ def test_intruder_attempts_against_many_projects_are_all_forbidden(
     )
     intruder_headers = auth_headers(intruder["jwt"])
 
-    project_ids: List[str] = []
+    project_ids: list[str] = []
     for index in range(6):
         response = client.post(
             "/api/v1/projects/",
@@ -1662,7 +1661,7 @@ def test_intruder_attempts_against_many_projects_are_all_forbidden(
             ("POST", "/api/v1/boards/"),
             ("GET", f"/api/v1/tasks/?projectId={project_id}"),
         ):
-            body: Dict[str, Any] | None
+            body: dict[str, Any] | None
             if method == "PUT":
                 body = {
                     "_id": project_id,
@@ -1860,7 +1859,7 @@ def test_repeated_invalid_reorder_payloads_never_corrupt_state(
         for task in store.find_many(TASKS, {"projectId": ids["project_id"]})
     }
 
-    invalid_payloads: List[Dict[str, Any]] = [
+    invalid_payloads: list[dict[str, Any]] = [
         # Mismatched column hints.
         {
             "type": "after",

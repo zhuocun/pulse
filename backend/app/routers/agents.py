@@ -30,10 +30,11 @@ The SSE wire format matches the FE's ``StreamPart`` discriminator
 
 import asyncio
 import contextvars
+import logging
+from collections.abc import AsyncIterator, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import is_dataclass
-import logging
-from typing import Any, AsyncIterator, Dict, Iterator, Mapping, Optional, get_type_hints
+from typing import Any, get_type_hints
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -54,8 +55,8 @@ from app.agents.sse import (
 from app.auth.project_access import is_project_ai_enabled
 from app.config import settings
 from app.middleware.budget import BudgetBackend, get_budget_tracker
-from app.middleware.rate_limit import RateLimitBackend, get_rate_limiter
 from app.middleware.idempotency_metrics import check_idempotency_with_metrics
+from app.middleware.rate_limit import RateLimitBackend, get_rate_limiter
 from app.observability.metrics import record_idempotency, record_invocation
 from app.routers._dispatch import (
     chat_model_override_from_request,
@@ -76,7 +77,7 @@ router = APIRouter()
 # The runtime's ``build_config`` omits ``project_id``; the router injects it
 # per request via this context var so resume turns can recover the id from
 # checkpoint when the client omits it.
-_PROJECT_ID_FOR_RUN: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+_PROJECT_ID_FOR_RUN: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "_PROJECT_ID_FOR_RUN",
     default=None,
 )
@@ -87,11 +88,11 @@ def _build_config_with_project_id(
     self: AgentRuntime,
     agent: BaseAgent,
     *,
-    thread_id: Optional[str] = None,
-    user_id: Optional[str] = None,
-    assistant_id: Optional[str] = None,
-    tags: Optional[list[str]] = None,
-) -> Dict[str, Any]:
+    thread_id: str | None = None,
+    user_id: str | None = None,
+    assistant_id: str | None = None,
+    tags: list[str] | None = None,
+) -> dict[str, Any]:
     config = _ORIGINAL_BUILD_CONFIG(
         self,
         agent,
@@ -112,7 +113,7 @@ AgentRuntime.build_config = _build_config_with_project_id  # type: ignore[method
 
 
 @contextmanager
-def _agent_turn_project_scope(project_id: Optional[str]) -> Iterator[None]:
+def _agent_turn_project_scope(project_id: str | None) -> Iterator[None]:
     token = _PROJECT_ID_FOR_RUN.set(project_id)
     try:
         yield
@@ -130,7 +131,7 @@ _CONFIGURABLE_HOIST_KEYS = ("thread_id", "assistant_id", "tags", "autonomy")
 _AUTONOMY_LEVELS = ("suggest", "plan", "auto")
 
 
-def _normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+def _normalize_payload(payload: dict[str, Any]) -> dict[str, Any]:
     """Translate the LangGraph SDK envelope into the flat router shape.
 
     * ``input`` (singular) is aliased to ``inputs`` when the latter is
@@ -154,7 +155,7 @@ def _normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(payload, dict):
         return payload
 
-    normalized: Dict[str, Any] = dict(payload)
+    normalized: dict[str, Any] = dict(payload)
 
     config = normalized.get("config")
     if not isinstance(config, dict):
@@ -188,7 +189,7 @@ def _normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     return normalized
 
 
-def _optional_str(payload: Mapping[str, Any], field: str) -> Optional[str]:
+def _optional_str(payload: Mapping[str, Any], field: str) -> str | None:
     value = payload.get(field)
     if value is None:
         return None
@@ -198,7 +199,7 @@ def _optional_str(payload: Mapping[str, Any], field: str) -> Optional[str]:
     return stripped or None
 
 
-def _optional_tags(payload: Mapping[str, Any]) -> Optional[list[str]]:
+def _optional_tags(payload: Mapping[str, Any]) -> list[str] | None:
     value = payload.get("tags")
     if value is None:
         return None
@@ -213,7 +214,7 @@ def _optional_tags(payload: Mapping[str, Any]) -> Optional[list[str]]:
 
 def _resolve_autonomy(
     payload: Mapping[str, Any], metadata: AgentMetadata
-) -> Optional[str]:
+) -> str | None:
     """Validate ``autonomy`` against the agent's :attr:`allowed_autonomy`.
 
     A missing autonomy means "use the agent default"; the global
@@ -247,7 +248,7 @@ def _resolve_autonomy(
     return cleaned
 
 
-def _run_options(payload: Dict[str, Any], *, user_id: str) -> Dict[str, Any]:
+def _run_options(payload: dict[str, Any], *, user_id: str) -> dict[str, Any]:
     """Pull common run-control fields from the request body."""
 
     if "user_id" in payload:
@@ -320,7 +321,7 @@ def _coerce_context(schema: type[Any], payload: Any) -> Any:
     )
 
 
-def _project_id_from_agent_payload(payload: Mapping[str, Any]) -> Optional[str]:
+def _project_id_from_agent_payload(payload: Mapping[str, Any]) -> str | None:
     """Best-effort ``project_id`` for per-project model routing (budget + context)."""
 
     inputs = payload.get("inputs")
@@ -346,7 +347,7 @@ async def _async_resolve_project_id_for_turn(
     inputs: Mapping[str, Any],
     *,
     resuming: bool,
-) -> Optional[str]:
+) -> str | None:
     """Resolve ``project_id`` for policy gates on initial and resume turns.
 
     Order: ``inputs`` → request ``config.configurable`` → checkpoint metadata
@@ -404,7 +405,7 @@ def _request_context(
     name: str,
     payload: Mapping[str, Any],
     runtime: AgentRuntime,
-    request: Optional[Request] = None,
+    request: Request | None = None,
 ) -> Any:
     """Resolve the per-call context for an agent invocation.
 
@@ -435,7 +436,7 @@ def _request_context(
         settings=settings,
     )
 
-    def _merge_chat_overlay(base: Any, overlay: Optional[Dict[str, Any]]) -> Any:
+    def _merge_chat_overlay(base: Any, overlay: dict[str, Any] | None) -> Any:
         if overlay is None:
             return base
         if base is None:
@@ -504,7 +505,7 @@ def _enforce_rate_limit(
 
 
 def _enforce_budget(
-    project_id: Optional[str],
+    project_id: str | None,
     tokens: int,
     budget_tracker: BudgetBackend,
 ) -> int:
@@ -530,7 +531,7 @@ def _enforce_budget(
     return requested
 
 
-def _enforce_project_access(project_id: Optional[str]) -> None:
+def _enforce_project_access(project_id: str | None) -> None:
     """Raise 403 when the project is on the org AI-disable list (PRD §6.3)."""
 
     if not is_project_ai_enabled(project_id):
@@ -542,7 +543,7 @@ def _enforce_project_access(project_id: Optional[str]) -> None:
         )
 
 
-def _require_project_manager(project_id: Optional[str], user_id: str) -> None:
+def _require_project_manager(project_id: str | None, user_id: str) -> None:
     """Ensure budgeted agent calls cannot target another tenant's project."""
 
     if not project_id:
@@ -619,7 +620,7 @@ def _redact_content_blocks(
 def _redact_inputs(
     inputs: dict[str, Any],
     request: Request,
-    metadata: Optional[AgentMetadata] = None,
+    metadata: AgentMetadata | None = None,
 ) -> dict[str, Any]:
     """Apply redaction to user-supplied text in ``inputs`` (PRD §5A.10).
 
@@ -686,7 +687,7 @@ def _redact_resume(resume: Any) -> Any:
 
 
 def _record_real_usage(
-    project_id: Optional[str],
+    project_id: str | None,
     tokens_in: int,
     tokens_out: int,
     *,
@@ -730,7 +731,7 @@ def _record_real_usage(
 def _resolve_resume_and_inputs(
     payload: Mapping[str, Any],
     request: Request,
-    metadata: Optional[AgentMetadata] = None,
+    metadata: AgentMetadata | None = None,
 ) -> tuple[dict[str, Any], Any, bool]:
     """Build ``(inputs, resume, resuming)`` from a request body.
 
@@ -781,8 +782,8 @@ def _input_token_estimate(inputs: Mapping[str, Any]) -> int:
 @router.get("", status_code=status.HTTP_200_OK)
 def list_agents(
     runtime: AgentRuntime = Depends(get_runtime),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
-) -> Dict[str, Any]:
+    auth_payload: dict[str, Any] = Depends(current_user_payload_for_ai),
+) -> dict[str, Any]:
     """List active and deprecated agents; ``shadow`` agents are hidden."""
 
     current_user_id(auth_payload)
@@ -791,8 +792,8 @@ def list_agents(
 
 @router.get("/_tools", status_code=status.HTTP_200_OK)
 def list_fe_tools(
-    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
-) -> Dict[str, Any]:
+    auth_payload: dict[str, Any] = Depends(current_user_payload_for_ai),
+) -> dict[str, Any]:
     """Expose the FE-tool catalogue (PRD §5.4.1).
 
     Agents fetch FE-side data by raising ``langgraph.types.interrupt`` with
@@ -833,7 +834,7 @@ class MutationUndoIn(BaseModel):
 
 def _merge_autonomy_into_context(
     context: Any,
-    autonomy: Optional[str],
+    autonomy: str | None,
 ) -> Any:
     if autonomy is None:
         return context
@@ -847,7 +848,7 @@ def _merge_autonomy_into_context(
 @router.post("/mutations/record", status_code=status.HTTP_200_OK)
 def record_agent_mutation_apply(
     body: MutationRecordIn,
-    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
+    auth_payload: dict[str, Any] = Depends(current_user_payload_for_ai),
 ) -> dict[str, Any]:
     """Idempotent journal entry for an FE-applied proposal (undo payload)."""
 
@@ -865,7 +866,7 @@ def record_agent_mutation_apply(
 @router.post("/mutations/undo", status_code=status.HTTP_200_OK)
 def undo_agent_mutation_apply(
     body: MutationUndoIn,
-    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
+    auth_payload: dict[str, Any] = Depends(current_user_payload_for_ai),
 ) -> dict[str, Any]:
     """Server-side reversal using the stored undo diff."""
 
@@ -893,13 +894,13 @@ def undo_agent_mutation_apply(
 def get_agent(
     name: str,
     runtime: AgentRuntime = Depends(get_runtime),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
-) -> Dict[str, Any]:
+    auth_payload: dict[str, Any] = Depends(current_user_payload_for_ai),
+) -> dict[str, Any]:
     current_user_id(auth_payload)
     return _metadata_on_wire(runtime.get(name).metadata)
 
 
-def _autonomy_into_inputs(inputs: dict[str, Any], autonomy: Optional[str]) -> None:
+def _autonomy_into_inputs(inputs: dict[str, Any], autonomy: str | None) -> None:
     """Forward the validated autonomy through inputs so the runtime can read it.
 
     The runtime reads ``autonomy_level`` from inputs via ``_autonomy(inputs)``
@@ -922,9 +923,9 @@ def _autonomy_into_inputs(inputs: dict[str, Any], autonomy: Optional[str]) -> No
 async def invoke_agent(
     name: str,
     request: Request,
-    payload: Dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Body(default_factory=dict),
     runtime: AgentRuntime = Depends(get_runtime),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
+    auth_payload: dict[str, Any] = Depends(current_user_payload_for_ai),
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
@@ -951,7 +952,7 @@ async def invoke_agent(
     try:
         reserved_budget = 0
         budget_reconciled = False
-        project_id: Optional[str] = None
+        project_id: str | None = None
         metadata = runtime.get(name).metadata
         response_headers: dict[str, str] = {}
         _enforce_status(metadata, response_headers)
@@ -1003,7 +1004,7 @@ async def invoke_agent(
                     ),
                     timeout=timeout,
                 )
-        except asyncio.TimeoutError as exc:
+        except TimeoutError as exc:
             raise HTTPException(
                 status_code=status.HTTP_504_GATEWAY_TIMEOUT,
                 detail=agent_http_error_detail(
@@ -1022,7 +1023,7 @@ async def invoke_agent(
             failure=False,
         )
         budget_reconciled = True
-        body: Dict[str, Any] = {
+        body: dict[str, Any] = {
             "result": result,
             "usage": {"tokensIn": tokens_in, "tokensOut": tokens_out},
         }
@@ -1054,9 +1055,9 @@ async def invoke_agent(
 async def stream_agent(
     name: str,
     request: Request,
-    payload: Dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Body(default_factory=dict),
     runtime: AgentRuntime = Depends(get_runtime),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
+    auth_payload: dict[str, Any] = Depends(current_user_payload_for_ai),
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
@@ -1218,7 +1219,7 @@ async def stream_agent(
                             code=getattr(exc, "code", "agent_error"),
                         )
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     yield encode_sse(
                         error_envelope(
                             f"Agent run exceeded {timeout}s timeout",
@@ -1295,7 +1296,7 @@ class _ClientDisconnected(Exception):
     """Raised internally when the SSE client closes the connection."""
 
 
-def _maybe_capture_usage(envelope: dict[str, Any]) -> Optional[tuple[int, int]]:
+def _maybe_capture_usage(envelope: dict[str, Any]) -> tuple[int, int] | None:
     """Return ``(tokens_in, tokens_out)`` if envelope is a usage event."""
 
     data = envelope.get("data")
@@ -1339,12 +1340,12 @@ async def _with_disconnect(
                 return
             await asyncio.sleep(0.1)
 
-    disconnect_task: Optional[asyncio.Task[None]] = None
+    disconnect_task: asyncio.Task[None] | None = None
     try:
         while True:
             remaining = deadline - loop.time()
             if remaining <= 0:
-                raise asyncio.TimeoutError()
+                raise TimeoutError()
             if disconnect_task is None or disconnect_task.done():
                 disconnect_task = asyncio.create_task(_watch_disconnect())
             anext_task = asyncio.create_task(iterator.__anext__())
@@ -1359,7 +1360,7 @@ async def _with_disconnect(
                     await anext_task
                 except (asyncio.CancelledError, StopAsyncIteration):
                     pass
-                raise asyncio.TimeoutError()
+                raise TimeoutError()
             if disconnect_task in done:
                 anext_task.cancel()
                 try:

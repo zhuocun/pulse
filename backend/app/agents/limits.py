@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator
-from typing import Optional
 
 from fastapi import HTTPException, Request, status
 
@@ -38,7 +37,7 @@ def iter_message_content_texts(content: object) -> Iterator[str]:
 def enforce_request_limits(
     payload: dict,  # type: ignore[type-arg]
     *,
-    request: Optional[Request] = None,
+    request: Request | None = None,
 ) -> None:
     """Raise HTTP 413 when ``payload`` exceeds any configured size limit.
 

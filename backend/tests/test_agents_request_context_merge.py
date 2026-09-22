@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from unittest.mock import MagicMock, patch
-
 from typing import TypedDict
+from unittest.mock import MagicMock, patch
 
 from app.routers.agents import _request_context
 

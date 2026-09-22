@@ -21,7 +21,7 @@ router (status code) against the in-memory ``FakeStore`` from
 ``conftest.py``.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -30,7 +30,7 @@ from app.services import project_service, task_service
 from tests.conftest import FakeStore
 
 
-def auth_headers(token: str) -> Dict[str, str]:
+def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -38,7 +38,7 @@ def register_and_login(
     client: TestClient,
     username: str,
     email: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Register + login a user; return the login body plus a bearer token."""
 
     response = client.post(
@@ -74,7 +74,7 @@ def create_project(client: TestClient, token: str, name: str = "Pulse") -> str:
 
 def column_named(
     client: TestClient, token: str, project_id: str, column_name: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     columns = client.get(
         f"/api/v1/boards/?projectId={project_id}", headers=auth_headers(token)
     ).json()
@@ -93,7 +93,7 @@ def set_category(store: FakeStore, column_id: str, category: str) -> None:
     store.update_by_id(COLUMNS, column_id, {"category": category})
 
 
-def stored_task(store: FakeStore, task_id: str) -> Dict[str, Any]:
+def stored_task(store: FakeStore, task_id: str) -> dict[str, Any]:
     task = store.find_by_id(TASKS, task_id)
     assert task is not None
     return task
@@ -104,8 +104,8 @@ def make_task(
     project_id: str,
     column_id: str,
     **extra: Any,
-) -> Dict[str, Any]:
-    body: Dict[str, Any] = {
+) -> dict[str, Any]:
+    body: dict[str, Any] = {
         "projectId": project_id,
         "columnId": column_id,
         "coordinatorId": user_id,
@@ -119,7 +119,7 @@ def make_task(
 
 def named_task(
     store: FakeStore, project_id: str, name: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     return next(
         task
         for task in store.find_many(TASKS, {"projectId": project_id})
@@ -128,16 +128,16 @@ def named_task(
 
 
 def reorder_body(
-    from_task: Dict[str, Any],
-    from_column: Dict[str, Any],
-    to_column: Dict[str, Any],
+    from_task: dict[str, Any],
+    from_column: dict[str, Any],
+    to_column: dict[str, Any],
     **extra: Any,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """A tail-append cross-column drag (no reference task) from one column
     to another -- the same shape ``test_task_completed_at`` uses to move a
     task into the done column."""
 
-    body: Dict[str, Any] = {
+    body: dict[str, Any] = {
         "type": "after",
         "fromId": str(from_task["_id"]),
         "referenceId": None,
@@ -149,13 +149,13 @@ def reorder_body(
 
 
 def update_body(
-    task: Dict[str, Any],
+    task: dict[str, Any],
     project_id: str,
     column_id: str,
     coordinator_id: str,
     **extra: Any,
-) -> Dict[str, Any]:
-    body: Dict[str, Any] = {
+) -> dict[str, Any]:
+    body: dict[str, Any] = {
         "_id": str(task["_id"]),
         "projectId": project_id,
         "columnId": column_id,
@@ -171,13 +171,13 @@ def update_body(
 def seed_blocked_with_prereq(
     client: TestClient,
     store: FakeStore,
-    owner: Dict[str, Any],
+    owner: dict[str, Any],
     project_id: str,
-    todo: Dict[str, Any],
+    todo: dict[str, Any],
     *,
     prereq_done: bool,
-    done_column: Dict[str, Any],
-) -> tuple[Dict[str, Any], Dict[str, Any]]:
+    done_column: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
     """Create a ``Prereq`` task and a ``Blocked`` task that depends on it.
 
     Both start in the ``todo`` column. When ``prereq_done`` is True the

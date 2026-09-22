@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
@@ -107,7 +107,7 @@ class PostgresCheckpointerSpec:
     conn_string: str
 
 
-def resolve_agent_postgres_uri(settings: "Settings", *, backend_env: str) -> str:
+def resolve_agent_postgres_uri(settings: Settings, *, backend_env: str) -> str:
     """Resolve the postgres connection string for an agent backend.
 
     ``backend_env`` is the env-var name the caller is configuring
@@ -168,8 +168,8 @@ _resolve_agent_postgres_uri = resolve_agent_postgres_uri
 def build_checkpointer(
     backend: str,
     *,
-    settings: Optional["Settings"] = None,
-) -> Union[BaseCheckpointSaver, PostgresCheckpointerSpec, None]:
+    settings: Settings | None = None,
+) -> BaseCheckpointSaver | PostgresCheckpointerSpec | None:
     """Return a checkpointer for ``backend``.
 
     Returns ``None`` when persistence is disabled, an
@@ -213,7 +213,7 @@ def build_checkpointer(
 async def enter_agent_postgres_pool(
     stack: AsyncExitStack,
     conn_string: str,
-    settings: "Settings",
+    settings: Settings,
 ) -> Any:
     """Open an :class:`~psycopg_pool.AsyncConnectionPool` and register it on
     ``stack``.
@@ -251,9 +251,9 @@ async def open_checkpointer(
     backend: str,
     *,
     stack: AsyncExitStack,
-    settings: Optional["Settings"] = None,
-    pool: Optional[Any] = None,
-) -> Optional[BaseCheckpointSaver]:
+    settings: Settings | None = None,
+    pool: Any | None = None,
+) -> BaseCheckpointSaver | None:
     """Async counterpart of :func:`build_checkpointer`.
 
     For the ``"none"`` and ``"memory"`` backends this is a thin wrapper

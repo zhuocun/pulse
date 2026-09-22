@@ -1,8 +1,7 @@
 import pytest
 
-from app import database
+from app import database, repositories
 from app.config import Settings, env_bool, env_int
-from app import repositories
 
 
 def test_repository_helpers_and_errors(monkeypatch) -> None:

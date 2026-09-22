@@ -17,18 +17,18 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
+from langgraph.runtime import get_runtime
 from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
-from app.agents.pipeline import linear_graph
 from app.agents.catalog._schemas import NUDGE_ID_MAX, NUDGE_SUMMARY_MAX
 from app.agents.catalog._shared import (
     detect_drift_node,
@@ -40,12 +40,12 @@ from app.agents.catalog._shared import (
 )
 from app.agents.context import ChatContext
 from app.agents.identity import COPILOT_IDENTITY
+from app.agents.pipeline import linear_graph
 from app.agents.polish import PolishStep
 from app.agents.state import TriageState
+from app.store import namespaces
 from app.tools.fe_tool_names import FE_BOARD_SNAPSHOT
 from app.tools.redaction import redact_dict
-from app.store import namespaces
-from langgraph.runtime import get_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -219,7 +219,7 @@ async def _polish_triage(
     board_snapshot: dict[str, Any],
     *,
     profile_hint: dict[str, Any] | None = None,
-) -> tuple[list[dict[str, Any]], Optional[AIMessage], int, int]:
+) -> tuple[list[dict[str, Any]], AIMessage | None, int, int]:
     """4-tuple variant: returns ``(nudges, raw_msg, tokens_in, tokens_out)``.
 
     The raw ``AIMessage`` carries ``usage_metadata`` so ``generate_nudges``
@@ -288,8 +288,8 @@ class TriageAgent(BaseAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         _default_model = self.chat_model  # captured for fallback
 

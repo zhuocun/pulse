@@ -62,13 +62,12 @@ Design constraints
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Generic, Optional, TypeVar
+from collections.abc import Callable
+from typing import Any
 
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
-
-_SchemaT = TypeVar("_SchemaT", bound=BaseModel)
 
 
 def cap_polished_text(text: Any, *, max_chars: int, fallback: str) -> str:
@@ -139,7 +138,7 @@ def merge_keyed_string_updates(
     return out
 
 
-class PolishStep(Generic[_SchemaT]):
+class PolishStep[SchemaT: BaseModel]:
     """Declarative single LLM polish pass.
 
     Parameters
@@ -186,11 +185,11 @@ class PolishStep(Generic[_SchemaT]):
         self,
         *,
         prompt_fn: Callable[[Any], Any],
-        schema: type[_SchemaT],
+        schema: type[SchemaT],
         fallback_fn: Callable[[Any], Any],
-        merge_fn: Optional[Callable[[Any, Any], dict[str, Any]]] = None,
-        redact: Optional[Callable[[Any], Any]] = None,
-        cap_field: Optional[tuple[str, int]] = None,
+        merge_fn: Callable[[Any, Any], dict[str, Any]] | None = None,
+        redact: Callable[[Any], Any] | None = None,
+        cap_field: tuple[str, int] | None = None,
     ) -> None:
         if cap_field is not None and merge_fn is not None:
             raise ValueError("Provide either cap_field or merge_fn, not both.")
@@ -207,7 +206,7 @@ class PolishStep(Generic[_SchemaT]):
         # GC'd and its address is reused by a subsequent mock.
         import weakref
 
-        self._chain_cache: "weakref.WeakKeyDictionary[Any, Any]" = (
+        self._chain_cache: weakref.WeakKeyDictionary[Any, Any] = (
             weakref.WeakKeyDictionary()
         )
 
@@ -253,9 +252,10 @@ class PolishStep(Generic[_SchemaT]):
         append the raw message to ``state["messages"]``).
         """
 
+        from langchain_core.messages import HumanMessage
+
         from app.agents.catalog._shared import unpack_structured_response
         from app.agents.llm import extract_token_usage, is_stub_model
-        from langchain_core.messages import HumanMessage
 
         def _lazy_fallback() -> Any:
             return self._fallback_fn(state)

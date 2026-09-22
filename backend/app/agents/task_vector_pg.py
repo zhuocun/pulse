@@ -10,9 +10,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Optional
+from typing import Any
 
-from app.config import Settings, settings as default_settings
+from app.config import Settings
+from app.config import settings as default_settings
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ def fetch_vector_neighbours_for_project(
     project_id: str,
     query_embedding: list[float],
     limit: int = 8,
-    settings: Optional[Settings] = None,
+    settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
     """Return ``[{"id", "text", "score"}, ...]`` from pgvector, newest first."""
 
@@ -93,7 +94,7 @@ async def fetch_vector_neighbours_for_project_async(
     project_id: str,
     query_embedding: list[float],
     limit: int = 8,
-    settings: Optional[Settings] = None,
+    settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
     """Async wrapper around :func:`fetch_vector_neighbours_for_project`.
 

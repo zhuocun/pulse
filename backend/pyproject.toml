@@ -55,7 +55,7 @@ dev = [
     "httpx>=0.27.0",
     "pytest>=8.0.0",
     "pytest-cov>=5.0.0",
-    "ruff>=0.8.0",
+    "ruff>=0.13,<0.17",
     "fakeredis[lua]>=2.21",
 ]
 
@@ -89,12 +89,28 @@ target-version = "py312"
 
 [tool.ruff.lint]
 # State the rule set instead of inheriting whatever the installed ruff
-# defaults to. `ruff>=0.8.0` is unpinned, so CI installs the newest release,
-# and a release that widens the default select turns this suite red without a
-# line of code changing — which is what happened after three months of the
-# path filters keeping backend CI dormant. These four are ruff's historical
-# default and exactly what this codebase has been passing under.
-select = ["E4", "E7", "E9", "F"]
+# defaults to: when ruff was unpinned, a release that widened the default
+# select turned this suite red without a line of code changing. The adopted
+# set is ruff's historical default (E4, E7, E9, F) plus pyupgrade (UP), isort
+# (I), flake8-bugbear (B) and ruff's own rules (RUF). A family prefix still
+# grows when a ruff release stabilises a new rule in it, which is why ruff is
+# pinned to a tested range in [project.optional-dependencies]; 0.13 is the
+# oldest release this config passes on. Widen the range deliberately.
+select = ["E4", "E7", "E9", "F", "UP", "I", "B", "RUF"]
+# Rules this set leaves out but whose `# noqa` markers the code keeps as
+# deliberate-intent notes, most with an inline reason. Without this, RUF100
+# flags them as unused and its fix deletes the whole comment, reason and all.
+external = ["ANN401", "ARG002", "BLE001", "E501", "PLC0415", "SLF001"]
+
+[tool.ruff.lint.flake8-bugbear]
+# B008 exemptions. FastAPI resolves `Depends(...)`/`Body(...)` defaults per
+# request, so the markers are the idiom, not shared state; the backfill
+# options dataclass is frozen, so one shared default instance is safe.
+extend-immutable-calls = [
+    "fastapi.Body",
+    "fastapi.Depends",
+    "app.agents.task_vector_backfill.TaskEmbeddingBackfillOptions",
+]
 
 [tool.ruff.lint.per-file-ignores]
 "api/index.py" = ["F401"]

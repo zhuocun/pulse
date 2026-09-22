@@ -20,13 +20,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastapi import HTTPException, Request, status
 
 from app.middleware import idempotency as _idempotency
 from app.middleware.idempotency import CachedResponse
-
 
 _MAX_KEY_LENGTH = 255
 _KEY_RE = re.compile(r"^[A-Za-z0-9_\-:./]+$")
@@ -51,15 +50,15 @@ class IdempotencyContext:
     """
 
     enabled: bool
-    cache_key: Optional[str]
-    fingerprint: Optional[str]
-    cached_response: Optional[CachedResponse] = None
+    cache_key: str | None
+    fingerprint: str | None
+    cached_response: CachedResponse | None = None
 
     def store(
         self,
         status_code: int,
         body: Any,
-        headers: Optional[Dict[str, str]] = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         """Persist a successful 2xx response into the cache slot."""
 
@@ -88,7 +87,7 @@ async def check_idempotency(
     payload: Any,
     *,
     auth_subject: str,
-    operation_id: Optional[str] = None,
+    operation_id: str | None = None,
 ) -> IdempotencyContext:
     """Look up ``Idempotency-Key`` in the cache and return the per-request context.
 

@@ -24,7 +24,7 @@ schemas, not a runnable agent.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from langchain_core.tools import BaseTool, StructuredTool
 from pydantic import BaseModel, Field, create_model
@@ -40,7 +40,7 @@ _TYPE_MAP: dict[str, Any] = {
     "integer": int,
     "boolean": bool,
     "number": float,
-    "object": Dict[str, Any],
+    "object": dict[str, Any],
     "array": list,
 }
 
@@ -71,7 +71,7 @@ def _build_filter_submodel(tool_name: str, arg_name: str, arg_spec: dict[str, An
     model_fields: dict[str, Any] = {}
     for fname in filter_fields:
         desc = field_descriptions.get(fname, fname)
-        model_fields[fname] = (Optional[str], Field(None, description=desc))
+        model_fields[fname] = (str | None, Field(None, description=desc))
 
     model_name = f"{tool_name}{arg_name.capitalize()}Filter"
     return create_model(model_name, **model_fields)  # type: ignore[call-overload]
@@ -103,7 +103,7 @@ def _build_args_model(tool_name: str, args_spec: dict[str, dict[str, Any]]) -> t
 
         if is_optional:
             model_fields[arg_name] = (
-                Optional[inner_type],
+                inner_type | None,
                 Field(None, description=description),
             )
         else:

@@ -6,8 +6,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Optional, Sequence
 
 SCRIPT = Path(__file__).resolve()
 BACKEND_CANDIDATES = (SCRIPT.parent.parent, SCRIPT.parent.parent.parent / "backend")
@@ -72,7 +72,7 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     options = TaskEmbeddingBackfillOptions(
         project_id=args.project_id,

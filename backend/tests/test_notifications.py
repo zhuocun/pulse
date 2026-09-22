@@ -9,7 +9,7 @@ that mention members and then asserts on ``GET`` / ``PUT
 recipient and only that recipient may read or modify it.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -29,7 +29,7 @@ def _wire_repos(store: FakeStore, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ns, "repository", store)
 
 
-def auth_headers(token: str) -> Dict[str, str]:
+def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -37,7 +37,7 @@ def register_and_login(
     client: TestClient,
     username: str,
     email: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     response = client.post(
         "/api/v1/auth/register",
         json={"username": username, "email": email, "password": "secret"},
@@ -82,7 +82,7 @@ def add_member(
     assert response.status_code == 201, response.text
 
 
-def first_column(client: TestClient, token: str, project_id: str) -> Dict[str, Any]:
+def first_column(client: TestClient, token: str, project_id: str) -> dict[str, Any]:
     columns = client.get(
         f"/api/v1/boards/?projectId={project_id}", headers=auth_headers(token)
     ).json()

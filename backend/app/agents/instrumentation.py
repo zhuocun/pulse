@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any, Optional
+from typing import Any
 
 from app.agents.llm import result_token_usage_from_graph_result
 from app.observability.metrics import record_invocation
@@ -72,9 +72,9 @@ class _AgentRunSpan:
         *,
         operation: str,
         agent_name: str,
-        model_id: Optional[str],
-        project_id: Optional[str],
-        autonomy: Optional[str],
+        model_id: str | None,
+        project_id: str | None,
+        autonomy: str | None,
     ) -> None:
         self._operation = operation
         self._agent_name = agent_name
@@ -92,7 +92,7 @@ class _AgentRunSpan:
         # entirely.  _attrs is populated in __enter__.
         self._attrs: Any = None
 
-    def __enter__(self) -> "_AgentRunSpan":
+    def __enter__(self) -> _AgentRunSpan:
         self._start = time.monotonic()
         span_name = f"agent.{self._agent_name}.{self._operation}"
         # Start with a name-only span first so we can interrogate is_recording();
@@ -129,9 +129,9 @@ class _AgentRunSpan:
 
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[Any],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any | None,
     ) -> None:
         duration = time.monotonic() - self._start
         if exc_val is None:
@@ -161,9 +161,9 @@ def start_run_span(
     *,
     operation: str,
     agent_name: str,
-    model_id: Optional[str] = None,
-    project_id: Optional[str] = None,
-    autonomy: Optional[str] = None,
+    model_id: str | None = None,
+    project_id: str | None = None,
+    autonomy: str | None = None,
 ) -> _AgentRunSpan:
     """Construct a per-run span / metric pair to ``with``-enter."""
 

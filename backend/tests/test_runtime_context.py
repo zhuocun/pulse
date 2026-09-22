@@ -10,12 +10,7 @@ Verifies that:
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Optional
-
-from app.agents.base import AgentMetadata, BaseAgent
-from app.agents.context import ChatContext
-from app.agents.registry import AgentRegistry
-from app.agents.runtime import AgentRuntime
+from typing import Any, TypedDict
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
@@ -23,8 +18,10 @@ from langgraph.pregel import Pregel
 from langgraph.runtime import get_runtime
 from langgraph.store.base import BaseStore
 
-from typing import TypedDict
-
+from app.agents.base import AgentMetadata, BaseAgent
+from app.agents.context import ChatContext
+from app.agents.registry import AgentRegistry
+from app.agents.runtime import AgentRuntime
 
 # ---------------------------------------------------------------------------
 # Minimal sentinel models
@@ -78,8 +75,8 @@ class _ContextRecordingAgent(BaseAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         _default = self.chat_model  # captured fallback
 

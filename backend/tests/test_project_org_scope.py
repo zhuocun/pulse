@@ -14,7 +14,7 @@ org/project services are driven directly so the new create branches and
 both ``_org_visible`` arms are exercised independently of the routers.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -54,22 +54,22 @@ def _add_org_member(org_id: str, owner_id: str, target_id: str, role: str) -> No
 def _create_project(
     user_id: str,
     *,
-    organization_id: Optional[str] = None,
+    organization_id: str | None = None,
     project_name: str = "Pulse",
-) -> Optional[str]:
+) -> str | None:
     """Call ``project_service.create`` with the dual-write ``organization`` string.
 
     ``organizationId`` is threaded through only when supplied so the absent
     (legacy) case sends exactly the historical body shape.
     """
 
-    data: Dict[str, Any] = {"projectName": project_name, "organization": "OpenAI"}
+    data: dict[str, Any] = {"projectName": project_name, "organization": "OpenAI"}
     if organization_id is not None:
         data["organizationId"] = organization_id
     return project_service.create(data, user_id)
 
 
-def _stored_project(store: FakeStore, manager_id: str) -> Dict[str, Any]:
+def _stored_project(store: FakeStore, manager_id: str) -> dict[str, Any]:
     """The single project managed by ``manager_id`` (tests create one each)."""
 
     rows = [

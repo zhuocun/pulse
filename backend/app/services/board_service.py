@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from app.database import COLUMNS, PROJECTS, TASKS
 from app.domain.ordering import column_reorder_updates
@@ -20,7 +20,7 @@ _COLUMN_UPDATE_FIELDS = frozenset({"columnName", "wipLimit", "category"})
 _COLUMN_CATEGORIES = frozenset({"todo", "in_progress", "done"})
 
 
-def _wip_limit_error(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _wip_limit_error(data: dict[str, Any]) -> dict[str, Any] | None:
     """Validate ``wipLimit`` when present: a non-negative ``int``.
 
     Mirrors how ``task_service`` validates ``storyPoints`` -- ``bool`` is a
@@ -42,7 +42,7 @@ def _wip_limit_error(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _category_error(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _category_error(data: dict[str, Any]) -> dict[str, Any] | None:
     """Validate ``category`` when present: one of the allowed labels.
 
     Mirrors ``_wip_limit_error`` in return/sentinel style -- returns a
@@ -60,7 +60,7 @@ def _category_error(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return None
 
 
-def create_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+def create_validation_errors(data: dict[str, Any]) -> list[dict[str, Any]]:
     """Body errors for POST /boards (optional ``wipLimit`` / ``category``).
 
     ``columnName`` / ``projectId`` presence is enforced by the router's
@@ -69,7 +69,7 @@ def create_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     one defaults to ``"todo"`` in ``create``.
     """
 
-    errors: List[Dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
     if "wipLimit" in data:
         error = _wip_limit_error(data)
         if error is not None:
@@ -81,10 +81,10 @@ def create_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     return errors
 
 
-def update_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+def update_validation_errors(data: dict[str, Any]) -> list[dict[str, Any]]:
     """Body errors for PUT /boards (column rename / WIP-limit change)."""
 
-    errors: List[Dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
     if "columnName" in data:
         column_name = data.get("columnName")
         if not isinstance(column_name, str) or column_name == "":
@@ -102,7 +102,7 @@ def update_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     return errors
 
 
-def get(project_id: str, user_id: str) -> Union[None, str, List[Dict[str, Any]]]:
+def get(project_id: str, user_id: str) -> str | list[dict[str, Any]] | None:
     if repository.find_by_id(PROJECTS, project_id) is None:
         return None
     # Read path: any member (viewer and up) may load the board.
@@ -121,7 +121,7 @@ def get(project_id: str, user_id: str) -> Union[None, str, List[Dict[str, Any]]]
     return serialized
 
 
-def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
+def create(data: dict[str, Any], user_id: str) -> str | None:
     project_id = data.get("projectId")
     project = repository.find_by_id(PROJECTS, project_id or "")
     if project is None:
@@ -157,7 +157,7 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
     return "Column created"
 
 
-def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
+def update(data: dict[str, Any], user_id: str) -> str | None:
     """Update a column's ``columnName``, ``wipLimit`` and/or ``category``.
 
     Returns ``None`` (missing column), ``"Forbidden"`` (caller lacks
@@ -190,7 +190,7 @@ def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
     return "Column updated"
 
 
-def reorder(data: Dict[str, Any], user_id: str) -> Optional[str]:
+def reorder(data: dict[str, Any], user_id: str) -> str | None:
     order_type = data.get("type")
     from_id = data.get("fromId")
     reference_id = data.get("referenceId")
@@ -214,7 +214,7 @@ def reorder(data: Dict[str, Any], user_id: str) -> Optional[str]:
     return "Column reordered"
 
 
-def remove(column_id: str, user_id: str) -> Optional[str]:
+def remove(column_id: str, user_id: str) -> str | None:
     column = repository.find_by_id(COLUMNS, column_id)
     if column is None:
         return None

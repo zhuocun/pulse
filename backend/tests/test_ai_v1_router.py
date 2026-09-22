@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Iterable
 from dataclasses import replace
 from http import HTTPStatus
-from typing import Any, Iterable
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from pytest import FixtureRequest
 from langchain_core.messages import AIMessage, HumanMessage
+from pytest import FixtureRequest
 
-from app import main
-from app import security
+from app import main, security
 from app.agents.catalog import board_brief as bb_module
 from app.agents.catalog import task_drafting as td_module
 from app.agents.catalog import task_estimation as te_module
@@ -22,8 +22,12 @@ from app.config import settings as default_settings
 from app.middleware.budget import BudgetTracker
 from app.middleware.rate_limit import RateLimiter
 from app.security import create_token
-from tests.conftest import FakeStore, seed_agent_test_projects_if_absent
-from tests.conftest import is_not_stub, structured_model
+from tests.conftest import (
+    FakeStore,
+    is_not_stub,
+    seed_agent_test_projects_if_absent,
+    structured_model,
+)
 
 
 @pytest.fixture()
@@ -2275,8 +2279,8 @@ def test_gate_records_rate_limited_on_429(
     ai_rate_limit_backend: RateLimiter,
 ) -> None:
     """V1 gate emits record_invocation('rate_limited') and returns 429."""
-    from app.observability import metrics as metrics_module
     from app.config import settings as app_settings
+    from app.observability import metrics as metrics_module
 
     metrics_module.configure_metrics(
         settings=replace(app_settings, prometheus_metrics=True)
@@ -2357,8 +2361,8 @@ def test_gate_with_reservation_records_budget_exhausted_on_402(
     ai_budget_backend: BudgetTracker,
 ) -> None:
     """_gate_with_reservation records 'budget_exhausted' and returns 402."""
-    from app.observability import metrics as metrics_module
     from app.config import settings as app_settings
+    from app.observability import metrics as metrics_module
 
     metrics_module.configure_metrics(
         settings=replace(app_settings, prometheus_metrics=True)
@@ -2707,8 +2711,8 @@ def test_task_draft_returns_502_when_agent_error_and_fallback_returns_none(
     an ``UnboundLocalError`` (latent defect: ``final_state`` and
     ``custom_events`` were previously unbound on this code path).
     """
-    from app.agents.errors import AgentError
     from app.agents.catalog import task_drafting as td_mod
+    from app.agents.errors import AgentError
 
     # Make the runtime raise AgentError so the fallback branch is taken.
     async def _raise_agent_error(*args: Any, **kwargs: Any) -> Any:

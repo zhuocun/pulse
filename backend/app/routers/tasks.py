@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Query, status
 
@@ -6,17 +6,16 @@ from app.security import current_user_id, current_user_payload
 from app.services import task_service
 from app.validation import api_error, required_body_errors, validation_errors
 
-
 router = APIRouter()
 
 
 @router.get("/", status_code=status.HTTP_200_OK)
 def get_tasks(
-    projectId: Optional[str] = Query(default=None),
+    projectId: str | None = Query(default=None),
     includeArchived: bool = Query(default=False),
     includeTrashed: bool = Query(default=False),
-    payload: Dict[str, Any] = Depends(current_user_payload),
-) -> List[Dict[str, Any]]:
+    payload: dict[str, Any] = Depends(current_user_payload),
+) -> list[dict[str, Any]]:
     if projectId is None:
         api_error(status.HTTP_400_BAD_REQUEST, "Lack of project information")
 
@@ -42,8 +41,8 @@ def get_tasks(
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 def create_task(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     # Only the routing/identity fields are mandatory at the wire. ``type``,
     # ``epic``, ``storyPoints`` and ``note`` are filled with sensible
@@ -71,8 +70,8 @@ def create_task(
 
 @router.put("/", status_code=status.HTTP_200_OK)
 def update_task(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     errors = task_service.update_validation_errors(data)
     if errors:
@@ -90,9 +89,9 @@ def update_task(
 
 @router.delete("/", status_code=status.HTTP_200_OK)
 def remove_task(
-    taskId: Optional[str] = Query(default=None),
+    taskId: str | None = Query(default=None),
     purge: bool = Query(default=False),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     # Default DELETE soft-deletes (moves the task to trash, PRD §5.5);
     # ``?purge=true`` keeps the legacy hard delete (orphan children +
@@ -110,8 +109,8 @@ def remove_task(
 
 @router.put("/restore", status_code=status.HTTP_200_OK)
 def restore_task(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     # Un-trash / un-archive a task (PRD §5.4/§5.5): clears both markers so a
     # restore from trash brings the task all the way back to the board.
@@ -125,8 +124,8 @@ def restore_task(
 
 @router.put("/archive", status_code=status.HTTP_200_OK)
 def archive_task(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     # Archive / unarchive a task (PRD §5.4). Existence + access are checked
     # inside the service BEFORE ``archived`` is validated so a non-member
@@ -145,8 +144,8 @@ def archive_task(
 
 @router.put("/bulk", status_code=status.HTTP_200_OK)
 def bulk_update_tasks(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     # Fan-out metadata edit. ``task_service.bulk_update`` filters the
     # ``changes`` object down to the safe (non-positional) field set, so
@@ -164,9 +163,9 @@ def bulk_update_tasks(
 
 @router.put("/orders", status_code=status.HTTP_200_OK)
 def reorder_tasks(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
-) -> Union[str, Dict[str, Any]]:
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
+) -> str | dict[str, Any]:
     result = task_service.reorder(data, current_user_id(payload))
     if result is None:
         api_error(status.HTTP_400_BAD_REQUEST, "Bad request")

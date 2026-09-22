@@ -1,4 +1,4 @@
-from typing import Any, Dict, Union
+from typing import Any
 
 from fastapi import APIRouter, Body, Depends, status
 
@@ -11,8 +11,8 @@ router = APIRouter()
 
 @router.get("/", status_code=status.HTTP_200_OK)
 def get_notifications(
-    payload: Dict[str, Any] = Depends(current_user_payload),
-) -> Union[list, str]:
+    payload: dict[str, Any] = Depends(current_user_payload),
+) -> list | str:
     # Always the caller's own notifications -- no query parameters, so a
     # client cannot ask for anyone else's inbox.
     return notification_service.get(current_user_id(payload))
@@ -20,8 +20,8 @@ def get_notifications(
 
 @router.put("/", status_code=status.HTTP_200_OK)
 def mark_notification_read(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     result = notification_service.mark_read(data, current_user_id(payload))
     if result == "Notification updated":

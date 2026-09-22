@@ -28,7 +28,7 @@ import logging
 import math
 import re
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ def _hash_floats(text: str, dim: int) -> list[float]:
     digest = b""
     counter = 0
     while len(digest) < bytes_needed:
-        digest += hashlib.sha256(f"{counter}:{text}".encode("utf-8")).digest()
+        digest += hashlib.sha256(f"{counter}:{text}".encode()).digest()
         counter += 1
     out: list[float] = []
     for i in range(dim):
@@ -246,7 +246,7 @@ def _dot_normalised(a: list[float], b: list[float]) -> float:
 
     if len(a) != len(b):
         raise ValueError("vectors must share dimensionality")
-    return sum(x * y for x, y in zip(a, b))
+    return sum(x * y for x, y in zip(a, b, strict=True))
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -254,7 +254,7 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
 
     if len(a) != len(b):
         raise ValueError("vectors must share dimensionality")
-    dot = sum(x * y for x, y in zip(a, b))
+    dot = sum(x * y for x, y in zip(a, b, strict=True))
     norm_a = math.sqrt(sum(x * x for x in a))
     norm_b = math.sqrt(sum(x * x for x in b))
     if norm_a == 0 or norm_b == 0:
@@ -360,7 +360,7 @@ def detect_drift(snapshot: dict[str, Any]) -> dict[str, Any]:
 
     columns = snapshot.get("columns") or []
     tasks = snapshot.get("tasks") or []
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     signals: list[dict[str, Any]] = []
 

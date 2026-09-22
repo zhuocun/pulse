@@ -8,9 +8,10 @@ payloads as the only source of truth.
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
-from app.database import AGENT_MUTATION_JOURNAL, collection as db_collection, now
+from app.database import AGENT_MUTATION_JOURNAL, now
+from app.database import collection as db_collection
 from app.observability.metrics import record_agent_mutation_event
 from app.services import task_service
 
@@ -131,7 +132,7 @@ def undo_mutation(
 def journal_entry_for_tests(
     user_id: str,
     proposal_id: str,
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Test helper: return raw journal doc or ``None``."""
 
     return db_collection(AGENT_MUTATION_JOURNAL).find_one(

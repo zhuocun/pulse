@@ -14,7 +14,6 @@ from app.agents.errors import (
     agent_http_error_detail,
 )
 
-
 # ---------------------------------------------------------------------------
 # _safe_cause_kind -- classification by exception class name/module
 # ---------------------------------------------------------------------------

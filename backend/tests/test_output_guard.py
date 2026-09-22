@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from app.agents.output_guard import classify_pre_mutation
 
-
 # A minimal approved mutation that maps to a single task rename.
 _PROPOSAL = {
     "proposal_id": "pr-1",

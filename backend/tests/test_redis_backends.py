@@ -21,8 +21,8 @@ Coverage targets:
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import replace
-from typing import Iterable
 
 import fakeredis
 import pytest
@@ -32,7 +32,6 @@ from app.config import settings as app_settings
 from app.middleware import budget as _budget
 from app.middleware import rate_limit as _rate_limit
 from app.middleware import redis_backends
-
 
 # ---------------------------------------------------------------------------
 # Shared fakeredis fixture + autouse swap-back so test pollution cannot leak.

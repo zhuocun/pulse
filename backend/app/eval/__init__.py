@@ -28,11 +28,11 @@ from app.eval.rubrics import RUBRICS, RubricCriterion, get_rubric
 from app.eval.runner import EvalReport, FixtureResult, run_eval
 
 __all__ = [
+    "RUBRICS",
     "EvalFixture",
     "EvalReport",
     "FixtureResult",
     "JudgeResult",
-    "RUBRICS",
     "RubricCriterion",
     "StubJudge",
     "get_rubric",

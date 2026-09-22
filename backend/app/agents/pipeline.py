@@ -8,7 +8,8 @@ pairs so each agent file only needs one call instead of repeated
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 

@@ -8,7 +8,7 @@ so the service relies on flat filters (e.g. ``{"parentTaskId": id}``);
 the orphan-on-delete test exercises exactly that path.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -16,7 +16,7 @@ from app.database import TASKS
 from tests.conftest import FakeStore
 
 
-def auth_headers(token: str) -> Dict[str, str]:
+def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -24,7 +24,7 @@ def register_and_login(
     client: TestClient,
     username: str,
     email: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Register + login a user; return the login body plus a bearer token.
 
     Each login overwrites the shared ``TestClient`` cookie jar, so we pull
@@ -67,7 +67,7 @@ def create_project(
     )
 
 
-def first_column(client: TestClient, token: str, project_id: str) -> Dict[str, Any]:
+def first_column(client: TestClient, token: str, project_id: str) -> dict[str, Any]:
     columns = client.get(
         f"/api/v1/boards/?projectId={project_id}", headers=auth_headers(token)
     ).json()
@@ -584,7 +584,7 @@ def test_bulk_update_rejects_invalid_parent_and_coordinator(
     create_task(client, owner["jwt"], project_id, column["_id"], owner["_id"])
     task = get_tasks(client, owner["jwt"], project_id)[0]
 
-    def bulk(changes: Dict[str, Any]) -> Any:
+    def bulk(changes: dict[str, Any]) -> Any:
         return client.put(
             "/api/v1/tasks/bulk",
             json={"taskIds": [task["_id"]], "changes": changes},

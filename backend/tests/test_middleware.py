@@ -3,7 +3,7 @@ and the :mod:`app.middleware.idempotency` singleton smoke test."""
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -17,7 +17,6 @@ from app.middleware.budget import (
 )
 from app.middleware.idempotency import InMemoryIdempotencyBackend
 from app.middleware.rate_limit import DEFAULT_LIMIT, RateLimiter
-
 
 # Sample limits the catalog actually uses (PRD §5A.8).
 TRIAGE_LIMITS = (10, 60)
@@ -171,7 +170,7 @@ def test_budget_module_singleton_uses_settings_cap() -> None:
 
 
 def test_current_month_key_is_year_month() -> None:
-    fixed = datetime(2026, 1, 7, tzinfo=timezone.utc)
+    fixed = datetime(2026, 1, 7, tzinfo=UTC)
     assert _current_month_key(fixed) == "2026-01"
 
 
@@ -179,7 +178,7 @@ def test_current_month_key_default_uses_now(monkeypatch: pytest.MonkeyPatch) -> 
     class _FrozenDatetime:
         @classmethod
         def now(cls, tz: object = None) -> datetime:
-            return datetime(2030, 12, 5, tzinfo=timezone.utc)
+            return datetime(2030, 12, 5, tzinfo=UTC)
 
     monkeypatch.setattr(budget_module, "datetime", _FrozenDatetime)
     assert _current_month_key() == "2030-12"
@@ -201,7 +200,11 @@ def test_get_rate_limiter_returns_app_state_when_set() -> None:
     from fastapi import Depends, FastAPI
     from fastapi.testclient import TestClient
 
-    from app.middleware.rate_limit import RateLimiter, RateLimitBackend, get_rate_limiter
+    from app.middleware.rate_limit import (
+        RateLimitBackend,
+        RateLimiter,
+        get_rate_limiter,
+    )
 
     fake = RateLimiter()
     mini_app = FastAPI()

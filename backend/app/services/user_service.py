@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from app.database import PROJECTS, USERS
 from app.domain.password_policy import MIN_PASSWORD_LENGTH
@@ -17,13 +17,13 @@ USER_UPDATE_FIELDS = frozenset({"username", "email", "password"})
 _PUBLIC_MEMBER_FIELDS = ("_id", "username", "email")
 
 
-def get(user_id: str) -> Optional[Dict[str, Any]]:
+def get(user_id: str) -> dict[str, Any] | None:
     return repository.serialize_document(repository.find_by_id(USERS, user_id))
 
 
 def update_validation_errors(
-    user_id: str, update_data: Dict[str, Any]
-) -> List[Dict[str, Any]]:
+    user_id: str, update_data: dict[str, Any]
+) -> list[dict[str, Any]]:
     errors = []
     invalid_fields = sorted(set(update_data) - USER_UPDATE_FIELDS)
     if invalid_fields:
@@ -95,7 +95,7 @@ def update_validation_errors(
     return errors
 
 
-def update(user_id: str, update_data: Dict[str, Any]) -> Union[Dict[str, Any], str]:
+def update(user_id: str, update_data: dict[str, Any]) -> dict[str, Any] | str:
     user = repository.find_by_id(USERS, user_id)
     if user is None:
         return "User not found"
@@ -112,7 +112,7 @@ def update(user_id: str, update_data: Dict[str, Any]) -> Union[Dict[str, Any], s
     return repository.serialize_document(updated_user) or {}
 
 
-def get_members() -> List[Dict[str, Any]]:
+def get_members() -> list[dict[str, Any]]:
     members = repository.serialize_documents(repository.find_many(USERS, {}))
     return [
         {field: member.get(field) for field in _PUBLIC_MEMBER_FIELDS}
@@ -122,7 +122,7 @@ def get_members() -> List[Dict[str, Any]]:
 
 def switch_like_status(
     user_id: str, project_id: str
-) -> Optional[Union[Dict[str, Any], str]]:
+) -> dict[str, Any] | str | None:
     user = repository.find_by_id(USERS, user_id)
     project = repository.find_by_id(PROJECTS, project_id)
     if user is None or project is None:

@@ -11,11 +11,11 @@ Adding a fixture is a pure file-system operation; no Python edits required.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-
 
 AGENT_NAMES = (
     "chat",
@@ -87,7 +87,7 @@ class EvalFixture(BaseModel):
     input: dict[str, Any]
     must_have: list[str] = Field(default_factory=list)
     must_not: list[str] = Field(default_factory=list)
-    rubric_overrides: Optional[dict[str, dict[str, Any]]] = None
+    rubric_overrides: dict[str, dict[str, Any]] | None = None
     notes: str = ""
 
     @field_validator("id")
@@ -110,7 +110,7 @@ def fixtures_root() -> Path:
     return Path(__file__).resolve().parents[2] / "tests" / "eval" / "fixtures"
 
 
-def _iter_fixture_files(root: Path, agent: Optional[str]) -> Iterable[Path]:
+def _iter_fixture_files(root: Path, agent: str | None) -> Iterable[Path]:
     if agent is None:
         for name in AGENT_NAMES:
             yield from sorted((root / name).glob("*.json"))
@@ -123,9 +123,9 @@ def _iter_fixture_files(root: Path, agent: Optional[str]) -> Iterable[Path]:
 
 
 def load_fixtures(
-    agent: Optional[str] = None,
+    agent: str | None = None,
     *,
-    root: Optional[Path] = None,
+    root: Path | None = None,
 ) -> list[EvalFixture]:
     """Load every fixture for ``agent`` (or all agents when ``agent`` is None).
 

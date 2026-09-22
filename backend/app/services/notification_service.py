@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from app.database import NOTIFICATIONS
 from app.repositories import repository
@@ -15,7 +15,7 @@ def create(
     kind: str,
     ref_id: str,
     summary: str,
-    project_id: Optional[str] = None,
+    project_id: str | None = None,
 ) -> str:
     """Insert one notification for ``user_id`` and return its new id.
 
@@ -39,7 +39,7 @@ def create(
     return str(new_id)
 
 
-def get(user_id: str) -> List[Dict[str, Any]]:
+def get(user_id: str) -> list[dict[str, Any]]:
     """Return the caller's own notifications, newest first.
 
     Strictly scoped to ``userId == user_id`` -- a caller never sees
@@ -60,7 +60,7 @@ def get(user_id: str) -> List[Dict[str, Any]]:
     return repository.serialize_documents(ordered)
 
 
-def mark_read(data: Dict[str, Any], user_id: str) -> Union[str, None]:
+def mark_read(data: dict[str, Any], user_id: str) -> str | None:
     """Mark one notification (``{_id}``) or all unread (``{markAll: true}``).
 
     Single-id path: the row must exist (else ``None`` -> 404) and belong

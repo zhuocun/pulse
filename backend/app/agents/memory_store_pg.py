@@ -43,8 +43,8 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any
 
 from app.agents.memory_store import MemoryEntry, MemoryScope, MemoryStore
 
@@ -149,7 +149,7 @@ def _row_to_entry(row: Any) -> MemoryEntry:
             "updated_at",
             "expires_at",
         )
-        as_dict = dict(zip(keys, row))
+        as_dict = dict(zip(keys, row, strict=False))
         get = as_dict.get
 
     value = get("value")
@@ -161,7 +161,7 @@ def _row_to_entry(row: Any) -> MemoryEntry:
     if value is None:
         value = {}
 
-    ttl_seconds: Optional[int] = None
+    ttl_seconds: int | None = None
     expires_at = get("expires_at")
     updated_at = get("updated_at")
     if expires_at is not None and updated_at is not None:
@@ -278,14 +278,14 @@ class PostgresMemoryStore(MemoryStore):
         key: str,
         value: dict,
         *,
-        ttl_seconds: Optional[int] = None,
+        ttl_seconds: int | None = None,
     ) -> MemoryEntry:
         if not key:
             raise ValueError("key must be a non-empty string")
         if ttl_seconds is not None and ttl_seconds < 0:
             raise ValueError("ttl_seconds must be non-negative")
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expires_at = (
             now + timedelta(seconds=ttl_seconds)
             if ttl_seconds is not None
@@ -331,13 +331,13 @@ class PostgresMemoryStore(MemoryStore):
         self,
         scope: MemoryScope,
         *,
-        key: Optional[str] = None,
-        query: Optional[str] = None,
+        key: str | None = None,
+        query: str | None = None,
         limit: int = 20,
     ) -> list[MemoryEntry]:
         if limit < 0:
             raise ValueError("limit must be non-negative")
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         clauses: list[str] = []
         args: list[Any] = [scope.project_id, scope.kind, now]
@@ -384,7 +384,7 @@ class PostgresMemoryStore(MemoryStore):
                 return cur.rowcount > 0
 
     async def list_scopes(self, project_id: str) -> list[MemoryScope]:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         rows = await self._execute(
             self._sql(_LIST_SCOPES_SQL), (project_id, now)
         )
@@ -408,10 +408,10 @@ class PostgresMemoryStore(MemoryStore):
 async def open_memory_store(
     backend: str,
     *,
-    pool: Optional[Any] = None,
-    settings: Optional["Settings"] = None,
+    pool: Any | None = None,
+    settings: Settings | None = None,
     table: str = _DEFAULT_TABLE,
-) -> Optional[MemoryStore]:
+) -> MemoryStore | None:
     """Factory: build a memory store for ``backend``.
 
     - ``"none"`` / ``""`` / ``"disabled"`` → ``None``

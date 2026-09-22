@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Query, status
 
@@ -6,15 +6,14 @@ from app.security import current_user_id, current_user_payload
 from app.services import board_service
 from app.validation import api_error, required_body_errors, validation_errors
 
-
 router = APIRouter()
 
 
 @router.get("/", status_code=status.HTTP_200_OK)
 def get_boards(
-    projectId: Optional[str] = Query(default=None),
-    payload: Dict[str, Any] = Depends(current_user_payload),
-) -> List[Dict[str, Any]]:
+    projectId: str | None = Query(default=None),
+    payload: dict[str, Any] = Depends(current_user_payload),
+) -> list[dict[str, Any]]:
     if projectId is None:
         api_error(status.HTTP_400_BAD_REQUEST, "Bad request")
 
@@ -28,8 +27,8 @@ def get_boards(
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 def create_board_column(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     errors = required_body_errors(
         data,
@@ -52,8 +51,8 @@ def create_board_column(
 
 @router.put("/", status_code=status.HTTP_200_OK)
 def update_column(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     errors = required_body_errors(data, {"_id": "Column ID cannot be empty"})
     errors += board_service.update_validation_errors(data)
@@ -72,8 +71,8 @@ def update_column(
 
 @router.put("/orders", status_code=status.HTTP_200_OK)
 def reorder_columns(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     result = board_service.reorder(data, current_user_id(payload))
     if result == "Forbidden":
@@ -85,8 +84,8 @@ def reorder_columns(
 
 @router.delete("/", status_code=status.HTTP_200_OK)
 def remove_column(
-    columnId: Optional[str] = Query(default=None),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    columnId: str | None = Query(default=None),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     if columnId is None:
         api_error(status.HTTP_400_BAD_REQUEST, "Bad request")

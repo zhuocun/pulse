@@ -1,5 +1,6 @@
-from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Optional
+from collections.abc import Iterable
+from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from bson import ObjectId
@@ -8,7 +9,6 @@ from pymongo.collection import Collection
 from pymongo.database import Database
 
 from app.config import settings
-
 
 USERS = "users"
 PROJECTS = "projects"
@@ -63,20 +63,20 @@ def collection(name: str) -> Collection:
 
 
 def now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
-def object_id(value: str) -> Optional[ObjectId]:
+def object_id(value: str) -> ObjectId | None:
     if not value or not ObjectId.is_valid(value):
         return None
     return ObjectId(value)
 
 
-def serialize_document(document: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def serialize_document(document: dict[str, Any] | None) -> dict[str, Any] | None:
     if document is None:
         return None
 
-    output: Dict[str, Any] = {}
+    output: dict[str, Any] = {}
     for key, value in document.items():
         if key == "password":
             continue
@@ -96,31 +96,31 @@ def serialize_document(document: Optional[Dict[str, Any]]) -> Optional[Dict[str,
     return output
 
 
-def serialize_documents(documents: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def serialize_documents(documents: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     return [serialize_document(document) for document in documents]  # type: ignore[list-item]
 
 
-def insert_one(name: str, data: Dict[str, Any]) -> ObjectId:
+def insert_one(name: str, data: dict[str, Any]) -> ObjectId:
     timestamp = now()
     payload = {**data, "createdAt": timestamp, "updatedAt": timestamp}
     result = collection(name).insert_one(payload)
     return result.inserted_id
 
 
-def find_one(name: str, query: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def find_one(name: str, query: dict[str, Any]) -> dict[str, Any] | None:
     return collection(name).find_one(query)
 
 
-def find_many(name: str, query: Dict[str, Any]) -> List[Dict[str, Any]]:
+def find_many(name: str, query: dict[str, Any]) -> list[dict[str, Any]]:
     return list(collection(name).find(query))
 
 
-def delete_many(name: str, query: Dict[str, Any]) -> int:
+def delete_many(name: str, query: dict[str, Any]) -> int:
     result = collection(name).delete_many(query)
     return result.deleted_count
 
 
-def find_by_id(name: str, value: str) -> Optional[Dict[str, Any]]:
+def find_by_id(name: str, value: str) -> dict[str, Any] | None:
     oid = object_id(value)
     if oid is None:
         return None
@@ -128,8 +128,8 @@ def find_by_id(name: str, value: str) -> Optional[Dict[str, Any]]:
 
 
 def update_by_id(
-    name: str, value: str, data: Dict[str, Any]
-) -> Optional[Dict[str, Any]]:
+    name: str, value: str, data: dict[str, Any]
+) -> dict[str, Any] | None:
     oid = object_id(value)
     if oid is None:
         return None
@@ -143,7 +143,7 @@ def update_by_id(
     )
 
 
-def delete_by_id(name: str, value: str) -> Optional[Dict[str, Any]]:
+def delete_by_id(name: str, value: str) -> dict[str, Any] | None:
     oid = object_id(value)
     if oid is None:
         return None

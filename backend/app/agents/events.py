@@ -33,7 +33,7 @@ production; CI catches drift via the transcript tests.
 from __future__ import annotations
 
 import logging
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -55,13 +55,13 @@ class IBoardBriefPayload(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    headline: Optional[str] = None
-    counts: Optional[list] = None
-    largestUnstarted: Optional[list] = None
-    unowned: Optional[list] = None
-    workload: Optional[list] = None
-    recommendation: Optional[str] = None
-    recommendationDetail: Optional[dict] = None
+    headline: str | None = None
+    counts: list | None = None
+    largestUnstarted: list | None = None
+    unowned: list | None = None
+    workload: list | None = None
+    recommendation: str | None = None
+    recommendationDetail: dict | None = None
 
 
 class ITaskDraftPayload(BaseModel):
@@ -75,18 +75,18 @@ class ITaskDraftPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # Single-card fields (all optional so breakdown payloads also pass).
-    taskName: Optional[str] = None
-    type: Optional[str] = None
-    epic: Optional[str] = None
-    storyPoints: Optional[Any] = None
-    note: Optional[str] = None
-    columnId: Optional[str] = None
-    coordinatorId: Optional[str] = None
-    confidence: Optional[Any] = None
-    rationale: Optional[str] = None
+    taskName: str | None = None
+    type: str | None = None
+    epic: str | None = None
+    storyPoints: Any | None = None
+    note: str | None = None
+    columnId: str | None = None
+    coordinatorId: str | None = None
+    confidence: Any | None = None
+    rationale: str | None = None
     # Breakdown variant fields.
-    axis: Optional[str] = None
-    items: Optional[list] = None
+    axis: str | None = None
+    items: list | None = None
 
 
 class IEstimatePayload(BaseModel):
@@ -99,16 +99,16 @@ class IEstimatePayload(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    estimate: Optional[dict] = None
-    readiness: Optional[dict] = None
+    estimate: dict | None = None
+    readiness: dict | None = None
     # v1-shim pass-through fields (estimate_v1 / readiness_v1 surface payloads
     # are flat dicts, not nested — validated by the catch-all pass-through).
-    storyPoints: Optional[Any] = None
-    confidence: Optional[Any] = None
-    rationale: Optional[str] = None
-    similar: Optional[list] = None
-    ready: Optional[bool] = None
-    issues: Optional[list] = None
+    storyPoints: Any | None = None
+    confidence: Any | None = None
+    rationale: str | None = None
+    similar: list | None = None
+    ready: bool | None = None
+    issues: list | None = None
 
 
 class ISearchPayload(BaseModel):
@@ -120,10 +120,10 @@ class ISearchPayload(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    ids: Optional[list] = None
-    rationale: Optional[str] = None
-    matches: Optional[list] = None
-    expandedTerms: Optional[list] = None
+    ids: list | None = None
+    rationale: str | None = None
+    matches: list | None = None
+    expandedTerms: list | None = None
 
 
 class INudgePayload(BaseModel):
@@ -134,12 +134,12 @@ class INudgePayload(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    nudge_id: Optional[str] = None
-    kind: Optional[str] = None
-    project_id: Optional[str] = None
-    summary: Optional[str] = None
-    target_ids: Optional[list] = None
-    severity: Optional[str] = None
+    nudge_id: str | None = None
+    kind: str | None = None
+    project_id: str | None = None
+    summary: str | None = None
+    target_ids: list | None = None
+    severity: str | None = None
 
 
 class TaskUpdateWire(BaseModel):
@@ -149,8 +149,8 @@ class TaskUpdateWire(BaseModel):
 
     task_id: str
     field: str
-    from_: Optional[Any] = Field(default=None, alias="from")
-    to: Optional[Any] = None
+    from_: Any | None = Field(default=None, alias="from")
+    to: Any | None = None
 
 
 class ColumnUpdateWire(BaseModel):
@@ -158,8 +158,8 @@ class ColumnUpdateWire(BaseModel):
 
     column_id: str
     field: str
-    from_: Optional[Any] = Field(default=None, alias="from")
-    to: Optional[Any] = None
+    from_: Any | None = Field(default=None, alias="from")
+    to: Any | None = None
 
 
 class BulkApplyWire(BaseModel):
@@ -173,15 +173,15 @@ class BulkApplyWire(BaseModel):
 class MutationDiffWire(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    task_updates: Optional[list[TaskUpdateWire]] = Field(
+    task_updates: list[TaskUpdateWire] | None = Field(
         default=None,
         description="Supported organic chat mutation diff rows.",
     )
-    column_updates: Optional[list[ColumnUpdateWire]] = Field(
+    column_updates: list[ColumnUpdateWire] | None = Field(
         default=None,
         description="Reserved for non-organic proposal sources until undo support is safe.",
     )
-    bulk_apply: Optional[list[BulkApplyWire]] = Field(
+    bulk_apply: list[BulkApplyWire] | None = Field(
         default=None,
         description="Reserved for non-organic proposal sources until undo support is safe.",
     )
@@ -263,7 +263,7 @@ class Usage(BaseModel):
 
 
 # Union of all known event types.
-AgentEvent = Union[Suggestion, Citation, Usage, MutationProposalEvent]
+AgentEvent = Suggestion | Citation | Usage | MutationProposalEvent
 
 
 def validate_mutation_proposal_event(
@@ -298,10 +298,10 @@ def validate_mutation_proposal_event(
 
 
 def validate_suggestion_payload(
-    suggestion: "dict[str, Any]",
+    suggestion: dict[str, Any],
     *,
     agent: str = "<unknown>",
-) -> "dict[str, Any]":
+) -> dict[str, Any]:
     """Validate the payload of a suggestion event against its surface schema.
 
     Dispatches on ``suggestion["surface"]`` and runs the matching Pydantic

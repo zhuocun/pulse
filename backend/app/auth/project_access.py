@@ -9,12 +9,13 @@ stable.
 
 from __future__ import annotations
 
-from typing import Iterable, Optional, Set
+from collections.abc import Iterable
 
-from app.config import Settings, settings as default_settings
+from app.config import Settings
+from app.config import settings as default_settings
 
 
-def disabled_project_ids(settings: Optional[Settings] = None) -> Set[str]:
+def disabled_project_ids(settings: Settings | None = None) -> set[str]:
     """Return the set of project ids the org has opted out of AI on."""
 
     cfg = settings if settings is not None else default_settings
@@ -22,10 +23,10 @@ def disabled_project_ids(settings: Optional[Settings] = None) -> Set[str]:
 
 
 def is_project_ai_enabled(
-    project_id: Optional[str],
+    project_id: str | None,
     *,
-    settings: Optional[Settings] = None,
-    disabled: Optional[Iterable[str]] = None,
+    settings: Settings | None = None,
+    disabled: Iterable[str] | None = None,
 ) -> bool:
     """Return whether AI agent runs are permitted on ``project_id``.
 

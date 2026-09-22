@@ -13,9 +13,9 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Iterable
 from dataclasses import replace
 from http import HTTPStatus
-from typing import Iterable
 
 import pytest
 from fastapi.testclient import TestClient

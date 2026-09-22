@@ -27,8 +27,8 @@ import asyncio
 import json
 import logging
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Optional, Sequence
 
 from app.eval.fixtures import AGENT_NAMES
 from app.eval.judge import (
@@ -140,14 +140,14 @@ def _print_summary(report: EvalReport, *, stream=sys.stdout) -> None:
                 print(f"           {snippet}", file=stream)
 
 
-def _emit_report(report: EvalReport, output: Optional[Path]) -> None:
+def _emit_report(report: EvalReport, output: Path | None) -> None:
     if output is None:
         return
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report.to_dict(), indent=2, default=str))
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     logging.basicConfig(

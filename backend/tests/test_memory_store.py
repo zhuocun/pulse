@@ -15,7 +15,7 @@ The Postgres backend's tests live in :mod:`tests.test_memory_store_pg`.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -25,7 +25,6 @@ from app.agents.memory_store import (
     MemoryScope,
     MemoryStore,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -324,7 +323,7 @@ def test_in_memory_ttl_future_entries_survive_recall() -> None:
 def test_memory_entry_is_expired_with_explicit_now() -> None:
     """Direct check on :meth:`MemoryEntry.is_expired` -- mocking the clock."""
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     entry = MemoryEntry(
         id="x",
         scope=MemoryScope(project_id="p", user_id=None, kind="preference"),
@@ -341,7 +340,7 @@ def test_memory_entry_is_expired_with_explicit_now() -> None:
 
 
 def test_memory_entry_without_expiry_is_never_expired() -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     entry = MemoryEntry(
         id="x",
         scope=MemoryScope(project_id="p", user_id=None, kind="preference"),

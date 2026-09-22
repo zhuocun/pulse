@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Request, Response, status
 
@@ -10,7 +10,6 @@ from app.security import (
     current_user_payload,
 )
 from app.services import auth_service
-
 
 router = APIRouter()
 
@@ -44,7 +43,7 @@ def _set_session_cookie(response: Response, request: Request, token: str) -> Non
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-def register(data: Dict[str, Any] = Body(default_factory=dict)) -> str:
+def register(data: dict[str, Any] = Body(default_factory=dict)) -> str:
     return auth_service.register(data)
 
 
@@ -52,8 +51,8 @@ def register(data: Dict[str, Any] = Body(default_factory=dict)) -> str:
 def login(
     request: Request,
     response: Response,
-    data: Dict[str, Any] = Body(default_factory=dict),
-) -> Dict[str, Any]:
+    data: dict[str, Any] = Body(default_factory=dict),
+) -> dict[str, Any]:
     result = auth_service.login(data)
     # Pop the REST JWT off the service result and move it into an
     # HttpOnly cookie. The FE never sees this token in JS -- it rides
@@ -68,7 +67,7 @@ def login(
 
 
 @router.post("/ai-token", status_code=status.HTTP_200_OK)
-def refresh_ai_token(payload: Dict[str, Any] = Depends(current_user_payload)) -> Dict[str, str]:
+def refresh_ai_token(payload: dict[str, Any] = Depends(current_user_payload)) -> dict[str, str]:
     """Issue a fresh narrow AI proxy token for an existing REST session."""
 
     return {"ai_jwt": create_ai_proxy_token(current_user_id(payload))}

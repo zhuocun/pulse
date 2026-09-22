@@ -23,7 +23,7 @@ via ``TestClient``. The timestamps themselves are opaque here -- we only
 assert presence vs ``None`` and visibility in/out of the default listing.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -32,7 +32,7 @@ from app.services import project_service, task_service
 from tests.conftest import FakeStore
 
 
-def auth_headers(token: str) -> Dict[str, str]:
+def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -40,7 +40,7 @@ def register_and_login(
     client: TestClient,
     username: str,
     email: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Register + login a user; return the login body plus a bearer token."""
 
     response = client.post(
@@ -131,13 +131,13 @@ def add_member(
     assert response.status_code == 201, response.text
 
 
-def stored_project(project_id: str) -> Dict[str, Any]:
+def stored_project(project_id: str) -> dict[str, Any]:
     project = _STORE.find_by_id(PROJECTS, project_id)
     assert project is not None
     return project
 
 
-def listed_ids(manager_id: str, **flags: bool) -> List[str]:
+def listed_ids(manager_id: str, **flags: bool) -> list[str]:
     """The ids ``project_service.get`` enumerates for ``manager_id`` (default
     listing unless ``include_trashed`` / ``include_archived`` flags widen it)."""
 
@@ -146,7 +146,7 @@ def listed_ids(manager_id: str, **flags: bool) -> List[str]:
     return [project["_id"] for project in result]
 
 
-def bootstrap(client: TestClient, store: FakeStore) -> Dict[str, Any]:
+def bootstrap(client: TestClient, store: FakeStore) -> dict[str, Any]:
     """Manager + project + seeded "To Do" column; wire the module store handle."""
 
     global _STORE

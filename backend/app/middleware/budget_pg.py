@@ -23,7 +23,7 @@ idempotently by :meth:`setup`).
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from app.middleware.budget import (
     DEFAULT_MONTHLY_TOKEN_CAP,
@@ -181,7 +181,7 @@ class PostgresBudgetBackend:
     # ------------------------------------------------------------------
 
     async def aremaining(
-        self, project_id: str, month: Optional[str] = None
+        self, project_id: str, month: str | None = None
     ) -> int:
         m = month or _current_month_key()
         async with self._pool.connection() as conn:
@@ -314,7 +314,7 @@ class PostgresBudgetBackend:
         )
 
     def remaining(
-        self, project_id: str, month: Optional[str] = None
+        self, project_id: str, month: str | None = None
     ) -> int:
         return self._run(self.aremaining(project_id, month))
 

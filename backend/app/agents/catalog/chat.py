@@ -27,7 +27,7 @@ import json
 import logging
 import re
 import secrets
-from typing import Any, List, Literal, Optional
+from typing import Any, Literal
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -35,17 +35,17 @@ from langchain_core.messages.utils import trim_messages
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import Pregel
+from langgraph.runtime import get_runtime
 from langgraph.store.base import BaseStore
 from langgraph.types import interrupt
-from langgraph.runtime import get_runtime
 
 from app.agents.base import AgentMetadata, BaseAgent
 from app.agents.catalog._chat_tools import CHAT_TOOLS
 from app.agents.context import ChatContext
 from app.agents.events import (
+    MutationDiffWire,
     MutationProposalEvent,
     MutationProposalWire,
-    MutationDiffWire,
     TaskUpdateWire,
 )
 from app.agents.identity import COPILOT_IDENTITY, mutation_policy_reminder
@@ -53,6 +53,7 @@ from app.agents.llm import is_stub_model
 from app.agents.output_guard import classify_pre_mutation
 from app.agents.state import ChatState
 from app.agents.tool_envelope import wrap_tool_result
+from app.observability.metrics import record_agent_mutation_event
 from app.tools import be_tools
 from app.tools.fe_tool_names import (
     FE_APPLY_APPROVED_MUTATION,
@@ -65,7 +66,6 @@ from app.tools.fe_tool_names import (
     FE_REQUEST_MUTATION_APPROVAL,
 )
 from app.tools.fe_tool_schemas import interrupt_payload
-from app.observability.metrics import record_agent_mutation_event
 
 logger = logging.getLogger(__name__)
 
@@ -659,8 +659,8 @@ class ChatAgent(BaseAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         _default_model = self.chat_model  # captured for fallback
 
@@ -773,7 +773,7 @@ class ChatAgent(BaseAgent):
                     if isinstance(msg, HumanMessage):
                         trimmed = [msg]
                         break
-            conversation: List[Any] = [_SYSTEM_MESSAGE]
+            conversation: list[Any] = [_SYSTEM_MESSAGE]
             # Trust boundary: re-fence every ToolMessage in the trimmed window
             # so the provider treats its content as untrusted data, and
             # re-anchor the mutation policy after each tool result so a

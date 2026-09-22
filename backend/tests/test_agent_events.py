@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 
 import pytest
+from pydantic import ValidationError
 
 from app.agents.events import (
     AgentEvent,
@@ -28,7 +29,6 @@ from app.agents.events import (
     validate_suggestion_payload,
 )
 
-
 # ---------------------------------------------------------------------------
 # Suggestion model
 # ---------------------------------------------------------------------------
@@ -42,7 +42,7 @@ def test_suggestion_model_defaults_kind_to_suggestion() -> None:
 
 
 def test_suggestion_model_rejects_extra_keys() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         Suggestion(surface="brief", payload={}, unknown_key="x")  # type: ignore[call-arg]
 
 
@@ -58,7 +58,7 @@ def test_citation_model_defaults_kind_to_citation() -> None:
 
 
 def test_citation_model_rejects_extra_keys() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         Citation(refs=[], extra_field="x")  # type: ignore[call-arg]
 
 
@@ -81,7 +81,7 @@ def test_usage_model_accepts_token_counts() -> None:
 
 
 def test_usage_model_rejects_extra_keys() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         Usage(tokensIn=1, bad_key="x")  # type: ignore[call-arg]
 
 

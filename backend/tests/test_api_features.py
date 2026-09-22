@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -16,11 +16,11 @@ from app.validation import unwrap_error_detail
 from tests.conftest import FakeStore
 
 
-def auth_headers(token: str) -> Dict[str, str]:
+def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def register_and_login(client: TestClient) -> Dict[str, Any]:
+def register_and_login(client: TestClient) -> dict[str, Any]:
     response = client.post(
         "/api/v1/auth/register",
         json={
@@ -56,7 +56,7 @@ def register_and_login_user(
     client: TestClient,
     username: str,
     email: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     response = client.post(
         "/api/v1/auth/register",
         json={
@@ -81,7 +81,7 @@ def register_and_login_user(
 
 def create_project_board_and_task(
     client: TestClient, token: str, user_id: str
-) -> Dict[str, str]:
+) -> dict[str, str]:
     headers = auth_headers(token)
     response = client.post(
         "/api/v1/projects/",
@@ -1603,7 +1603,7 @@ def test_cross_project_board_and_task_relationships_are_rejected(
     assert response.status_code == 400
 
 
-def seed_ordering_data(store: FakeStore) -> Dict[str, str]:
+def seed_ordering_data(store: FakeStore) -> dict[str, str]:
     user_id = str(
         store.insert_one(
             USERS,

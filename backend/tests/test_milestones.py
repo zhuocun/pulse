@@ -16,7 +16,7 @@ through the real HTTP layer via ``TestClient`` so the sentinel->status
 mapping is covered too.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -25,7 +25,7 @@ from app.services import milestone_service, project_service
 from tests.conftest import FakeStore
 
 
-def auth_headers(token: str) -> Dict[str, str]:
+def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -33,7 +33,7 @@ def register_and_login(
     client: TestClient,
     username: str,
     email: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Register + login a user; return the login body plus a bearer token."""
 
     response = client.post(
@@ -97,13 +97,13 @@ def milestone_rows(project_id: str) -> list:
     return _STORE.find_many(MILESTONES, {"projectId": project_id})
 
 
-def only_milestone(project_id: str) -> Dict[str, Any]:
+def only_milestone(project_id: str) -> dict[str, Any]:
     rows = milestone_rows(project_id)
     assert len(rows) == 1, rows
     return rows[0]
 
 
-def bootstrap(client: TestClient, store: FakeStore) -> Dict[str, Any]:
+def bootstrap(client: TestClient, store: FakeStore) -> dict[str, Any]:
     """Manager + project; wire the module-level store handle."""
 
     global _STORE

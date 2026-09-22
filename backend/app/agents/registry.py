@@ -8,7 +8,7 @@ an agent is purely a question of importing (or not importing) its module.
 from __future__ import annotations
 
 import threading
-from typing import Iterator
+from collections.abc import Iterator
 
 from app.agents.base import AgentMetadata, BaseAgent
 from app.agents.errors import AgentAlreadyRegisteredError, AgentNotFoundError
@@ -115,7 +115,7 @@ class ChainedAgentRegistry(AgentRegistry):
     patterns working without requiring all ~70 fixtures to migrate.
     """
 
-    def __init__(self, parent: "AgentRegistry") -> None:
+    def __init__(self, parent: AgentRegistry) -> None:
         super().__init__()
         self._parent = parent
 

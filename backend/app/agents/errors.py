@@ -6,7 +6,7 @@ responses with the correct status code.
 """
 
 from http import HTTPStatus
-from typing import Any, Optional
+from typing import Any
 
 from app.errors import AppError
 
@@ -175,7 +175,7 @@ class AgentExecutionError(AgentError):
         self,
         name: str,
         *,
-        cause: Optional[BaseException] = None,
+        cause: BaseException | None = None,
         message: str = "Execution failed",
     ) -> None:
         # Map the raw exception to a safe public category so internal class
@@ -184,8 +184,8 @@ class AgentExecutionError(AgentError):
         # compatibility with existing callers; cause_kind is the recommended
         # field for new consumers.  The original exception stays on self.cause
         # for internal logging / Sentry.
-        cause_kind: Optional[str] = _safe_cause_kind(cause) if cause is not None else None
-        cause_message: Optional[str] = None
+        cause_kind: str | None = _safe_cause_kind(cause) if cause is not None else None
+        cause_message: str | None = None
         if cause is not None:
             raw = str(cause)
             cause_message = raw[:200] if len(raw) > 200 else raw

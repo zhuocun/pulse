@@ -27,19 +27,20 @@ work unchanged via :func:`polish_search`.
 from __future__ import annotations
 
 import json
-from typing import Any, Optional
+import re as _re_search
+from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
+from langgraph.runtime import get_runtime
 from langgraph.store.base import BaseStore
 from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
-from app.agents.pipeline import linear_graph
 from app.agents.catalog._schemas import (
     EXPANDED_TERMS_MAX,
     SEARCH_IDS_MAX,
@@ -55,23 +56,20 @@ from app.agents.catalog._shared import (
 from app.agents.context import ChatContext
 from app.agents.identity import COPILOT_IDENTITY
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
+from app.agents.pipeline import linear_graph
 from app.agents.polish import PolishStep
 from app.agents.state import SearchState
 from app.agents.tool_envelope import wrap_tool_result
-from langgraph.runtime import get_runtime
 from app.tools import be_tools
 from app.tools.fe_tool_names import FE_SEARCH_CANDIDATES
 from app.tools.fe_tool_schemas import interrupt_payload
 from app.tools.redaction import redact, redact_dict
-
 
 # ---------------------------------------------------------------------------
 # v1-compatible semantic search baseline (ported from v1_engine.py).
 # The ``rank`` node uses this when ``ranking`` is not pre-populated so the
 # route no longer needs to pre-call v1_engine.semantic_search.
 # ---------------------------------------------------------------------------
-
-import re as _re_search  # noqa: E402
 
 _SEARCH_TOKEN_RE = _re_search.compile(r"[A-Za-z0-9]+")
 
@@ -196,11 +194,11 @@ class SearchRanking(BaseModel):
 
 # Thresholds calibrated for unit-normalised (L2) vectors from a real
 # text-embedding model. A cosine score of 0.75+ means the two pieces of
-# text share substantial semantic content ("strong" match); 0.50–0.75
+# text share substantial semantic content ("strong" match); 0.50-0.75
 # indicates topical overlap but possible synonym drift ("moderate"); and
 # below 0.50 the match is speculative or only surface-level ("weak").
 # For the deterministic SHA-256 stub embedder scores cluster in the
-# 0.20–0.60 range due to its low (16-dim) capacity, so most stub results
+# 0.20-0.60 range due to its low (16-dim) capacity, so most stub results
 # will land in "weak" or "moderate" — that is expected and acceptable.
 _STRENGTH_STRONG: float = 0.75
 _STRENGTH_MODERATE: float = 0.50
@@ -414,8 +412,8 @@ class SearchAgent(BaseAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         """Compile the v2.1 search graph.
 
