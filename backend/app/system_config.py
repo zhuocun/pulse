@@ -22,10 +22,10 @@ so this module needs no special test scaffolding.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import logging
 import secrets
-from typing import Any, Tuple
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ def load_or_create_jwt_secret(
     repository: Any,
     *,
     length_bytes: int = 32,
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     """Return ``(secret_hex, source)`` for the persisted JWT secret.
 
     ``source`` is ``"persisted"`` when an existing row was read and
@@ -130,7 +130,7 @@ def _upsert_secret_document(repository: Any, secret_hex: str) -> None:
     document = {
         "_id": _JWT_SECRET_DOC_ID,
         "value": secret_hex,
-        "createdAt": datetime.now(timezone.utc),
+        "createdAt": datetime.now(UTC),
     }
 
     upsert = getattr(repository, "upsert_system_config", None)

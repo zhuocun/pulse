@@ -12,9 +12,9 @@ endpoint could be turned into a DoS amplifier.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import replace
 from http import HTTPStatus
-from typing import Iterable
 
 import pytest
 from fastapi.testclient import TestClient
@@ -176,7 +176,7 @@ def test_probe_cache_collapses_back_to_back_calls() -> None:
 
     import asyncio
 
-    from app.agents.llm import ChatModelSpec, PROVIDER_OPENAI
+    from app.agents.llm import PROVIDER_OPENAI, ChatModelSpec
 
     spec = ChatModelSpec(provider=PROVIDER_OPENAI, model="x", api_key="sk-fake")
 
@@ -221,7 +221,7 @@ def test_deepseek_probe_uses_openai_compatible_base_url() -> None:
     import asyncio
     import sys
 
-    from app.agents.llm import ChatModelSpec, PROVIDER_DEEPSEEK
+    from app.agents.llm import PROVIDER_DEEPSEEK, ChatModelSpec
 
     captured: dict[str, object] = {}
 
@@ -266,6 +266,7 @@ def test_stub_provider_probe_returns_reachable_without_imports() -> None:
     """The stub branch is hermetic -- exercises the no-network code path."""
 
     import asyncio
+
     from app.agents.llm import ChatModelSpec
 
     spec = ChatModelSpec(provider=PROVIDER_STUB, model="stub", api_key="")

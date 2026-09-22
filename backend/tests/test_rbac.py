@@ -7,7 +7,7 @@ matrix: viewers read, editors write, owners administer membership, and
 the manager (project root of trust) can never be demoted or removed.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -15,7 +15,7 @@ from app.database import PROJECTS
 from tests.conftest import FakeStore
 
 
-def auth_headers(token: str) -> Dict[str, str]:
+def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -23,7 +23,7 @@ def register_and_login(
     client: TestClient,
     username: str,
     email: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Register a user and return the login body plus a bearer token.
 
     The REST JWT rides an HttpOnly ``Token`` cookie; because every login
@@ -64,7 +64,7 @@ def create_project(client: TestClient, token: str) -> str:
     return projects[0]["_id"]
 
 
-def first_column(client: TestClient, token: str, project_id: str) -> Dict[str, Any]:
+def first_column(client: TestClient, token: str, project_id: str) -> dict[str, Any]:
     columns = client.get(
         f"/api/v1/boards/?projectId={project_id}", headers=auth_headers(token)
     ).json()

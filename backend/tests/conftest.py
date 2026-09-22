@@ -1,14 +1,13 @@
-from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Optional
+from collections.abc import Iterable
+from datetime import UTC, datetime
+from typing import Any
 
-from bson import ObjectId
 import pytest
+from bson import ObjectId
 from fastapi.testclient import TestClient
 from pytest import FixtureRequest
 
-from app import database
-from app import main
-from app import security
+from app import database, main, security
 from app.config import settings
 from app.database import (
     COLUMNS,
@@ -37,7 +36,6 @@ from app.services import (
     task_service,
     user_service,
 )
-
 
 # ---------------------------------------------------------------------------
 # Shared polish-helper test scaffolding
@@ -72,7 +70,7 @@ def structured_model(
     parsed: Any = None,
     raw_message: Any = None,
     parsing_error: Any = None,
-    raise_on_call: Optional[Exception] = None,
+    raise_on_call: Exception | None = None,
 ) -> Any:
     """Build a fake chat model with a scripted ``with_structured_output``.
 
@@ -122,7 +120,7 @@ EXTRA_REPOSITORY_MODULES = [main, health_router]
 
 class FakeStore:
     def __init__(self) -> None:
-        self.data: Dict[str, List[Dict[str, Any]]] = {
+        self.data: dict[str, list[dict[str, Any]]] = {
             USERS: [],
             PROJECTS: [],
             COLUMNS: [],
@@ -146,12 +144,12 @@ class FakeStore:
     def ensure_schema(self) -> None:
         return None
 
-    def insert_one(self, name: str, data: Dict[str, Any]) -> Any:
+    def insert_one(self, name: str, data: dict[str, Any]) -> Any:
         payload = dict(data)
         oid = payload.pop("_id", None)
         if oid is None:
             oid = ObjectId()
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.now(UTC)
         self.data[name].append(
             {
                 **payload,
@@ -162,41 +160,41 @@ class FakeStore:
         )
         return oid
 
-    def find_one(self, name: str, query: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def find_one(self, name: str, query: dict[str, Any]) -> dict[str, Any] | None:
         return next(
             (item for item in self.data[name] if self.matches(item, query)),
             None,
         )
 
-    def find_many(self, name: str, query: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def find_many(self, name: str, query: dict[str, Any]) -> list[dict[str, Any]]:
         return [item for item in self.data[name] if self.matches(item, query)]
 
-    def find_by_id(self, name: str, value: str) -> Optional[Dict[str, Any]]:
+    def find_by_id(self, name: str, value: str) -> dict[str, Any] | None:
         return next(
             (item for item in self.data[name] if str(item.get("_id")) == str(value)),
             None,
         )
 
     def update_by_id(
-        self, name: str, value: str, data: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+        self, name: str, value: str, data: dict[str, Any]
+    ) -> dict[str, Any] | None:
         item = self.find_by_id(name, value)
         if item is None:
             return None
         for key, val in data.items():
             if key != "_id":
                 item[key] = val
-        item["updatedAt"] = datetime.now(timezone.utc)
+        item["updatedAt"] = datetime.now(UTC)
         return item
 
-    def delete_by_id(self, name: str, value: str) -> Optional[Dict[str, Any]]:
+    def delete_by_id(self, name: str, value: str) -> dict[str, Any] | None:
         item = self.find_by_id(name, value)
         if item is None:
             return None
         self.data[name].remove(item)
         return item
 
-    def delete_many(self, name: str, query: Dict[str, Any]) -> int:
+    def delete_many(self, name: str, query: dict[str, Any]) -> int:
         items = self.find_many(name, query)
         for item in items:
             self.data[name].remove(item)
@@ -204,18 +202,18 @@ class FakeStore:
 
     @staticmethod
     def serialize_document(
-        document: Optional[Dict[str, Any]],
-    ) -> Optional[Dict[str, Any]]:
+        document: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
         return database.serialize_document(document)
 
     @staticmethod
     def serialize_documents(
-        documents: Iterable[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+        documents: Iterable[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         return database.serialize_documents(documents)
 
     @staticmethod
-    def matches(item: Dict[str, Any], query: Dict[str, Any]) -> bool:
+    def matches(item: dict[str, Any], query: dict[str, Any]) -> bool:
         return all(item.get(key) == value for key, value in query.items())
 
 

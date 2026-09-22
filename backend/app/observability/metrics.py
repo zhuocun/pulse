@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import importlib
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from app.config import Settings
 
@@ -90,7 +90,7 @@ class _NoOpMetric:
     unconditionally and pay near-zero cost when disabled.
     """
 
-    def labels(self, *_args: Any, **_kwargs: Any) -> "_NoOpMetric":
+    def labels(self, *_args: Any, **_kwargs: Any) -> _NoOpMetric:
         return self
 
     def inc(self, _amount: float = 1.0) -> None:
@@ -209,7 +209,7 @@ def record_invocation(
     *,
     tokens_in: int = 0,
     tokens_out: int = 0,
-    duration_s: Optional[float] = None,
+    duration_s: float | None = None,
 ) -> None:
     """Increment the per-agent counters for one invocation.
 
@@ -268,7 +268,7 @@ def record_event_validation_failure(
     ).inc()
 
 
-def make_metrics_app() -> Optional[Any]:
+def make_metrics_app() -> Any | None:
     """Return a ``prometheus_client.make_asgi_app()`` mountable at ``/metrics``.
 
     Returns ``None`` when metrics are disabled so the lifespan can

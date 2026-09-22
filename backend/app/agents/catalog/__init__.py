@@ -19,8 +19,8 @@ from __future__ import annotations
 import importlib
 import logging
 import pkgutil
+from collections.abc import Callable
 from types import ModuleType
-from typing import Callable
 
 from app.agents.base import BaseAgent
 

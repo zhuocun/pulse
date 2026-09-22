@@ -1,9 +1,9 @@
-from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Optional, Protocol
+from collections.abc import Iterable
+from datetime import UTC, datetime
+from typing import Any, Protocol
 
 from app import database
 from app.config import Settings, settings
-
 
 MONGODB = "mongoDB"
 
@@ -191,34 +191,34 @@ class Repository(Protocol):
 
     def ensure_schema(self) -> None: ...
 
-    def insert_one(self, name: str, data: Dict[str, Any]) -> Any: ...
+    def insert_one(self, name: str, data: dict[str, Any]) -> Any: ...
 
     def find_one(
-        self, name: str, query: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]: ...
+        self, name: str, query: dict[str, Any]
+    ) -> dict[str, Any] | None: ...
 
-    def find_many(self, name: str, query: Dict[str, Any]) -> List[Dict[str, Any]]: ...
+    def find_many(self, name: str, query: dict[str, Any]) -> list[dict[str, Any]]: ...
 
-    def find_by_id(self, name: str, value: str) -> Optional[Dict[str, Any]]: ...
+    def find_by_id(self, name: str, value: str) -> dict[str, Any] | None: ...
 
     def update_by_id(
-        self, name: str, value: str, data: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]: ...
+        self, name: str, value: str, data: dict[str, Any]
+    ) -> dict[str, Any] | None: ...
 
-    def delete_by_id(self, name: str, value: str) -> Optional[Dict[str, Any]]: ...
+    def delete_by_id(self, name: str, value: str) -> dict[str, Any] | None: ...
 
-    def delete_many(self, name: str, query: Dict[str, Any]) -> int: ...
+    def delete_many(self, name: str, query: dict[str, Any]) -> int: ...
 
     def serialize_document(
-        self, document: Optional[Dict[str, Any]]
-    ) -> Optional[Dict[str, Any]]: ...
+        self, document: dict[str, Any] | None
+    ) -> dict[str, Any] | None: ...
 
     def serialize_documents(
-        self, documents: Iterable[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]: ...
+        self, documents: Iterable[dict[str, Any]]
+    ) -> list[dict[str, Any]]: ...
 
     def upsert_system_config(
-        self, doc_id: str, document: Dict[str, Any]
+        self, doc_id: str, document: dict[str, Any]
     ) -> None: ...
 
 
@@ -227,7 +227,7 @@ def validate_table(name: str) -> None:
         raise ValueError(f"Unknown table: {name}")
 
 
-def validate_fields(name: str, data: Dict[str, Any]) -> None:
+def validate_fields(name: str, data: dict[str, Any]) -> None:
     validate_table(name)
     invalid = set(data) - TABLE_FIELDS[name]
     if invalid:
@@ -235,11 +235,11 @@ def validate_fields(name: str, data: Dict[str, Any]) -> None:
 
 
 def timestamped_payload(
-    data: Dict[str, Any],
-    item_id: Optional[str] = None,
-    timestamp: Optional[Any] = None,
-) -> Dict[str, Any]:
-    timestamp = timestamp or datetime.now(timezone.utc)
+    data: dict[str, Any],
+    item_id: str | None = None,
+    timestamp: Any | None = None,
+) -> dict[str, Any]:
+    timestamp = timestamp or datetime.now(UTC)
     payload = {**data, "createdAt": timestamp, "updatedAt": timestamp}
     if item_id is not None:
         payload["_id"] = item_id
@@ -247,16 +247,16 @@ def timestamped_payload(
 
 
 def update_payload(
-    data: Dict[str, Any],
-    timestamp: Optional[Any] = None,
-) -> Dict[str, Any]:
+    data: dict[str, Any],
+    timestamp: Any | None = None,
+) -> dict[str, Any]:
     return {
         **{key: value for key, value in data.items() if key != "_id"},
-        "updatedAt": timestamp or datetime.now(timezone.utc),
+        "updatedAt": timestamp or datetime.now(UTC),
     }
 
 
-def matches(item: Dict[str, Any], query: Dict[str, Any]) -> bool:
+def matches(item: dict[str, Any], query: dict[str, Any]) -> bool:
     return all(item.get(key) == value for key, value in query.items())
 
 
@@ -267,7 +267,7 @@ class MongoRepository:
     def ensure_schema(self) -> None:
         database.ensure_indexes()
 
-    def insert_one(self, name: str, data: Dict[str, Any]) -> Any:
+    def insert_one(self, name: str, data: dict[str, Any]) -> Any:
         # ``system_config`` is owned by :mod:`app.system_config` and uses
         # a sentinel string ``_id`` (e.g. ``"jwt_secret"``) plus arbitrary
         # value fields, so the per-table field allowlist does not apply.
@@ -276,7 +276,7 @@ class MongoRepository:
         validate_fields(name, data)
         return database.insert_one(name, data)
 
-    def find_one(self, name: str, query: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def find_one(self, name: str, query: dict[str, Any]) -> dict[str, Any] | None:
         # See ``insert_one`` -- ``system_config`` documents are queried
         # by their sentinel ``_id`` and the schema-less collection skips
         # the allowlist entirely.
@@ -285,38 +285,38 @@ class MongoRepository:
         validate_fields(name, query)
         return database.find_one(name, query)
 
-    def find_many(self, name: str, query: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def find_many(self, name: str, query: dict[str, Any]) -> list[dict[str, Any]]:
         validate_fields(name, query)
         return database.find_many(name, query)
 
-    def find_by_id(self, name: str, value: str) -> Optional[Dict[str, Any]]:
+    def find_by_id(self, name: str, value: str) -> dict[str, Any] | None:
         return database.find_by_id(name, value)
 
     def update_by_id(
-        self, name: str, value: str, data: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+        self, name: str, value: str, data: dict[str, Any]
+    ) -> dict[str, Any] | None:
         validate_fields(name, data)
         return database.update_by_id(name, value, data)
 
-    def delete_by_id(self, name: str, value: str) -> Optional[Dict[str, Any]]:
+    def delete_by_id(self, name: str, value: str) -> dict[str, Any] | None:
         return database.delete_by_id(name, value)
 
-    def delete_many(self, name: str, query: Dict[str, Any]) -> int:
+    def delete_many(self, name: str, query: dict[str, Any]) -> int:
         validate_fields(name, query)
         return database.delete_many(name, query)
 
     def serialize_document(
-        self, document: Optional[Dict[str, Any]]
-    ) -> Optional[Dict[str, Any]]:
+        self, document: dict[str, Any] | None
+    ) -> dict[str, Any] | None:
         return database.serialize_document(document)
 
     def serialize_documents(
-        self, documents: Iterable[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self, documents: Iterable[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         return database.serialize_documents(documents)
 
     def upsert_system_config(
-        self, doc_id: str, document: Dict[str, Any]
+        self, doc_id: str, document: dict[str, Any]
     ) -> None:
         """Idempotent insert of a ``system_config`` row.
 

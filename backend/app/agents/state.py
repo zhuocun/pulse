@@ -11,11 +11,10 @@ declarations via multiple inheritance rather than repeating them.
 """
 
 import itertools
-from typing import Annotated, Any, TypedDict
+from typing import Annotated, Any, NotRequired, TypedDict
 
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
-from typing_extensions import NotRequired
 
 
 def add_events(

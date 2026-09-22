@@ -23,7 +23,7 @@ import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Optional, Protocol, Tuple, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from fastapi import Request
 
@@ -66,8 +66,8 @@ class RateLimitBackend(Protocol):
         agent: str,
         user_id: str,
         *,
-        limits: Optional[Tuple[int, int]] = None,
-        now: Optional[float] = None,
+        limits: tuple[int, int] | None = None,
+        now: float | None = None,
     ) -> tuple[bool, int]: ...
 
     def reset(self) -> None: ...
@@ -92,8 +92,8 @@ class InMemoryRateLimitBackend:
         agent: str,
         user_id: str,
         *,
-        limits: Optional[Tuple[int, int]] = None,
-        now: Optional[float] = None,
+        limits: tuple[int, int] | None = None,
+        now: float | None = None,
     ) -> tuple[bool, int]:
         """Return ``(allowed, retry_after_seconds)``.
 

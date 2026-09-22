@@ -1,6 +1,6 @@
 """Legacy ``/api/ai/<route>`` shim for the v1 FE surfaces.
 
-The shipped Board Copilot UI in pulse (Phases 0–4 from
+The shipped Board Copilot UI in pulse (Phases 0-4 from
 ``docs/prd/board-copilot-progress.md``) posts JSON to
 ``/api/ai/{task-draft,task-breakdown,estimate,readiness,board-brief,search,chat}``
 and expects synchronous JSON back. The v2.1 streaming agent surface at
@@ -36,7 +36,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Final, List, Optional, Tuple
+from typing import Any, Final
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
@@ -44,31 +44,30 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from app.agents import AgentRuntime
 from app.agents.base import AgentMetadata
-from app.agents.limits import enforce_request_limits
+from app.agents.catalog.search import semantic_search as _semantic_search
 from app.agents.errors import AgentError, agent_http_error_detail
+from app.agents.limits import enforce_request_limits
 from app.agents.llm import result_token_usage_from_graph_result
-from app.config import settings
 from app.auth.project_access import is_project_ai_enabled
+from app.config import settings
 from app.middleware.budget import BudgetBackend, get_budget_tracker
+from app.middleware.idempotency_guard import IdempotencyContext
+from app.middleware.idempotency_metrics import check_idempotency_with_metrics
 from app.middleware.rate_limit import (
     DEFAULT_LIMIT,
     RateLimitBackend,
     get_rate_limiter,
 )
-from app.middleware.idempotency_guard import IdempotencyContext
-from app.middleware.idempotency_metrics import check_idempotency_with_metrics
 from app.observability.metrics import record_idempotency, record_invocation
-from app.security import current_user_id, current_user_payload_for_ai
-from app.services.project_service import is_project_manager
-from app.agents.catalog.search import semantic_search as _semantic_search
-from app.tools.redaction import redact, redact_task_fields
-from app.validation import api_error
 from app.routers._dispatch import (
     _find_suggestion,
     merged_v1_chat_context,
     run_v1_route,
 )
-
+from app.security import current_user_id, current_user_payload_for_ai
+from app.services.project_service import is_project_manager
+from app.tools.redaction import redact, redact_task_fields
+from app.validation import api_error
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +86,7 @@ class LegacyAiRouteMeta:
     for polish helpers or for full ``chat-agent`` invocations.
     """
 
-    envelope_key: Optional[str]
+    envelope_key: str | None
     agent_label: str
     catalog_agent_name: str
 
@@ -170,7 +169,7 @@ def _redact(text: str) -> str:
     return redact(text)[0]
 
 
-def _unwrap_envelope(payload: Dict[str, Any], key: str) -> Dict[str, Any]:
+def _unwrap_envelope(payload: dict[str, Any], key: str) -> dict[str, Any]:
     """Accept the FE's ``{key: {...}}`` envelope shape.
 
     The shipped React client (pulse ``src/utils/hooks/useAi.ts``)
@@ -194,8 +193,8 @@ def _unwrap_envelope(payload: Dict[str, Any], key: str) -> Dict[str, Any]:
 
 
 def _maybe_unwrap_legacy_payload(
-    payload: Dict[str, Any], meta: LegacyAiRouteMeta
-) -> Dict[str, Any]:
+    payload: dict[str, Any], meta: LegacyAiRouteMeta
+) -> dict[str, Any]:
     """Apply :func:`_unwrap_envelope` when ``meta`` declares an FE envelope key."""
 
     key = meta.envelope_key
@@ -207,11 +206,11 @@ def _maybe_unwrap_legacy_payload(
 def _gate_with_reservation(
     request: Request,
     user_id: str,
-    project_id: Optional[str],
+    project_id: str | None,
     *,
     rate_limiter: RateLimitBackend,
     budget_tracker: BudgetBackend,
-    metadata: Optional[AgentMetadata] = None,
+    metadata: AgentMetadata | None = None,
     agent_label: str = "v1-shim",
 ) -> int:
     """Like ``_gate`` but atomically reserves 1 token instead of read-only ``can_spend``.
@@ -263,7 +262,7 @@ def _gate_with_reservation(
     return 0
 
 
-def _project_id_from_payload(payload: Dict[str, Any]) -> Optional[str]:
+def _project_id_from_payload(payload: dict[str, Any]) -> str | None:
     """Pull a project_id from any of the FE wire envelopes.
 
     Most routes nest the project under ``context.project._id``. The
@@ -284,7 +283,7 @@ def _project_id_from_payload(payload: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _token_usage_from_events(custom_events: List[Any]) -> Tuple[int, int]:
+def _token_usage_from_events(custom_events: list[Any]) -> tuple[int, int]:
     """Sum ``(tokens_in, tokens_out)`` from ``{"kind": "usage"}`` custom events.
 
     Phase 2: catalog agents now include raw ``AIMessage`` objects (with
@@ -305,10 +304,10 @@ def _token_usage_from_events(custom_events: List[Any]) -> Tuple[int, int]:
 
 
 def _reconcile_token_budget(
-    project_id: Optional[str],
+    project_id: str | None,
     budget_tracker: BudgetBackend,
     final_state: Any,
-    custom_events: List[Any],
+    custom_events: list[Any],
     *,
     prebooked: int = 0,
 ) -> None:
@@ -336,8 +335,8 @@ def _reconcile_token_budget(
         budget_tracker.record(project_id, tokens=delta)
 
 
-def _redact_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    out: List[Dict[str, Any]] = []
+def _redact_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
     for message in messages:
         if not isinstance(message, dict):
             continue
@@ -357,7 +356,7 @@ def _idempotent_replay(
     *,
     route: str,
     agent_label: str,
-) -> Optional[JSONResponse]:
+) -> JSONResponse | None:
     """Return the replay response when ``idem`` carries a cached hit.
 
     Centralises the ``Idempotent-Replay: true`` stamping so each handler
@@ -383,8 +382,8 @@ _READINESS_DRAFT_FIELDS = ("taskName", "note", "epic", "type", "coordinatorId")
 
 
 def _draft_from_payload(
-    payload: Dict[str, Any], fields: tuple[str, ...]
-) -> Dict[str, str]:
+    payload: dict[str, Any], fields: tuple[str, ...]
+) -> dict[str, str]:
     """Project ``payload`` down to ``fields`` for the LLM prompt.
 
     Forwarding the FE's full payload would JSON-encode ``context.tasks``
@@ -395,7 +394,7 @@ def _draft_from_payload(
     return {field: payload.get(field) or "" for field in fields}
 
 
-def _similar_from_context(context: Any, *, limit: int = 3) -> List[Dict[str, Any]]:
+def _similar_from_context(context: Any, *, limit: int = 3) -> list[dict[str, Any]]:
     """Extract up to ``limit`` neighbour-task references for polish_draft.
 
     The catalog ``polish_draft`` helper grounds its rewrite on a list of
@@ -411,7 +410,7 @@ def _similar_from_context(context: Any, *, limit: int = 3) -> List[Dict[str, Any
     tasks = context.get("tasks")
     if not isinstance(tasks, list):
         return []
-    similar: List[Dict[str, Any]] = []
+    similar: list[dict[str, Any]] = []
     for task in tasks[:limit]:
         if not isinstance(task, dict):
             continue
@@ -433,8 +432,8 @@ _SEARCH_PROJECT_FIELDS = (
 
 
 def _candidates_from_context(
-    kind: str, context: Dict[str, Any]
-) -> List[Dict[str, Any]]:
+    kind: str, context: dict[str, Any]
+) -> list[dict[str, Any]]:
     """Project ``context`` items down to ``[{id, text}]`` for polish_search.
 
     The deterministic ranker in ``v1_engine.semantic_search`` already
@@ -450,7 +449,7 @@ def _candidates_from_context(
     if not isinstance(items, list):
         return []
     fields = _SEARCH_TASK_FIELDS if kind == "tasks" else _SEARCH_PROJECT_FIELDS
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for item in items[:30]:
         if not isinstance(item, dict):
             continue
@@ -465,18 +464,18 @@ def _candidates_from_context(
 @router.post("/task-draft", status_code=status.HTTP_200_OK)
 async def task_draft(
     request: Request,
-    payload: Dict[str, Any] = Body(default_factory=dict),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
+    payload: dict[str, Any] = Body(default_factory=dict),
+    auth_payload: dict[str, Any] = Depends(current_user_payload_for_ai),
     runtime: AgentRuntime = Depends(_get_runtime),
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
-    def _inputs(p: Dict[str, Any], project_id: Optional[str]) -> Dict[str, Any]:
+    def _inputs(p: dict[str, Any], project_id: str | None) -> dict[str, Any]:
         p = dict(p)
         if isinstance(p.get("prompt"), str):
             p["prompt"] = _redact(p["prompt"])
         context = p.get("context") or {}
-        inp: Dict[str, Any] = {
+        inp: dict[str, Any] = {
             "prompt": p.get("prompt") or "",
             "similar_tasks": _similar_from_context(context),
             "board_snapshot": context if isinstance(context, dict) else {},
@@ -490,11 +489,13 @@ async def task_draft(
             inp["project_id"] = project_id
         return inp
 
-    def _body(_final_state: Any, events: List[Any]) -> Any:
+    def _body(_final_state: Any, events: list[Any]) -> Any:
         return _find_suggestion(events, "draft")
 
-    def _fallback(p: Dict[str, Any]) -> Any:
-        from app.agents.catalog.task_drafting import draft_task as _draft_task  # noqa: PLC0415
+    def _fallback(p: dict[str, Any]) -> Any:
+        from app.agents.catalog.task_drafting import (  # noqa: PLC0415
+            draft_task as _draft_task,
+        )
         return _draft_task(p)
 
     return await run_v1_route(
@@ -513,19 +514,19 @@ async def task_draft(
 @router.post("/task-breakdown", status_code=status.HTTP_200_OK)
 async def task_breakdown(
     request: Request,
-    payload: Dict[str, Any] = Body(default_factory=dict),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
+    payload: dict[str, Any] = Body(default_factory=dict),
+    auth_payload: dict[str, Any] = Depends(current_user_payload_for_ai),
     runtime: AgentRuntime = Depends(_get_runtime),
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
-    def _inputs(p: Dict[str, Any], project_id: Optional[str]) -> Dict[str, Any]:
+    def _inputs(p: dict[str, Any], project_id: str | None) -> dict[str, Any]:
         p = dict(p)
         if isinstance(p.get("prompt"), str):
             p["prompt"] = _redact(p["prompt"])
         count = p.get("count")
         context_bd = p.get("context") or {}
-        inp: Dict[str, Any] = {
+        inp: dict[str, Any] = {
             "prompt": p.get("prompt") or "",
             "similar_tasks": _similar_from_context(context_bd),
             "board_snapshot": context_bd if isinstance(context_bd, dict) else {},
@@ -540,7 +541,7 @@ async def task_breakdown(
             inp["project_id"] = project_id
         return inp
 
-    def _body(_final_state: Any, events: List[Any]) -> Any:
+    def _body(_final_state: Any, events: list[Any]) -> Any:
         return _find_suggestion(events, "breakdown")
 
     return await run_v1_route(
@@ -558,17 +559,17 @@ async def task_breakdown(
 @router.post("/estimate", status_code=status.HTTP_200_OK)
 async def estimate(
     request: Request,
-    payload: Dict[str, Any] = Body(default_factory=dict),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
+    payload: dict[str, Any] = Body(default_factory=dict),
+    auth_payload: dict[str, Any] = Depends(current_user_payload_for_ai),
     runtime: AgentRuntime = Depends(_get_runtime),
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
-    def _inputs(p: Dict[str, Any], project_id: Optional[str]) -> Dict[str, Any]:
+    def _inputs(p: dict[str, Any], project_id: str | None) -> dict[str, Any]:
         task_draft = redact_task_fields(_draft_from_payload(p, _ESTIMATE_DRAFT_FIELDS))
         context = p.get("context") or {}
         context_tasks = context.get("tasks") if isinstance(context, dict) else None
-        inp: Dict[str, Any] = {
+        inp: dict[str, Any] = {
             "task_draft": task_draft,
             "similar_tasks": [],
             "context_tasks": context_tasks if isinstance(context_tasks, list) else [],
@@ -577,7 +578,7 @@ async def estimate(
             inp["project_id"] = project_id
         return inp
 
-    def _body(_final_state: Any, events: List[Any]) -> Any:
+    def _body(_final_state: Any, events: list[Any]) -> Any:
         return _find_suggestion(events, "estimate_v1")
 
     return await run_v1_route(
@@ -595,17 +596,17 @@ async def estimate(
 @router.post("/readiness", status_code=status.HTTP_200_OK)
 async def readiness(
     request: Request,
-    payload: Dict[str, Any] = Body(default_factory=dict),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
+    payload: dict[str, Any] = Body(default_factory=dict),
+    auth_payload: dict[str, Any] = Depends(current_user_payload_for_ai),
     runtime: AgentRuntime = Depends(_get_runtime),
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
-    def _inputs(p: Dict[str, Any], project_id: Optional[str]) -> Dict[str, Any]:
+    def _inputs(p: dict[str, Any], project_id: str | None) -> dict[str, Any]:
         task_draft = redact_task_fields(_draft_from_payload(p, _READINESS_DRAFT_FIELDS))
         context = p.get("context") or {}
         context_tasks_rd = context.get("tasks") if isinstance(context, dict) else None
-        inp: Dict[str, Any] = {
+        inp: dict[str, Any] = {
             "task_draft": task_draft,
             "similar_tasks": [],
             "context_tasks": context_tasks_rd if isinstance(context_tasks_rd, list) else [],
@@ -616,7 +617,7 @@ async def readiness(
             inp["project_id"] = project_id
         return inp
 
-    def _body(_final_state: Any, events: List[Any]) -> Any:
+    def _body(_final_state: Any, events: list[Any]) -> Any:
         return _find_suggestion(events, "readiness_v1")
 
     return await run_v1_route(
@@ -634,22 +635,22 @@ async def readiness(
 @router.post("/board-brief", status_code=status.HTTP_200_OK)
 async def board_brief(
     request: Request,
-    payload: Dict[str, Any] = Body(default_factory=dict),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
+    payload: dict[str, Any] = Body(default_factory=dict),
+    auth_payload: dict[str, Any] = Depends(current_user_payload_for_ai),
     runtime: AgentRuntime = Depends(_get_runtime),
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
-    def _inputs(p: Dict[str, Any], project_id: Optional[str]) -> Dict[str, Any]:
+    def _inputs(p: dict[str, Any], project_id: str | None) -> dict[str, Any]:
         context = p.get("context") or {}
         if not isinstance(context, dict):
             api_error(status.HTTP_400_BAD_REQUEST, "context must be an object")
-        inp: Dict[str, Any] = {"board_snapshot": context}
+        inp: dict[str, Any] = {"board_snapshot": context}
         if project_id:
             inp["project_id"] = project_id
         return inp
 
-    def _body(_final_state: Any, events: List[Any]) -> Any:
+    def _body(_final_state: Any, events: list[Any]) -> Any:
         return _find_suggestion(events, "brief")
 
     return await run_v1_route(
@@ -667,13 +668,13 @@ async def board_brief(
 @router.post("/search", status_code=status.HTTP_200_OK)
 async def search(
     request: Request,
-    payload: Dict[str, Any] = Body(default_factory=dict),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
+    payload: dict[str, Any] = Body(default_factory=dict),
+    auth_payload: dict[str, Any] = Depends(current_user_payload_for_ai),
     runtime: AgentRuntime = Depends(_get_runtime),
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
 ) -> Any:
-    def _inputs(p: Dict[str, Any], project_id: Optional[str]) -> Dict[str, Any]:
+    def _inputs(p: dict[str, Any], project_id: str | None) -> dict[str, Any]:
         kind = p.get("kind")
         if kind not in {"tasks", "projects"}:
             api_error(status.HTTP_400_BAD_REQUEST, "kind must be 'tasks' or 'projects'")
@@ -687,7 +688,7 @@ async def search(
             api_error(status.HTTP_400_BAD_REQUEST, "context must be an object")
         deterministic = _semantic_search(kind, redacted_query, context)
         candidates = _candidates_from_context(kind, context)
-        inp: Dict[str, Any] = {
+        inp: dict[str, Any] = {
             "query": redacted_query,
             "kind": kind,
             "candidates": candidates,
@@ -697,7 +698,7 @@ async def search(
             inp["project_id"] = project_id
         return inp
 
-    def _body(_final_state: Any, events: List[Any]) -> Any:
+    def _body(_final_state: Any, events: list[Any]) -> Any:
         return _find_suggestion(events, "search")
 
     return await run_v1_route(
@@ -712,7 +713,7 @@ async def search(
     )
 
 
-def _normalize_tool_calls(value: Any) -> List[Dict[str, Any]]:
+def _normalize_tool_calls(value: Any) -> list[dict[str, Any]]:
     """Coerce the FE ``toolCalls`` array into LangChain ``tool_calls`` dicts.
 
     The FE wire shape is ``[{id, name, arguments}]``; LangChain (and
@@ -725,7 +726,7 @@ def _normalize_tool_calls(value: Any) -> List[Dict[str, Any]]:
 
     if not isinstance(value, list):
         return []
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for item in value:
         if not isinstance(item, dict):
             continue
@@ -745,7 +746,7 @@ def _normalize_tool_calls(value: Any) -> List[Dict[str, Any]]:
     return out
 
 
-def _build_chat_messages(redacted_messages: List[Dict[str, Any]]) -> List[Any]:
+def _build_chat_messages(redacted_messages: list[dict[str, Any]]) -> list[Any]:
     """Convert FE messages into LangChain message objects.
 
     Wire shape per turn:
@@ -763,7 +764,7 @@ def _build_chat_messages(redacted_messages: List[Dict[str, Any]]) -> List[Any]:
       replay) must not poison the next provider call.
     """
 
-    chat_messages: List[Any] = []
+    chat_messages: list[Any] = []
     known_tool_call_ids: set[str] = set()
     for message in redacted_messages:
         role = message.get("role")
@@ -794,7 +795,7 @@ def _build_chat_messages(redacted_messages: List[Dict[str, Any]]) -> List[Any]:
 
 def _extract_chat_response(
     result: Any,
-) -> Tuple[str, List[Dict[str, Any]]]:
+) -> tuple[str, list[dict[str, Any]]]:
     """Read ``(text, toolCalls)`` from the chat-agent's final state.
 
     The FE wire shape is mutually exclusive (``kind: "text"`` xor
@@ -813,7 +814,7 @@ def _extract_chat_response(
     if not isinstance(tail, AIMessage):
         return "", []
     raw_calls = getattr(tail, "tool_calls", None) or []
-    tool_calls: List[Dict[str, Any]] = []
+    tool_calls: list[dict[str, Any]] = []
     for call in raw_calls:
         if not isinstance(call, dict):
             continue
@@ -836,12 +837,12 @@ def _extract_chat_response(
 @router.post("/chat", status_code=status.HTTP_200_OK)
 async def chat(
     request: Request,
-    payload: Dict[str, Any] = Body(default_factory=dict),
-    auth_payload: Dict[str, Any] = Depends(current_user_payload_for_ai),
+    payload: dict[str, Any] = Body(default_factory=dict),
+    auth_payload: dict[str, Any] = Depends(current_user_payload_for_ai),
     runtime: AgentRuntime = Depends(_get_runtime),
     rate_limiter: RateLimitBackend = Depends(get_rate_limiter),
     budget_tracker: BudgetBackend = Depends(get_budget_tracker),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Forward chat to the ``chat-agent`` runtime so the LLM is shared.
 
     Wire shape:
@@ -876,7 +877,7 @@ async def chat(
         return replay
     reserved_budget = 0
     budget_reconciled = False
-    project_id: Optional[str] = None
+    project_id: str | None = None
     try:
         chat_metadata = runtime.get(meta.catalog_agent_name).metadata
         project_id = _project_id_from_payload(payload)
@@ -898,7 +899,7 @@ async def chat(
         request.state.redaction_spans = []
 
         chat_messages = _build_chat_messages(redacted_messages)
-        inputs: Dict[str, Any] = {"messages": chat_messages}
+        inputs: dict[str, Any] = {"messages": chat_messages}
         if project_id:
             inputs["project_id"] = project_id
 
@@ -914,7 +915,7 @@ async def chat(
                 ),
                 timeout=timeout,
             )
-        except asyncio.TimeoutError as exc:
+        except TimeoutError as exc:
             logger.warning("chat-agent v1 shim exceeded %ss timeout", timeout)
             raise HTTPException(
                 status_code=status.HTTP_504_GATEWAY_TIMEOUT,
@@ -948,7 +949,7 @@ async def chat(
                 budget_tracker.record(project_id, tokens=delta)
         budget_reconciled = True
         if tool_calls:
-            body: Dict[str, Any] = {"kind": "tool_calls", "toolCalls": tool_calls}
+            body: dict[str, Any] = {"kind": "tool_calls", "toolCalls": tool_calls}
         else:
             body = {"kind": "text", "text": text or "Board Copilot is unavailable."}
         idem.store(status_code=status.HTTP_200_OK, body=body)

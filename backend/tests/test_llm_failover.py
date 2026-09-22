@@ -7,6 +7,8 @@ import itertools
 from unittest.mock import MagicMock
 
 import pytest
+from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
+from langchain_core.messages import AIMessage
 
 from app.agents.llm import (
     DEFAULT_ANTHROPIC_MODEL,
@@ -20,8 +22,6 @@ from app.agents.llm import (
     _wrap_cross_provider_failover,
 )
 from app.config import Settings
-from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
-from langchain_core.messages import AIMessage
 
 
 def test_failover_exception_types_non_empty() -> None:
@@ -321,8 +321,8 @@ def test_failover_forces_max_retries_zero_on_both_models(
 
     assert len(captured_specs) == 2
     for spec in captured_specs:
-        assert getattr(spec, "max_retries") == 0, (
-            f"Expected max_retries=0, got {getattr(spec, 'max_retries')}"
+        assert spec.max_retries == 0, (
+            f"Expected max_retries=0, got {spec.max_retries}"
         )
 
 

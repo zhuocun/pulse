@@ -1,5 +1,5 @@
 import math
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from app.database import COLUMNS, MILESTONES, PROJECTS, TASKS, USERS, now
 from app.domain.ordering import task_reorder_updates
@@ -54,14 +54,14 @@ _BULK_CHANGE_FIELDS = _TASK_UPDATE_FIELDS - {
 }
 
 
-def _same_project(*items: Dict[str, Any]) -> bool:
+def _same_project(*items: dict[str, Any]) -> bool:
     project_ids = {
         str(item.get("projectId")) for item in items if item.get("projectId")
     }
     return len(project_ids) == 1
 
 
-def _story_points_error(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _story_points_error(data: dict[str, Any]) -> dict[str, Any] | None:
     story_points = data.get("storyPoints")
     if (
         not isinstance(story_points, (int, float))
@@ -81,7 +81,7 @@ def _story_points_error(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 _PRIORITY_VALUES = ("none", "low", "medium", "high", "urgent")
 
 
-def _priority_error(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _priority_error(data: dict[str, Any]) -> dict[str, Any] | None:
     """``priority`` must be one of the five-member enum when sent.
 
     Mirrors ``_story_points_error``: only checked when the key is present,
@@ -95,7 +95,7 @@ def _priority_error(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _date_error(data: Dict[str, Any], field: str) -> Optional[Dict[str, Any]]:
+def _date_error(data: dict[str, Any], field: str) -> dict[str, Any] | None:
     """Light ISO-date validation: when present and non-empty it must be a
     string. We do not parse the calendar value here -- the column card and
     brief render whatever string the client supplies, and a stricter
@@ -109,7 +109,7 @@ def _date_error(data: Dict[str, Any], field: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _id_list_error(data: Dict[str, Any], field: str) -> Optional[Dict[str, Any]]:
+def _id_list_error(data: dict[str, Any], field: str) -> dict[str, Any] | None:
     """``labelIds`` / ``assigneeIds`` must be a list of strings when sent."""
 
     if field not in data:
@@ -122,14 +122,14 @@ def _id_list_error(data: Dict[str, Any], field: str) -> Optional[Dict[str, Any]]
     return None
 
 
-def _metadata_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _metadata_errors(data: dict[str, Any]) -> list[dict[str, Any]]:
     """Shape checks shared by create + update for the new richness fields.
 
     ``parentTaskId`` is intentionally excluded here: it needs the task's
     own id and project context, so it is validated separately by the
     create/update paths via ``_parent_task_error``."""
 
-    errors: List[Dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
     for field in ("startDate", "dueDate"):
         error = _date_error(data, field)
         if error is not None:
@@ -142,10 +142,10 @@ def _metadata_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def _parent_task_error(
-    data: Dict[str, Any],
-    project_id: Optional[str],
-    task_id: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
+    data: dict[str, Any],
+    project_id: str | None,
+    task_id: str | None = None,
+) -> dict[str, Any] | None:
     """Validate ``parentTaskId`` against the task's project + own id.
 
     The parent must exist, live in the same ``project_id`` as the child,
@@ -170,8 +170,8 @@ def _parent_task_error(
 
 
 def _milestone_error(
-    data: Dict[str, Any], project_id: Optional[str]
-) -> Optional[Dict[str, Any]]:
+    data: dict[str, Any], project_id: str | None
+) -> dict[str, Any] | None:
     """Validate ``milestoneId`` (a scalar FK onto ``milestones``).
 
     Mirrors ``_parent_task_error``: present-only (skipped unless the key is
@@ -194,10 +194,10 @@ def _milestone_error(
 
 
 def _depends_on_error(
-    data: Dict[str, Any],
-    project_id: Optional[str],
-    task_id: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
+    data: dict[str, Any],
+    project_id: str | None,
+    task_id: str | None = None,
+) -> dict[str, Any] | None:
     """Validate ``dependsOn`` (the prerequisite edge-list) for one task.
 
     Present-only, like ``_priority_error`` / ``_parent_task_error``: skipped
@@ -260,10 +260,10 @@ def _depends_on_error(
 
 
 def _dependency_gate_blocks(
-    depends_on: Optional[List[Any]],
-    project_id: Optional[str],
-    source_column: Optional[Dict[str, Any]],
-    target_column: Optional[Dict[str, Any]],
+    depends_on: list[Any] | None,
+    project_id: str | None,
+    source_column: dict[str, Any] | None,
+    target_column: dict[str, Any] | None,
     force: bool,
 ) -> bool:
     """True if a move should be gated: entering a done column (source not
@@ -291,7 +291,7 @@ def _dependency_gate_blocks(
     return False
 
 
-def create_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+def create_validation_errors(data: dict[str, Any]) -> list[dict[str, Any]]:
     errors = _metadata_errors(data)
     if "storyPoints" in data:
         error = _story_points_error(data)
@@ -314,7 +314,7 @@ def create_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     return errors
 
 
-def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
+def create(data: dict[str, Any], user_id: str) -> str | None:
     column_id = data.get("columnId")
     coordinator_id = data.get("coordinatorId")
     project_id = data.get("projectId")
@@ -389,7 +389,7 @@ def get(
     *,
     include_archived: bool = False,
     include_trashed: bool = False,
-) -> Union[List[Dict[str, Any]], str]:
+) -> list[dict[str, Any]] | str:
     """Load a project's tasks, excluding archived/trashed ones by default.
 
     Trashed (``deletedAt`` set) and archived (``archivedAt`` set) tasks are
@@ -480,7 +480,7 @@ def get(
     return serialized
 
 
-def update_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+def update_validation_errors(data: dict[str, Any]) -> list[dict[str, Any]]:
     errors = _metadata_errors(data)
     if "taskName" in data:
         task_name = data.get("taskName")
@@ -496,7 +496,7 @@ def update_validation_errors(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     return errors
 
 
-def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
+def update(data: dict[str, Any], user_id: str) -> str | None:
     task_id = data.get("_id")
     task = repository.find_by_id(TASKS, task_id or "")
     if not task_id or task is None:
@@ -577,8 +577,8 @@ def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
 
 
 def remove(
-    task_id: Optional[str], user_id: str, purge: bool = False
-) -> Optional[str]:
+    task_id: str | None, user_id: str, purge: bool = False
+) -> str | None:
     if task_id is None:
         return "Lack of task information"
     task = repository.find_by_id(TASKS, task_id)
@@ -620,7 +620,7 @@ def remove(
     return "Task deleted"
 
 
-def restore(task_id: Optional[str], user_id: str) -> Optional[str]:
+def restore(task_id: str | None, user_id: str) -> str | None:
     """Un-trash / un-archive a task (PRD §5.4/§5.5).
 
     Clears BOTH ``deletedAt`` and ``archivedAt`` so a restore from trash
@@ -642,7 +642,7 @@ def restore(task_id: Optional[str], user_id: str) -> Optional[str]:
     return "Task restored"
 
 
-def archive(task_id: Optional[str], user_id: str, archived: Any) -> Optional[str]:
+def archive(task_id: str | None, user_id: str, archived: Any) -> str | None:
     """Archive / unarchive a task (PRD §5.4).
 
     Stamps ``archivedAt`` (archive) or clears it (unarchive) based on the
@@ -671,7 +671,7 @@ def archive(task_id: Optional[str], user_id: str, archived: Any) -> Optional[str
     return "Task archived"
 
 
-def reorder(data: Dict[str, Any], user_id: str) -> Optional[str]:
+def reorder(data: dict[str, Any], user_id: str) -> str | None:
     order_type = data.get("type")
     from_id = data.get("fromId")
     reference_id = data.get("referenceId") or None
@@ -760,7 +760,7 @@ def reorder(data: Dict[str, Any], user_id: str) -> Optional[str]:
     return "Task reordered"
 
 
-def bulk_update(data: Dict[str, Any], user_id: str) -> Optional[str]:
+def bulk_update(data: dict[str, Any], user_id: str) -> str | None:
     """Apply one set of metadata ``changes`` to many tasks at once.
 
     Only the non-positional subset of ``_TASK_UPDATE_FIELDS`` is editable
@@ -792,7 +792,7 @@ def bulk_update(data: Dict[str, Any], user_id: str) -> Optional[str]:
 
     # Load every target up front: a single unknown id fails the whole
     # batch (404) before any write lands, so a typo can't partially apply.
-    tasks: List[Dict[str, Any]] = []
+    tasks: list[dict[str, Any]] = []
     for task_id in task_ids:
         task = repository.find_by_id(TASKS, str(task_id))
         if task is None:

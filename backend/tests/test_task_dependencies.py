@@ -22,7 +22,7 @@ This slice covers the stored edge-list + validation only: there is no
 move-to-done gate and no derived read field yet (those are the next slice).
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -31,7 +31,7 @@ from app.services import task_service
 from tests.conftest import FakeStore
 
 
-def auth_headers(token: str) -> Dict[str, str]:
+def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -39,7 +39,7 @@ def register_and_login(
     client: TestClient,
     username: str,
     email: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Register + login a user; return the login body plus a bearer token."""
 
     response = client.post(
@@ -73,7 +73,7 @@ def create_project(client: TestClient, token: str, name: str = "Pulse") -> str:
     )
 
 
-def first_column(client: TestClient, token: str, project_id: str) -> Dict[str, Any]:
+def first_column(client: TestClient, token: str, project_id: str) -> dict[str, Any]:
     columns = client.get(
         f"/api/v1/boards/?projectId={project_id}", headers=auth_headers(token)
     ).json()
@@ -88,7 +88,7 @@ def create_task(
     coordinator_id: str,
     **extra: Any,
 ) -> Any:
-    body: Dict[str, Any] = {
+    body: dict[str, Any] = {
         "projectId": project_id,
         "columnId": column_id,
         "coordinatorId": coordinator_id,
@@ -109,7 +109,7 @@ def get_tasks(client: TestClient, token: str, project_id: str) -> Any:
 def update_task(
     client: TestClient,
     token: str,
-    task: Dict[str, Any],
+    task: dict[str, Any],
     project_id: str,
     column_id: str,
     coordinator_id: str,
@@ -122,7 +122,7 @@ def update_task(
     ``_depends_on_error`` check.
     """
 
-    body: Dict[str, Any] = {
+    body: dict[str, Any] = {
         "_id": task["_id"],
         "projectId": project_id,
         "columnId": column_id,
@@ -135,7 +135,7 @@ def update_task(
     return client.put("/api/v1/tasks/", json=body, headers=auth_headers(token))
 
 
-def named_task(client: TestClient, token: str, project_id: str, name: str) -> Dict[str, Any]:
+def named_task(client: TestClient, token: str, project_id: str, name: str) -> dict[str, Any]:
     return next(
         task
         for task in get_tasks(client, token, project_id)

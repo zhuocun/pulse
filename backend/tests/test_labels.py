@@ -7,7 +7,7 @@ These drive the label endpoints end-to-end through the real HTTP layer
 cascade that keeps ``task.labelIds`` free of dangling references.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -27,7 +27,7 @@ def _patch_label_repository(store: FakeStore, monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(label_service, "repository", store)
 
 
-def auth_headers(token: str) -> Dict[str, str]:
+def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -35,7 +35,7 @@ def register_and_login(
     client: TestClient,
     username: str,
     email: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Register + log a user in, returning the body plus a bearer token.
 
     Mirrors ``tests/test_rbac.py``: the JWT rides an HttpOnly cookie that
@@ -88,7 +88,7 @@ def add_member(
     assert response.status_code == 201, response.text
 
 
-def first_column(client: TestClient, token: str, project_id: str) -> Dict[str, Any]:
+def first_column(client: TestClient, token: str, project_id: str) -> dict[str, Any]:
     columns = client.get(
         f"/api/v1/boards/?projectId={project_id}", headers=auth_headers(token)
     ).json()
@@ -102,7 +102,7 @@ def create_label(
     name: str = "bug",
     color: str | None = None,
 ) -> Any:
-    body: Dict[str, Any] = {"projectId": project_id, "name": name}
+    body: dict[str, Any] = {"projectId": project_id, "name": name}
     if color is not None:
         body["color"] = color
     return client.post("/api/v1/labels/", json=body, headers=auth_headers(token))

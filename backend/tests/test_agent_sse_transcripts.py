@@ -28,9 +28,9 @@ import asyncio
 from typing import Any
 
 import pytest
+from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.store.memory import InMemoryStore
-from langchain_core.messages import HumanMessage
 
 from app.agents.catalog.board_brief import BoardBriefAgent
 from app.agents.catalog.chat import ChatAgent
@@ -40,7 +40,6 @@ from app.agents.catalog.task_estimation import TaskEstimationAgent
 from app.agents.catalog.triage import TriageAgent
 from app.agents.registry import AgentRegistry
 from app.agents.runtime import AgentRuntime
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

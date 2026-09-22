@@ -19,7 +19,6 @@ import pytest
 from app.agents.catalog._chat_tools import CHAT_TOOLS, _make_chat_tool
 from app.tools.fe_tool_schemas import CHAT_TOOL_SCHEMAS
 
-
 _INVOCATIONS: tuple[tuple[str, dict[str, object]], ...] = (
     ("listProjects", {}),
     ("listMembers", {}),

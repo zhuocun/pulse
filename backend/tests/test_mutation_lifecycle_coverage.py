@@ -22,7 +22,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from http import HTTPStatus
-from typing import Any, Optional
+from typing import Any, ClassVar
 from unittest.mock import patch
 
 import pytest
@@ -50,7 +50,6 @@ from app.agents.state import BaseAgentState, merge_mutation_applied_ids
 from app.routers import agents as agents_router
 from app.security import create_token
 
-
 # ---------------------------------------------------------------------------
 # app.agents.state.merge_mutation_applied_ids — dedup branch (line 45)
 # ---------------------------------------------------------------------------
@@ -66,7 +65,7 @@ def test_merge_mutation_applied_ids_dedups_repeats() -> None:
 
 
 # ---------------------------------------------------------------------------
-# app.agents.events — pass-through validators (lines 270–280, 359)
+# app.agents.events — pass-through validators (lines 270-280, 359)
 # ---------------------------------------------------------------------------
 
 
@@ -223,7 +222,7 @@ def test_mutation_finalize_blocks_apply_under_suggest_autonomy(
     """``autonomy_level=suggest`` short-circuits before the apply interrupt fires."""
 
     class _Rt:
-        context = {"autonomy_level": "suggest", "project_id": "p1"}
+        context: ClassVar[dict[str, str]] = {"autonomy_level": "suggest", "project_id": "p1"}
 
     monkeypatch.setattr(chat_module, "get_runtime", lambda _ctx: _Rt())
 
@@ -242,7 +241,7 @@ def test_mutation_finalize_surfaces_apply_error_from_fe(
     """When the FE apply tool returns ``{"error": ...}`` the node reports it."""
 
     class _Rt:
-        context = {"autonomy_level": "plan", "project_id": "p1"}
+        context: ClassVar[dict[str, str]] = {"autonomy_level": "plan", "project_id": "p1"}
 
     monkeypatch.setattr(chat_module, "get_runtime", lambda _ctx: _Rt())
     monkeypatch.setattr(
@@ -266,7 +265,7 @@ def test_mutation_finalize_surfaces_apply_error_from_fe(
 
 
 # ---------------------------------------------------------------------------
-# app.routers.agents._merge_autonomy_into_context (lines 665–667)
+# app.routers.agents._merge_autonomy_into_context (lines 665-667)
 # ---------------------------------------------------------------------------
 
 
@@ -288,7 +287,7 @@ def test_merge_autonomy_into_context_passes_non_dict_through() -> None:
 
 
 # ---------------------------------------------------------------------------
-# app.routers.agents — /mutations/record + /mutations/undo (lines 678–713)
+# app.routers.agents — /mutations/record + /mutations/undo (lines 678-713)
 # ---------------------------------------------------------------------------
 
 
@@ -386,8 +385,8 @@ class _ProposalEmittingAgent(BaseAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         def emit(_state: BaseAgentState) -> dict[str, Any]:
             return {"events": [_proposal_dict()]}

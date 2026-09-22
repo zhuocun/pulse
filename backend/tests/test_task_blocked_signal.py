@@ -25,7 +25,7 @@ store; a dangling prerequisite is produced by a hard-purge (DELETE
 in-memory ``FakeStore`` from ``conftest.py``.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -34,7 +34,7 @@ from app.services import task_service
 from tests.conftest import FakeStore
 
 
-def auth_headers(token: str) -> Dict[str, str]:
+def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -42,7 +42,7 @@ def register_and_login(
     client: TestClient,
     username: str,
     email: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Register + login a user; return the login body plus a bearer token."""
 
     response = client.post(
@@ -78,7 +78,7 @@ def create_project(client: TestClient, token: str, name: str = "Pulse") -> str:
 
 def column_named(
     client: TestClient, token: str, project_id: str, column_name: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     columns = client.get(
         f"/api/v1/boards/?projectId={project_id}", headers=auth_headers(token)
     ).json()
@@ -105,7 +105,7 @@ def create_task(
     coordinator_id: str,
     **extra: Any,
 ) -> Any:
-    body: Dict[str, Any] = {
+    body: dict[str, Any] = {
         "projectId": project_id,
         "columnId": column_id,
         "coordinatorId": coordinator_id,
@@ -117,7 +117,7 @@ def create_task(
     return client.post("/api/v1/tasks/", json=body, headers=auth_headers(token))
 
 
-def http_tasks(client: TestClient, token: str, project_id: str) -> List[Dict[str, Any]]:
+def http_tasks(client: TestClient, token: str, project_id: str) -> list[dict[str, Any]]:
     return client.get(
         f"/api/v1/tasks/?projectId={project_id}", headers=auth_headers(token)
     ).json()
@@ -126,7 +126,7 @@ def http_tasks(client: TestClient, token: str, project_id: str) -> List[Dict[str
 def update_task(
     client: TestClient,
     token: str,
-    task: Dict[str, Any],
+    task: dict[str, Any],
     project_id: str,
     column_id: str,
     coordinator_id: str,
@@ -135,7 +135,7 @@ def update_task(
     """PUT /tasks with the routing/identity fields the update path requires;
     ``extra`` carries the field(s) under test (e.g. ``dependsOn``)."""
 
-    body: Dict[str, Any] = {
+    body: dict[str, Any] = {
         "_id": task["_id"],
         "projectId": project_id,
         "columnId": column_id,
@@ -150,7 +150,7 @@ def update_task(
 
 def service_task(
     project_id: str, user_id: str, name: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """A single named task read straight off ``task_service.get`` (so the
     assertion sees the derived ``blockedBy``, not the stored doc)."""
 
@@ -165,7 +165,7 @@ def seed_prereq_and_blocked(
     user_id: str,
     project_id: str,
     todo_column_id: str,
-) -> tuple[Dict[str, Any], Dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, Any]]:
     """Create ``Prereq`` and ``Blocked`` (depends on ``Prereq``); both start in
     the ``To Do`` column. Returns the freshly-read ``(blocked, prereq)``."""
 
@@ -281,7 +281,7 @@ def test_dangling_prerequisite_is_skipped(
     project_id = create_project(client, owner["jwt"])
     todo = column_named(client, owner["jwt"], project_id, "To Do")
 
-    blocked, prereq = seed_prereq_and_blocked(
+    _blocked, prereq = seed_prereq_and_blocked(
         client, owner["jwt"], owner["_id"], project_id, todo["_id"]
     )
     # Precondition: the unfinished prerequisite blocks before it is purged.
@@ -378,7 +378,7 @@ def test_blocked_by_present_on_every_task_over_http(
 
     # A blocked task (unfinished prereq), a finished prereq, and a free task --
     # so the response mixes blocked and unblocked rows.
-    blocked, _ = seed_prereq_and_blocked(
+    _blocked, _ = seed_prereq_and_blocked(
         client, owner["jwt"], owner["_id"], project_id, todo["_id"]
     )
     assert (

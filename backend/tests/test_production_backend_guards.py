@@ -15,8 +15,8 @@ Covers:
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import replace
-from typing import Iterable
 
 import pytest
 
@@ -25,7 +25,6 @@ from app.config import settings as app_settings
 from app.middleware import budget as _budget
 from app.middleware import idempotency as _idempotency
 from app.middleware import rate_limit as _rate_limit
-
 
 # ---------------------------------------------------------------------------
 # Autouse fixture: restore middleware singletons after each test so a swap

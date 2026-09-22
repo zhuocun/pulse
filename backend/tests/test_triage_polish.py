@@ -18,10 +18,14 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.store.memory import InMemoryStore
 from langgraph.types import Command
 
-from app.agents.catalog.triage import NudgePolish, TriageAgent, TriagePolish, polish_triage
+from app.agents.catalog.triage import (
+    NudgePolish,
+    TriageAgent,
+    TriagePolish,
+    polish_triage,
+)
 from app.agents.llm import make_stub_chat_model
 from tests.conftest import structured_model
-
 
 # ---------------------------------------------------------------------------
 # Helpers shared with emit-shape test

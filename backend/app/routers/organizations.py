@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Query, status
 
@@ -6,14 +6,13 @@ from app.security import current_user_id, current_user_payload
 from app.services import organization_service
 from app.validation import api_error, required_body_errors, validation_errors
 
-
 router = APIRouter()
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 def create_organization(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     errors = required_body_errors(
         data,
@@ -37,9 +36,9 @@ def create_organization(
 
 @router.get("/", status_code=status.HTTP_200_OK)
 def get_organizations(
-    organizationId: Optional[str] = Query(default=None),
-    payload: Dict[str, Any] = Depends(current_user_payload),
-) -> Union[Dict[str, Any], list]:
+    organizationId: str | None = Query(default=None),
+    payload: dict[str, Any] = Depends(current_user_payload),
+) -> dict[str, Any] | list:
     result = organization_service.get(
         current_user_id(payload),
         organizationId,
@@ -53,8 +52,8 @@ def get_organizations(
 
 @router.put("/", status_code=status.HTTP_200_OK)
 def update_organization(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     result = organization_service.update(
         data.get("_id"),
@@ -72,8 +71,8 @@ def update_organization(
 
 @router.delete("/", status_code=status.HTTP_200_OK)
 def remove_organization(
-    organizationId: Optional[str] = Query(default=None),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    organizationId: str | None = Query(default=None),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     result = organization_service.remove(organizationId, current_user_id(payload))
     if result == "Organization deleted":
@@ -98,9 +97,9 @@ def remove_organization(
 
 @router.get("/members", status_code=status.HTTP_200_OK)
 def list_organization_members(
-    organizationId: Optional[str] = Query(default=None),
-    payload: Dict[str, Any] = Depends(current_user_payload),
-) -> Union[list, str]:
+    organizationId: str | None = Query(default=None),
+    payload: dict[str, Any] = Depends(current_user_payload),
+) -> list | str:
     result = organization_service.list_members(
         organizationId, current_user_id(payload)
     )
@@ -113,8 +112,8 @@ def list_organization_members(
 
 @router.post("/members", status_code=status.HTTP_201_CREATED)
 def add_organization_member(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     errors = required_body_errors(
         data,
@@ -147,8 +146,8 @@ def add_organization_member(
 
 @router.put("/members", status_code=status.HTTP_200_OK)
 def update_organization_member(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     errors = required_body_errors(
         data,
@@ -181,9 +180,9 @@ def update_organization_member(
 
 @router.delete("/members", status_code=status.HTTP_200_OK)
 def remove_organization_member(
-    organizationId: Optional[str] = Query(default=None),
-    userId: Optional[str] = Query(default=None),
-    payload: Dict[str, Any] = Depends(current_user_payload),
+    organizationId: str | None = Query(default=None),
+    userId: str | None = Query(default=None),
+    payload: dict[str, Any] = Depends(current_user_payload),
 ) -> str:
     result = organization_service.remove_member(
         organizationId,

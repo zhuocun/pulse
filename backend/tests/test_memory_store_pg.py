@@ -24,7 +24,7 @@ import json
 import os
 import uuid
 from contextlib import AsyncExitStack, asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -36,7 +36,6 @@ from app.agents.memory_store_pg import (
     open_memory_store,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fake psycopg-style pool + cursor
 # ---------------------------------------------------------------------------
@@ -45,13 +44,13 @@ from app.agents.memory_store_pg import (
 class _FakeCursor:
     """Records executed SQL + binds and replays scripted result sets."""
 
-    def __init__(self, parent: "_FakeConn") -> None:
+    def __init__(self, parent: _FakeConn) -> None:
         self.parent = parent
         self._rows: list[Any] = []
         self.description: Any = None
         self.rowcount: int = 0
 
-    async def __aenter__(self) -> "_FakeCursor":
+    async def __aenter__(self) -> _FakeCursor:
         return self
 
     async def __aexit__(self, *args: Any) -> None:
@@ -119,7 +118,7 @@ def _run(coro: Any) -> Any:
 
 
 def test_row_to_entry_decodes_dict_row() -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     row = {
         "id": uuid.uuid4(),
         "project_id": "p",
@@ -142,7 +141,7 @@ def test_row_to_entry_decodes_dict_row() -> None:
 
 
 def test_row_to_entry_decodes_tuple_row() -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     row = (
         str(uuid.uuid4()),
         "p",
@@ -162,7 +161,7 @@ def test_row_to_entry_decodes_tuple_row() -> None:
 def test_row_to_entry_parses_json_text_value() -> None:
     """A value column round-tripped as text JSON still decodes."""
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     row = {
         "id": "x",
         "project_id": "p",
@@ -179,7 +178,7 @@ def test_row_to_entry_parses_json_text_value() -> None:
 
 
 def test_row_to_entry_recovers_ttl_from_expires_at_minus_updated_at() -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     from datetime import timedelta
 
     row = {
@@ -200,7 +199,7 @@ def test_row_to_entry_recovers_ttl_from_expires_at_minus_updated_at() -> None:
 def test_row_to_entry_handles_null_value_column() -> None:
     """A NULL value column shouldn't break the decoder."""
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     row = {
         "id": "x",
         "project_id": "p",
@@ -219,7 +218,7 @@ def test_row_to_entry_handles_null_value_column() -> None:
 def test_row_to_entry_wraps_non_dict_scalar_value() -> None:
     """Defensive: a stored bool/int/str shouldn't crash the Pydantic model."""
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     row = {
         "id": "x",
         "project_id": "p",
@@ -241,7 +240,7 @@ def test_row_to_entry_wraps_non_dict_scalar_value() -> None:
 
 
 def _stub_returning_row(scope: MemoryScope, key: str, value: dict) -> list[Any]:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return [
         {
             "id": uuid.uuid4(),
@@ -290,7 +289,7 @@ def test_pg_remember_passes_value_as_json_string() -> None:
     scope = MemoryScope(project_id="p", user_id="u", kind="preference")
     pool.script("INSERT INTO agent_memory", _stub_returning_row(scope, "k", {"v": 1}))
     _run(store.remember(scope, "k", {"a": [1, 2, 3]}))
-    last_sql, last_args = pool.executed[-1]
+    _last_sql, last_args = pool.executed[-1]
     # value arg position depends on scope; just confirm we serialised to JSON.
     serialised = [a for a in last_args if isinstance(a, str) and a.startswith("{")]
     assert serialised, f"expected json string in {last_args!r}"

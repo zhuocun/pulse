@@ -5,8 +5,9 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -149,7 +150,7 @@ def test_redact_dict_strings_dicts_lists_tuples_passthrough() -> None:
 
 def test_redaction_span_dataclass_is_frozen() -> None:
     span = RedactionSpan("[EMAIL]", 0, 5)
-    with pytest.raises(Exception):
+    with pytest.raises(dataclasses.FrozenInstanceError):
         span.start = 99  # type: ignore[misc]
     assert PATTERNS  # patterns list is non-empty
 
@@ -429,7 +430,7 @@ def test_resolve_embeddings_caches_singleton() -> None:
 
 def test_embedding_neighbors_topk_descending() -> None:
     vecs = be_tools.embed(["a", "b", "c", "d"])
-    corpus = list(zip(["a", "b", "c", "d"], vecs))
+    corpus = list(zip(["a", "b", "c", "d"], vecs, strict=True))
     query = vecs[0]
     out = be_tools.embedding_neighbors(query, corpus, k=2)
     assert len(out) == 2
@@ -475,7 +476,7 @@ def test_cosine_similarity_orthogonal_vectors_score_zero() -> None:
 
 
 def _iso(dt: datetime) -> str:
-    return dt.replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z")
+    return dt.replace(tzinfo=UTC).isoformat().replace("+00:00", "Z")
 
 
 def test_detect_drift_no_signals() -> None:
@@ -488,7 +489,7 @@ def test_detect_drift_no_signals() -> None:
 
 
 def test_detect_drift_wip_overflow_and_stale() -> None:
-    old = datetime.now(timezone.utc) - timedelta(days=20)
+    old = datetime.now(UTC) - timedelta(days=20)
     columns = [
         {"id": "c1", "name": "In Progress"},
         {"id": "c2", "name": "Done"},

@@ -36,7 +36,6 @@ from app.middleware.budget import (
 )
 from app.middleware.budget_pg import PostgresBudgetBackend
 
-
 # ---------------------------------------------------------------------------
 # Fake Postgres pool -- serialises by ``asyncio.Lock`` to simulate row locks
 # ---------------------------------------------------------------------------
@@ -65,13 +64,13 @@ class _FakeRowStore:
 class _FakeCursor:
     """SQL-aware fake that handles the four statements the backend emits."""
 
-    def __init__(self, parent: "_FakeConn") -> None:
+    def __init__(self, parent: _FakeConn) -> None:
         self.parent = parent
         self.description: Any = None
         self._result: Any = None
         self.rowcount: int = 0
 
-    async def __aenter__(self) -> "_FakeCursor":
+    async def __aenter__(self) -> _FakeCursor:
         return self
 
     async def __aexit__(self, *_: Any) -> None:
@@ -171,7 +170,7 @@ class _FakeCursor:
 
 
 class _FakeConn:
-    def __init__(self, parent: "_FakePool") -> None:
+    def __init__(self, parent: _FakePool) -> None:
         self.parent = parent
         self._held_locks: list[asyncio.Lock] = []
 
@@ -277,7 +276,7 @@ def test_pg_areserve_within_cap_succeeds() -> None:
 
 
 def test_pg_areserve_over_cap_returns_false_without_mutation() -> None:
-    backend, pool = _new_pg_backend(cap=10)
+    backend, _pool = _new_pg_backend(cap=10)
 
     async def run() -> tuple[bool, bool, int]:
         first = await backend.areserve("p", 8)
@@ -379,7 +378,7 @@ def test_pg_refund_clamps_at_zero_and_serialises_across_workers() -> None:
     here we get it from ``GREATEST(0, tokens_used - %s)``.
     """
 
-    backend, pool = _new_pg_backend()
+    backend, _pool = _new_pg_backend()
 
     async def run() -> int:
         await backend.arecord("p", 5)

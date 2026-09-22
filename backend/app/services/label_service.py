@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from app.database import LABELS, PROJECTS, TASKS
 from app.repositories import repository
@@ -19,7 +19,7 @@ def _valid_name(value: Any) -> bool:
     return isinstance(value, str) and value != ""
 
 
-def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
+def create(data: dict[str, Any], user_id: str) -> str | None:
     project_id = data.get("projectId")
     # Write path: the project must exist (None -> 404) and the caller must
     # be editor or owner on it (-> "Forbidden").
@@ -49,7 +49,7 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
     return "Label created"
 
 
-def get(project_id: Optional[str], user_id: str) -> Optional[Union[str, List[Any]]]:
+def get(project_id: str | None, user_id: str) -> str | list[Any] | None:
     if repository.find_by_id(PROJECTS, project_id or "") is None:
         return "Project not found"
     # Read path: any member (viewer and up) may list the labels.
@@ -61,7 +61,7 @@ def get(project_id: Optional[str], user_id: str) -> Optional[Union[str, List[Any
     )
 
 
-def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
+def update(data: dict[str, Any], user_id: str) -> str | None:
     label_id = data.get("_id")
     label = repository.find_by_id(LABELS, label_id or "")
     if not label_id or label is None:
@@ -82,7 +82,7 @@ def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
     return "Label updated"
 
 
-def remove(label_id: Optional[str], user_id: str) -> Optional[str]:
+def remove(label_id: str | None, user_id: str) -> str | None:
     label = repository.find_by_id(LABELS, label_id or "")
     if not label_id or label is None:
         return None

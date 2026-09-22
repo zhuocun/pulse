@@ -18,7 +18,6 @@ from app.agents.llm import make_stub_chat_model
 from app.agents.polish import PolishStep
 from tests.conftest import StructuredRunnable, structured_model
 
-
 # ---------------------------------------------------------------------------
 # Minimal schema used across all tests
 # ---------------------------------------------------------------------------
@@ -139,7 +138,7 @@ def test_polish_step_wrong_parsed_type_falls_back() -> None:
     model = structured_model(parsed=wrong_type)
 
     step = _make_step()
-    update, tokens_in, tokens_out = asyncio.run(step.run(_STATE, model))
+    update, _tokens_in, _tokens_out = asyncio.run(step.run(_STATE, model))
 
     assert update == {"result": _FALLBACK_VALUE}
 

@@ -25,8 +25,9 @@ import base64
 import hashlib
 import hmac as _hmac
 import logging
+from collections.abc import AsyncIterator, Mapping
 from contextlib import AsyncExitStack
-from typing import Any, AsyncIterator, Mapping, Optional
+from typing import Any
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.errors import GraphRecursionError
@@ -40,6 +41,7 @@ from app.agents.checkpointing import (
     enter_agent_postgres_pool,
     open_checkpointer,
 )
+from app.agents.context import ChatContext
 from app.agents.errors import (
     AgentConfigurationError,
     AgentError,
@@ -47,7 +49,6 @@ from app.agents.errors import (
     AgentRecursionError,
     InvalidThreadKeyError,
 )
-from app.agents.context import ChatContext
 from app.agents.events import (
     validate_mutation_proposal_event,
     validate_suggestion_payload,
@@ -114,7 +115,7 @@ def _try_verify_signed_thread_key(
     token: str,
     agent_name: str,
     scope: str,
-) -> Optional[str]:
+) -> str | None:
     """Validate a signed token and return the original thread_id, or ``None``.
 
     Accepts the ``sigv1.`` envelope (HMAC over ``jwt_secret``).
@@ -138,7 +139,7 @@ def _try_verify_signed_thread_key(
     return None
 
 
-def _verify_sigv1(token: str, agent_name: str, scope: str) -> Optional[str]:
+def _verify_sigv1(token: str, agent_name: str, scope: str) -> str | None:
     """Verify a ``sigv1.`` envelope."""
 
     encoded = token[len(_SIGNED_PREFIX):]
@@ -169,9 +170,9 @@ class AgentRuntime:
     def __init__(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver] = None,
-        store: Optional[BaseStore] = None,
-        registry: Optional[AgentRegistry] = None,
+        checkpointer: BaseCheckpointSaver | None = None,
+        store: BaseStore | None = None,
+        registry: AgentRegistry | None = None,
         default_thread_id: str = "default",
         recursion_limit: int = 25,
     ) -> None:
@@ -222,8 +223,8 @@ class AgentRuntime:
         cls,
         settings: Any,
         *,
-        registry: Optional[AgentRegistry] = None,
-    ) -> "AgentRuntime":
+        registry: AgentRegistry | None = None,
+    ) -> AgentRuntime:
         checkpointer = build_checkpointer(
             settings.agent_checkpoint_backend, settings=settings
         )
@@ -251,8 +252,8 @@ class AgentRuntime:
         settings: Any,
         *,
         stack: AsyncExitStack,
-        registry: Optional[AgentRegistry] = None,
-    ) -> "AgentRuntime":
+        registry: AgentRegistry | None = None,
+    ) -> AgentRuntime:
         """Async variant that supports the postgres backend.
 
         Postgres-backed checkpointers / stores require entering an async
@@ -301,11 +302,11 @@ class AgentRuntime:
         )
 
     @property
-    def checkpointer(self) -> Optional[BaseCheckpointSaver]:
+    def checkpointer(self) -> BaseCheckpointSaver | None:
         return self._checkpointer
 
     @property
-    def store(self) -> Optional[BaseStore]:
+    def store(self) -> BaseStore | None:
         return self._store
 
     @property
@@ -325,8 +326,8 @@ class AgentRuntime:
     def _namespaced_thread(
         self,
         agent: BaseAgent,
-        thread_id: Optional[str],
-        user_id: Optional[str] = None,
+        thread_id: str | None,
+        user_id: str | None = None,
     ) -> str:
         """Namespace the thread id by ``(agent, user)``.
 
@@ -419,9 +420,9 @@ class AgentRuntime:
         agent: BaseAgent,
         caller_context: Any,
         *,
-        user_id: Optional[str] = None,
-        project_id: Optional[str] = None,
-        autonomy_level: Optional[str] = None,
+        user_id: str | None = None,
+        project_id: str | None = None,
+        autonomy_level: str | None = None,
     ) -> Any:
         """Resolve a context object for one agent call.
 
@@ -468,10 +469,10 @@ class AgentRuntime:
         self,
         agent: BaseAgent,
         *,
-        thread_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        assistant_id: Optional[str] = None,
-        tags: Optional[list[str]] = None,
+        thread_id: str | None = None,
+        user_id: str | None = None,
+        assistant_id: str | None = None,
+        tags: list[str] | None = None,
     ) -> dict[str, Any]:
         """Build a LangGraph ``RunnableConfig`` for ``agent``.
 
@@ -502,10 +503,10 @@ class AgentRuntime:
         name: str,
         inputs: Mapping[str, Any],
         *,
-        thread_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        assistant_id: Optional[str] = None,
-        tags: Optional[list[str]] = None,
+        thread_id: str | None = None,
+        user_id: str | None = None,
+        assistant_id: str | None = None,
+        tags: list[str] | None = None,
         context: Any = None,
     ) -> Any:
         """Synchronous invoke. Postgres-backed runtimes should prefer
@@ -549,7 +550,7 @@ class AgentRuntime:
         self,
         inputs: Mapping[str, Any],
         resume: Any,
-        thread_id: Optional[str],
+        thread_id: str | None,
     ) -> Any:
         """Translate ``(inputs, resume)`` into the value passed to LangGraph.
 
@@ -583,10 +584,10 @@ class AgentRuntime:
         name: str,
         inputs: Mapping[str, Any],
         *,
-        thread_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        assistant_id: Optional[str] = None,
-        tags: Optional[list[str]] = None,
+        thread_id: str | None = None,
+        user_id: str | None = None,
+        assistant_id: str | None = None,
+        tags: list[str] | None = None,
         context: Any = None,
         resume: Any = None,
     ) -> Any:
@@ -636,10 +637,10 @@ class AgentRuntime:
         name: str,
         inputs: Mapping[str, Any],
         *,
-        thread_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        assistant_id: Optional[str] = None,
-        tags: Optional[list[str]] = None,
+        thread_id: str | None = None,
+        user_id: str | None = None,
+        assistant_id: str | None = None,
+        tags: list[str] | None = None,
         context: Any = None,
         resume: Any = None,
     ) -> tuple[Any, list[Any]]:
@@ -753,10 +754,10 @@ class AgentRuntime:
         name: str,
         inputs: Mapping[str, Any],
         *,
-        thread_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        assistant_id: Optional[str] = None,
-        tags: Optional[list[str]] = None,
+        thread_id: str | None = None,
+        user_id: str | None = None,
+        assistant_id: str | None = None,
+        tags: list[str] | None = None,
         context: Any = None,
         resume: Any = None,
         stream_mode: tuple[str, ...] = ("updates", "messages", "custom"),
@@ -786,7 +787,7 @@ class AgentRuntime:
         _request_modes: tuple[str, ...] = stream_mode
         _need_values = "values" not in stream_mode
         if _need_values:
-            _request_modes = stream_mode + ("values",)
+            _request_modes = (*stream_mode, "values")
         with start_run_span(
             operation="stream_agent",
             agent_name=name,
@@ -973,7 +974,7 @@ class AgentRuntime:
             )
 
 
-def _project_id(inputs: Mapping[str, Any]) -> Optional[str]:
+def _project_id(inputs: Mapping[str, Any]) -> str | None:
     """Pull ``project_id`` off the inputs for span tagging.
 
     Catalog agents standardise on a top-level ``project_id`` so the
@@ -988,7 +989,7 @@ def _project_id(inputs: Mapping[str, Any]) -> Optional[str]:
     return value if isinstance(value, str) and value else None
 
 
-def _autonomy(inputs: Mapping[str, Any]) -> Optional[str]:
+def _autonomy(inputs: Mapping[str, Any]) -> str | None:
     """Pull the resolved autonomy level off the inputs for span tagging."""
 
     if not isinstance(inputs, Mapping):

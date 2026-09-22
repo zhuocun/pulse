@@ -23,7 +23,8 @@ one, or many envelope dicts ready to be JSON-encoded into the SSE
 from __future__ import annotations
 
 import logging
-from typing import Any, Iterable, Optional
+from collections.abc import Iterable
+from typing import Any
 
 import orjson
 from fastapi.encoders import jsonable_encoder
@@ -96,7 +97,7 @@ def _coerce_namespace(value: Any) -> list[str]:
     return [str(value)]
 
 
-def _interrupt_data(payload: Any) -> Optional[dict[str, Any]]:
+def _interrupt_data(payload: Any) -> dict[str, Any] | None:
     """Extract ``{"tool", "args"}`` from a LangGraph interrupt payload.
 
     LangGraph wraps each ``interrupt(value)`` in an ``Interrupt`` object
@@ -163,7 +164,7 @@ def translate_event(
     mode: str,
     chunk: Any,
     *,
-    namespace: Optional[Any] = None,
+    namespace: Any | None = None,
 ) -> Iterable[dict[str, Any]]:
     """Yield zero or more FE-shaped envelopes for one LangGraph chunk.
 
@@ -260,7 +261,7 @@ def encode_sse(envelope: dict[str, Any]) -> bytes:
         body = orjson.dumps(
             error_envelope("invalid stream chunk", code="encode_error")
         ).decode()
-    return f"data: {body}\n\n".encode("utf-8")
+    return f"data: {body}\n\n".encode()
 
 
 DONE_FRAME = b"data: [DONE]\n\n"

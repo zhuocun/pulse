@@ -9,7 +9,7 @@ The org layer is parallel to the project layer: roles are
 must always retain at least one ``org_owner``.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -18,7 +18,7 @@ from app.services import organization_service as org_service
 from tests.conftest import FakeStore
 
 
-def auth_headers(token: str) -> Dict[str, str]:
+def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -26,7 +26,7 @@ def register_and_login(
     client: TestClient,
     username: str,
     email: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Register a user and return the login body plus a bearer token.
 
     The REST JWT rides an HttpOnly ``Token`` cookie; because every login

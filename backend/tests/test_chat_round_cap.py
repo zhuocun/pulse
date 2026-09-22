@@ -16,7 +16,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.store.memory import InMemoryStore
 
-from app.agents.catalog.chat import ChatAgent, MAX_SERVER_TOOL_ROUNDS
+from app.agents.catalog.chat import MAX_SERVER_TOOL_ROUNDS, ChatAgent
 
 
 @pytest.fixture()

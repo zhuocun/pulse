@@ -15,20 +15,18 @@ import asyncio
 import json
 import logging
 from collections import Counter
-from typing import Any, Optional
+from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
+from langgraph.runtime import get_runtime
 from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
 
-from langgraph.runtime import get_runtime
-
 from app.agents.base import AgentMetadata, BaseAgent
-from app.agents.pipeline import linear_graph
 from app.agents.catalog._schemas import HEADLINE_MAX
 from app.agents.catalog._shared import (
     build_citation_refs,
@@ -41,12 +39,13 @@ from app.agents.catalog._shared import (
 from app.agents.context import ChatContext
 from app.agents.identity import COPILOT_IDENTITY
 from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
+from app.agents.pipeline import linear_graph
 from app.agents.polish import PolishStep
 from app.agents.state import BoardBriefState
+from app.store import namespaces
 from app.tools.be_tools import _is_done_column
 from app.tools.fe_tool_names import FE_BOARD_SNAPSHOT
 from app.tools.redaction import redact_dict
-from app.store import namespaces
 
 logger = logging.getLogger(__name__)
 
@@ -422,8 +421,8 @@ class BoardBriefAgent(BaseAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         _default_model = self.chat_model  # captured for fallback
 

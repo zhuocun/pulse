@@ -19,14 +19,14 @@ deterministic neighbour scoring path).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import importlib
 import logging
-from typing import Optional
+from dataclasses import dataclass
 
 from langchain_core.embeddings import Embeddings
 
-from app.config import Settings, settings as default_settings
+from app.config import Settings
+from app.config import settings as default_settings
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +108,7 @@ def _detect_provider(settings: Settings) -> str:
 
 def resolve_embeddings_spec(
     *,
-    settings: Optional[Settings] = None,
+    settings: Settings | None = None,
 ) -> EmbeddingsSpec:
     """Translate :class:`Settings` into an :class:`EmbeddingsSpec`.
 
@@ -172,9 +172,9 @@ def make_stub_embeddings() -> _StubEmbeddings:
 
 
 def make_embeddings(
-    spec: Optional[EmbeddingsSpec] = None,
+    spec: EmbeddingsSpec | None = None,
     *,
-    settings: Optional[Settings] = None,
+    settings: Settings | None = None,
 ) -> Embeddings:
     """Build an :class:`Embeddings` for ``spec`` (or the resolved default).
 
@@ -206,9 +206,9 @@ def make_embeddings(
 
 
 def assert_embeddings_provider_available(
-    spec: Optional[EmbeddingsSpec] = None,
+    spec: EmbeddingsSpec | None = None,
     *,
-    settings: Optional[Settings] = None,
+    settings: Settings | None = None,
 ) -> None:
     """Fail fast at boot when the configured provider's package is missing.
 

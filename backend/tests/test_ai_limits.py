@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import replace
 from http import HTTPStatus
-from typing import Any, Iterable
+from typing import Any, ClassVar
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,7 +16,6 @@ from app.agents.limits import enforce_request_limits
 from app.routers.agents import _input_token_estimate
 from app.security import create_token
 from tests.conftest import FakeStore, seed_agent_test_projects_if_absent
-
 
 # ---------------------------------------------------------------------------
 # Unit tests for enforce_request_limits directly
@@ -139,7 +139,7 @@ def test_content_length_header_fastpath_rejects_oversized() -> None:
     parsed-body re-serialisation cost is paid."""
 
     class _RequestStub:
-        headers = {"content-length": "10000000"}  # 10 MB declared
+        headers: ClassVar[dict[str, str]] = {"content-length": "10000000"}  # 10 MB declared
 
     with pytest.raises(Exception) as exc_info:
         enforce_request_limits({"prompt": "tiny"}, request=_RequestStub())  # type: ignore[arg-type]
@@ -151,14 +151,14 @@ def test_content_length_header_invalid_falls_through_to_body_check() -> None:
     the body-size check still runs (and passes for a tiny payload)."""
 
     class _RequestStub:
-        headers = {"content-length": "not-a-number"}
+        headers: ClassVar[dict[str, str]] = {"content-length": "not-a-number"}
 
     enforce_request_limits({"prompt": "tiny"}, request=_RequestStub())  # type: ignore[arg-type]
 
 
 def test_content_length_header_within_limit_falls_through() -> None:
     class _RequestStub:
-        headers = {"content-length": "100"}
+        headers: ClassVar[dict[str, str]] = {"content-length": "100"}
 
     enforce_request_limits({"prompt": "ok"}, request=_RequestStub())  # type: ignore[arg-type]
 

@@ -1,3 +1,5 @@
+from datetime import UTC
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -70,10 +72,11 @@ def test_token_scope_non_string_defaults_to_rest() -> None:
 
 
 def test_ai_route_rejects_unknown_jwt_scope(client: TestClient) -> None:
-    import jwt
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
-    issued = datetime.now(timezone.utc)
+    import jwt
+
+    issued = datetime.now(UTC)
     payload = {
         "sub": "user-x",
         "iat": issued,

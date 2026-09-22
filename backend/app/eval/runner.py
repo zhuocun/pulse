@@ -28,8 +28,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import asdict, dataclass, field
-from typing import Any, Awaitable, Callable, Optional, Sequence
+from typing import Any
 
 from app.eval.fixtures import (
     AGENT_NAMES,
@@ -69,7 +70,7 @@ class FixtureResult:
     reasoning: str
     output: Any
     duration_ms: float
-    error: Optional[str] = None
+    error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -191,7 +192,7 @@ async def _run_one(
 ) -> FixtureResult:
     start = time.perf_counter()
     output: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     try:
         output = await _maybe_await(agent_fn(fixture))
     except Exception as exc:  # noqa: BLE001 — surface in report
@@ -239,10 +240,10 @@ async def _run_one(
 async def run_eval(
     agent: str,
     *,
-    fixtures: Optional[list[EvalFixture]] = None,
-    judge: Optional[Judge] = None,
-    agent_fn: Optional[Callable[[EvalFixture], Any]] = None,
-    max_fixtures: Optional[int] = None,
+    fixtures: list[EvalFixture] | None = None,
+    judge: Judge | None = None,
+    agent_fn: Callable[[EvalFixture], Any] | None = None,
+    max_fixtures: int | None = None,
     dry_run: bool = False,
     threshold: float = DEFAULT_PASS_THRESHOLD,
 ) -> EvalReport:

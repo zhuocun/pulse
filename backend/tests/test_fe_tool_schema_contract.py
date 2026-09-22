@@ -19,7 +19,6 @@ import app.agents.catalog as catalog
 from app.agents.registry import registry
 from app.tools.fe_tool_schemas import FE_TOOL_SCHEMAS, interrupt_payload
 
-
 # ---------------------------------------------------------------------------
 # (a) Catalog tool references are valid
 # ---------------------------------------------------------------------------

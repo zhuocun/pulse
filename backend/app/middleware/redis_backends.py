@@ -26,8 +26,9 @@ import json
 import time
 import uuid
 from calendar import monthrange
-from datetime import datetime, timedelta, timezone
-from typing import Any, Iterable, Literal, Optional, Tuple
+from collections.abc import Iterable
+from datetime import UTC, datetime, timedelta
+from typing import Any, Literal
 
 from app.middleware.budget import (
     DEFAULT_MONTHLY_TOKEN_CAP,
@@ -42,7 +43,7 @@ from app.middleware.idempotency import (
 from app.middleware.rate_limit import DEFAULT_LIMIT, RateLimitBackend
 
 
-def _budget_key_ttl_seconds(month: Optional[str] = None) -> int:
+def _budget_key_ttl_seconds(month: str | None = None) -> int:
     """Seconds until the budget key can be dropped after the billed month ends.
 
     Redis budget keys would otherwise accumulate one string per project
@@ -54,8 +55,8 @@ def _budget_key_ttl_seconds(month: Optional[str] = None) -> int:
     year_s, mon_s = key.split("-", 1)
     year, mon = int(year_s), int(mon_s)
     last_dom = monthrange(year, mon)[1]
-    month_end = datetime(year, mon, last_dom, tzinfo=timezone.utc) + timedelta(days=1)
-    now = datetime.now(timezone.utc)
+    month_end = datetime(year, mon, last_dom, tzinfo=UTC) + timedelta(days=1)
+    now = datetime.now(UTC)
     ttl = int((month_end - now).total_seconds()) + 7 * 86_400
     return max(ttl, 86_400)
 
@@ -93,8 +94,7 @@ def _iter_scan_keys(client: Any, pattern: str) -> Iterable[str]:
     cursor = 0
     while True:
         cursor, batch = client.scan(cursor=cursor, match=pattern, count=100)
-        for key in batch:
-            yield key
+        yield from batch
         if cursor == 0:
             return
 
@@ -164,10 +164,10 @@ class RedisBudgetBackend:
         self._reserve_script = client.register_script(_BUDGET_RESERVE_LUA)
         self._refund_script = client.register_script(_BUDGET_REFUND_LUA)
 
-    def _key(self, project_id: str, month: Optional[str] = None) -> str:
+    def _key(self, project_id: str, month: str | None = None) -> str:
         return f"{self._prefix}{project_id}:{month or _current_month_key()}"
 
-    def remaining(self, project_id: str, month: Optional[str] = None) -> int:
+    def remaining(self, project_id: str, month: str | None = None) -> int:
         raw = self._client.get(self._key(project_id, month))
         spent = int(raw) if raw is not None else 0
         return max(0, self.monthly_cap - spent)
@@ -292,7 +292,7 @@ class RedisRateLimitBackend:
         self._prefix = prefix
         self._check_script = client.register_script(_RATE_LIMIT_CHECK_LUA)
 
-    def _keys(self, agent: str, user_id: str) -> Tuple[str, str]:
+    def _keys(self, agent: str, user_id: str) -> tuple[str, str]:
         base = f"{self._prefix}{agent}:{user_id}"
         return f"{base}:m", f"{base}:h"
 
@@ -301,8 +301,8 @@ class RedisRateLimitBackend:
         agent: str,
         user_id: str,
         *,
-        limits: Optional[Tuple[int, int]] = None,
-        now: Optional[float] = None,
+        limits: tuple[int, int] | None = None,
+        now: float | None = None,
     ) -> tuple[bool, int]:
         per_minute, per_hour = limits if limits is not None else DEFAULT_LIMIT
         ts = time.time() if now is None else now
@@ -452,8 +452,8 @@ class RedisIdempotencyBackend:
 
     def reserve(
         self, key: str, fingerprint: str
-    ) -> Tuple[
-        Optional[CachedResponse],
+    ) -> tuple[
+        CachedResponse | None,
         Literal["fresh", "in_flight", "completed", "mismatch_pending"],
     ]:
         pending_blob = json.dumps(
@@ -503,7 +503,7 @@ class RedisIdempotencyBackend:
         )
         return int(result or 0) == 1
 
-    def release(self, key: str, fingerprint: Optional[str] = None) -> bool:
+    def release(self, key: str, fingerprint: str | None = None) -> bool:
         if fingerprint is None:
             return bool(self._client.delete(self._key(key)))
         result = self._release_script(

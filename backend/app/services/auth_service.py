@@ -1,6 +1,7 @@
 from http import HTTPStatus
-from typing import Any, Dict
+from typing import Any
 
+from app.config import settings
 from app.database import USERS
 from app.domain.password_policy import MIN_PASSWORD_LENGTH
 from app.repositories import repository
@@ -14,7 +15,6 @@ from app.security import (
     encrypt_password,
     verify_password,
 )
-from app.config import settings
 from app.validation import (
     api_error,
     body_error,
@@ -24,7 +24,7 @@ from app.validation import (
 )
 
 
-def register(data: Dict[str, Any]) -> str:
+def register(data: dict[str, Any]) -> str:
     errors = []
 
     username = data.get("username")
@@ -88,7 +88,7 @@ def register(data: Dict[str, Any]) -> str:
     return "User created"
 
 
-def login(data: Dict[str, Any]) -> Dict[str, Any]:
+def login(data: dict[str, Any]) -> dict[str, Any]:
     if len(settings.jwt_secret) < JWT_SECRET_MIN_LENGTH:
         api_error(
             HTTPStatus.SERVICE_UNAVAILABLE,

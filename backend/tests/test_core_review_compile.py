@@ -8,7 +8,7 @@ async lock and then reuses the cached result).
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import MagicMock
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -16,7 +16,6 @@ from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore
 
 from app.agents.base import AgentMetadata, BaseAgent
-
 
 # ---------------------------------------------------------------------------
 # Minimal concrete agent for tests -- build() is mocked per test.
@@ -29,8 +28,8 @@ class _SimpleAgent(BaseAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         # Concrete agents must implement build(); callers will mock it.
         raise NotImplementedError  # pragma: no cover

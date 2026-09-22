@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from app.database import ORGANIZATIONS, PROJECTS, USERS
 from app.repositories import repository
@@ -26,8 +26,8 @@ ORG_ROLE_RANK = {ORG_ROLE_MEMBER: 1, ORG_ROLE_ADMIN: 2, ORG_ROLE_OWNER: 3}
 
 
 def _resolve_org(
-    org_id_or_doc: Union[str, Dict[str, Any], None],
-) -> Optional[Dict[str, Any]]:
+    org_id_or_doc: str | dict[str, Any] | None,
+) -> dict[str, Any] | None:
     """Accept either an org id or an already-fetched doc.
 
     Passing the doc through avoids a redundant lookup when the caller has
@@ -42,7 +42,7 @@ def _resolve_org(
     return repository.find_by_id(ORGANIZATIONS, str(org_id_or_doc))
 
 
-def _member_role(org: Dict[str, Any], user_id: Optional[str]) -> Optional[str]:
+def _member_role(org: dict[str, Any], user_id: str | None) -> str | None:
     """Role recorded for ``user_id`` in ``members`` (None if not a member)."""
 
     for entry in org.get("members") or []:
@@ -53,8 +53,8 @@ def _member_role(org: Dict[str, Any], user_id: Optional[str]) -> Optional[str]:
 
 
 def can_access_org(
-    org_id_or_doc: Union[str, Dict[str, Any], None],
-    user_id: Optional[str],
+    org_id_or_doc: str | dict[str, Any] | None,
+    user_id: str | None,
     min_org_role: str = ORG_ROLE_MEMBER,
 ) -> bool:
     """True if ``user_id`` holds at least ``min_org_role`` on the org.
@@ -77,7 +77,7 @@ def can_access_org(
     return ORG_ROLE_RANK[role] >= threshold
 
 
-def create(name: str, slug: str, user_id: str) -> Optional[str]:
+def create(name: str, slug: str, user_id: str) -> str | None:
     # The public ``slug`` is the tenant handle and must be globally
     # unique. Read-before-write mirrors the register flow in
     # ``auth_service``; the DB also carries a unique index as the
@@ -101,8 +101,8 @@ def create(name: str, slug: str, user_id: str) -> Optional[str]:
 
 def get(
     user_id: str,
-    organization_id: Optional[str] = None,
-) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]], str]]:
+    organization_id: str | None = None,
+) -> dict[str, Any] | list[dict[str, Any]] | str | None:
     """Return organizations visible to ``user_id`` (the authenticated caller).
 
     By id: the caller must be a member (any role). Without an id: list
@@ -130,10 +130,10 @@ def get(
 
 
 def update(
-    organization_id: Optional[str],
+    organization_id: str | None,
     user_id: str,
-    data: Dict[str, Any],
-) -> Optional[str]:
+    data: dict[str, Any],
+) -> str | None:
     if not organization_id:
         return "Bad request"
     org = repository.find_by_id(ORGANIZATIONS, organization_id)
@@ -154,7 +154,7 @@ def update(
     return "Organization updated"
 
 
-def remove(organization_id: Optional[str], user_id: str) -> Optional[str]:
+def remove(organization_id: str | None, user_id: str) -> str | None:
     if organization_id is None:
         return "Bad request"
     org = repository.find_by_id(ORGANIZATIONS, organization_id)
@@ -184,10 +184,10 @@ def remove(organization_id: Optional[str], user_id: str) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 
-def _normalized_members(org: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _normalized_members(org: dict[str, Any]) -> list[dict[str, Any]]:
     """Copy of ``members`` keeping only well-formed ``{userId, role}`` rows."""
 
-    members: List[Dict[str, Any]] = []
+    members: list[dict[str, Any]] = []
     for entry in org.get("members") or []:
         if not isinstance(entry, dict):
             continue
@@ -199,7 +199,7 @@ def _normalized_members(org: Dict[str, Any]) -> List[Dict[str, Any]]:
     return members
 
 
-def _is_last_owner(members: List[Dict[str, Any]], target_user_id: str) -> bool:
+def _is_last_owner(members: list[dict[str, Any]], target_user_id: str) -> bool:
     """True if ``target_user_id`` is the org's only remaining ``org_owner``."""
 
     owners = [entry for entry in members if entry["role"] == ORG_ROLE_OWNER]
@@ -207,11 +207,11 @@ def _is_last_owner(members: List[Dict[str, Any]], target_user_id: str) -> bool:
 
 
 def add_member(
-    organization_id: Optional[str],
+    organization_id: str | None,
     actor_id: str,
-    target_user_id: Optional[str],
-    role: Optional[str],
-) -> Optional[str]:
+    target_user_id: str | None,
+    role: str | None,
+) -> str | None:
     org = repository.find_by_id(ORGANIZATIONS, organization_id or "")
     if org is None:
         return "Organization not found"
@@ -245,11 +245,11 @@ def add_member(
 
 
 def update_member_role(
-    organization_id: Optional[str],
+    organization_id: str | None,
     actor_id: str,
-    target_user_id: Optional[str],
-    role: Optional[str],
-) -> Optional[str]:
+    target_user_id: str | None,
+    role: str | None,
+) -> str | None:
     org = repository.find_by_id(ORGANIZATIONS, organization_id or "")
     if org is None:
         return "Organization not found"
@@ -280,10 +280,10 @@ def update_member_role(
 
 
 def remove_member(
-    organization_id: Optional[str],
+    organization_id: str | None,
     actor_id: str,
-    target_user_id: Optional[str],
-) -> Optional[str]:
+    target_user_id: str | None,
+) -> str | None:
     org = repository.find_by_id(ORGANIZATIONS, organization_id or "")
     if org is None:
         return "Organization not found"
@@ -308,9 +308,9 @@ def remove_member(
 
 
 def list_members(
-    organization_id: Optional[str],
+    organization_id: str | None,
     actor_id: str,
-) -> Optional[Union[List[Dict[str, Any]], str]]:
+) -> list[dict[str, Any]] | str | None:
     org = repository.find_by_id(ORGANIZATIONS, organization_id or "")
     if org is None:
         return "Organization not found"
@@ -318,7 +318,7 @@ def list_members(
     if not can_access_org(org, actor_id, ORG_ROLE_MEMBER):
         return "Forbidden"
 
-    members: List[Dict[str, Any]] = []
+    members: list[dict[str, Any]] = []
     for entry in _normalized_members(org):
         user = repository.find_by_id(USERS, entry["userId"])
         # Skip dangling references (a user deleted out from under the org)

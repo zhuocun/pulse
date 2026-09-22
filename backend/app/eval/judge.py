@@ -25,7 +25,8 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Any, Optional, Protocol, Sequence
+from collections.abc import Sequence
+from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -252,7 +253,7 @@ class LLMJudge:
     def __init__(
         self,
         *,
-        model: Optional[str] = None,
+        model: str | None = None,
         provider: str = "anthropic",
         temperature: float = 0.0,
         client: Any = None,
@@ -393,9 +394,9 @@ def judge_output(
     output: Any,
     rubric: Sequence[RubricCriterion],
     *,
-    judge: Optional[Judge] = None,
+    judge: Judge | None = None,
     threshold: float = DEFAULT_PASS_THRESHOLD,
-    model: Optional[str] = None,
+    model: str | None = None,
 ) -> JudgeResult:
     """Dispatch helper.
 

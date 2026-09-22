@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from app.config import Settings, parse_project_chat_model_map, settings as default_settings
+from app.config import Settings, parse_project_chat_model_map
+from app.config import settings as default_settings
 
 
 def test_default_agent_chat_model_max_retries() -> None:

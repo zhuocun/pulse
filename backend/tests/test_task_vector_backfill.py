@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -25,11 +25,11 @@ class _MongoCursor:
         self.sort_args: tuple[str, int] | None = None
         self.batch_size_value: int | None = None
 
-    def sort(self, key_or_list: str, direction: int) -> "_MongoCursor":
+    def sort(self, key_or_list: str, direction: int) -> _MongoCursor:
         self.sort_args = (key_or_list, direction)
         return self
 
-    def batch_size(self, batch_size: int) -> "_MongoCursor":
+    def batch_size(self, batch_size: int) -> _MongoCursor:
         self.batch_size_value = batch_size
         return self
 
@@ -55,12 +55,12 @@ class _MongoCollection:
 
 
 class _PgCursor:
-    def __init__(self, conn: "_PgConnection") -> None:
+    def __init__(self, conn: _PgConnection) -> None:
         self._conn = conn
         self._rows: list[tuple[object, ...]] = []
         self._rowcount = -1
 
-    def __enter__(self) -> "_PgCursor":
+    def __enter__(self) -> _PgCursor:
         return self
 
     def __exit__(self, *_exc: object) -> None:
@@ -211,7 +211,7 @@ def test_resolve_embeddings_provider_refuses_stub_for_execute() -> None:
 def test_backfill_dry_run_reports_missing_existing_and_invalid(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    now = datetime(2026, 5, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 5, 1, tzinfo=UTC)
     collection = _MongoCollection(
         [
             {"_id": "t1", "projectId": "p1", "taskName": "Build auth"},
@@ -264,8 +264,8 @@ def test_backfill_dry_run_reports_missing_existing_and_invalid(
 def test_backfill_execute_embeds_and_upserts_pending_rows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    old = datetime(2026, 5, 1, tzinfo=timezone.utc)
-    new = datetime(2026, 5, 2, tzinfo=timezone.utc)
+    old = datetime(2026, 5, 1, tzinfo=UTC)
+    new = datetime(2026, 5, 2, tzinfo=UTC)
     collection = _MongoCollection(
         [
             {
@@ -315,7 +315,7 @@ def test_backfill_execute_embeds_and_upserts_pending_rows(
 def test_backfill_counts_actual_upserts_after_concurrent_skip(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    now = datetime(2026, 5, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 5, 1, tzinfo=UTC)
     collection = _MongoCollection(
         [{"_id": "t1", "projectId": "p1", "taskName": "Build auth", "updatedAt": now}]
     )
@@ -345,8 +345,8 @@ def test_backfill_counts_actual_upserts_after_concurrent_skip(
 def test_backfill_force_rewrites_existing_rows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    old = datetime(2026, 5, 1, tzinfo=timezone.utc)
-    new = datetime(2026, 5, 2, tzinfo=timezone.utc)
+    old = datetime(2026, 5, 1, tzinfo=UTC)
+    new = datetime(2026, 5, 2, tzinfo=UTC)
     collection = _MongoCollection(
         [{"_id": "t1", "projectId": "p1", "taskName": "Build auth", "updatedAt": old}]
     )

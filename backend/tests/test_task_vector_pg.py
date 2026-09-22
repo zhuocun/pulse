@@ -123,7 +123,7 @@ def test_fetch_vector_psycopg_query_rows(monkeypatch: pytest.MonkeyPatch) -> Non
     )
 
     class _FakeCur:
-        def __enter__(self) -> "_FakeCur":
+        def __enter__(self) -> _FakeCur:
             return self
 
         def __exit__(self, *_: object) -> None:
@@ -136,7 +136,7 @@ def test_fetch_vector_psycopg_query_rows(monkeypatch: pytest.MonkeyPatch) -> Non
             return [("t1", "Hello", 0.91)]
 
     class _FakeConn:
-        def __enter__(self) -> "_FakeConn":
+        def __enter__(self) -> _FakeConn:
             return self
 
         def __exit__(self, *_: object) -> None:

@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import logging
 from collections import Counter
-from typing import Any, Optional
+from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
@@ -26,7 +26,6 @@ from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentMetadata, BaseAgent
-from app.agents.pipeline import linear_graph
 from app.agents.catalog._schemas import (
     DRAFT_RATIONALE_MAX,
     NOTE_MAX,
@@ -42,7 +41,8 @@ from app.agents.catalog._shared import (
 )
 from app.agents.context import ChatContext
 from app.agents.identity import COPILOT_IDENTITY
-from app.agents.llm import is_stub_model  # noqa: F401 -- re-exported for test patching
+from app.agents.llm import is_stub_model
+from app.agents.pipeline import linear_graph
 from app.agents.polish import PolishStep
 from app.agents.state import TaskDraftingState
 from app.agents.tool_envelope import wrap_tool_result
@@ -105,13 +105,13 @@ def _type_for(prompt: str) -> str:
     return "feature"
 
 
-def _safe_id(value: Any) -> Optional[str]:
+def _safe_id(value: Any) -> str | None:
     if isinstance(value, str) and value.strip():
         return value
     return None
 
 
-def _default_column(context: dict[str, Any]) -> Optional[str]:
+def _default_column(context: dict[str, Any]) -> str | None:
     columns = context.get("columns") or []
     if not isinstance(columns, list):
         return None
@@ -127,7 +127,7 @@ def _default_column(context: dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _least_loaded_member(context: dict[str, Any]) -> Optional[str]:
+def _least_loaded_member(context: dict[str, Any]) -> str | None:
     members = context.get("members") or []
     tasks = context.get("tasks") or []
     if not isinstance(members, list) or not members:
@@ -341,8 +341,8 @@ class TaskDraftingAgent(BaseAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         _default_model = self.chat_model  # captured for fallback
 
@@ -444,7 +444,7 @@ class TaskDraftingAgent(BaseAgent):
                 extra_msgs_bd = [raw_msg_bd] if raw_msg_bd is not None else []
                 return {
                     "draft": result_payload,
-                    "messages": extra_msgs_bd + [AIMessage(content=json.dumps(result_payload))],
+                    "messages": [*extra_msgs_bd, AIMessage(content=json.dumps(result_payload))],
                     "events": [{"kind": "suggestion", "surface": "breakdown", "payload": result_payload}],
                 }
             if isinstance(pre_draft, dict):
@@ -456,7 +456,7 @@ class TaskDraftingAgent(BaseAgent):
                 extra_msgs_sd = [raw_msg_sd] if raw_msg_sd is not None else []
                 return {
                     "draft": polished,
-                    "messages": extra_msgs_sd + [AIMessage(content=json.dumps(polished))],
+                    "messages": [*extra_msgs_sd, AIMessage(content=json.dumps(polished))],
                     "events": [{"kind": "suggestion", "surface": "draft", "payload": polished}],
                 }
             base = _draft_from_prompt(prompt)
@@ -478,7 +478,7 @@ class TaskDraftingAgent(BaseAgent):
             extra_msgs_base = [raw_msg_base] if raw_msg_base is not None else []
             return {
                 "draft": draft,
-                "messages": extra_msgs_base + [AIMessage(content=json.dumps(draft))],
+                "messages": [*extra_msgs_base, AIMessage(content=json.dumps(draft))],
                 "events": [{"kind": "suggestion", "surface": "draft", "payload": draft}],
             }
 

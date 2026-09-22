@@ -34,11 +34,10 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Optional, Protocol, runtime_checkable
+from datetime import UTC, datetime, timedelta
+from typing import Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict
-
 
 # ---------------------------------------------------------------------------
 # Typed payloads
@@ -58,10 +57,10 @@ class MemoryScope(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     project_id: str
-    user_id: Optional[str] = None
+    user_id: str | None = None
     kind: str
 
-    def matches(self, other: "MemoryScope") -> bool:
+    def matches(self, other: MemoryScope) -> bool:
         """Whether two scopes refer to the exact same bucket."""
 
         return (
@@ -91,10 +90,10 @@ class MemoryEntry(BaseModel):
     value: dict
     created_at: datetime
     updated_at: datetime
-    ttl_seconds: Optional[int] = None
-    expires_at: Optional[datetime] = None
+    ttl_seconds: int | None = None
+    expires_at: datetime | None = None
 
-    def is_expired(self, *, now: Optional[datetime] = None) -> bool:
+    def is_expired(self, *, now: datetime | None = None) -> bool:
         """Whether the entry has passed its expiry.
 
         Returns ``False`` when the entry has no TTL configured.
@@ -102,7 +101,7 @@ class MemoryEntry(BaseModel):
 
         if self.expires_at is None:
             return False
-        moment = now or datetime.now(timezone.utc)
+        moment = now or datetime.now(UTC)
         return moment >= self.expires_at
 
 
@@ -132,15 +131,15 @@ class MemoryStore(Protocol):
         key: str,
         value: dict,
         *,
-        ttl_seconds: Optional[int] = None,
+        ttl_seconds: int | None = None,
     ) -> MemoryEntry: ...
 
     async def recall(
         self,
         scope: MemoryScope,
         *,
-        key: Optional[str] = None,
-        query: Optional[str] = None,
+        key: str | None = None,
+        query: str | None = None,
         limit: int = 20,
     ) -> list[MemoryEntry]: ...
 
@@ -154,13 +153,13 @@ class MemoryStore(Protocol):
 # ---------------------------------------------------------------------------
 
 
-def _scope_key(scope: MemoryScope) -> tuple[str, Optional[str], str]:
+def _scope_key(scope: MemoryScope) -> tuple[str, str | None, str]:
     return (scope.project_id, scope.user_id, scope.kind)
 
 
 def _compute_expires_at(
-    *, ttl_seconds: Optional[int], now: datetime
-) -> Optional[datetime]:
+    *, ttl_seconds: int | None, now: datetime
+) -> datetime | None:
     if ttl_seconds is None:
         return None
     if ttl_seconds < 0:
@@ -184,7 +183,7 @@ class InMemoryMemoryStore:
 
     def __init__(self) -> None:
         self._data: dict[
-            tuple[str, Optional[str], str], dict[str, MemoryEntry]
+            tuple[str, str | None, str], dict[str, MemoryEntry]
         ] = {}
         self._lock = asyncio.Lock()
 
@@ -194,11 +193,11 @@ class InMemoryMemoryStore:
         key: str,
         value: dict,
         *,
-        ttl_seconds: Optional[int] = None,
+        ttl_seconds: int | None = None,
     ) -> MemoryEntry:
         if not key:
             raise ValueError("key must be a non-empty string")
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expires_at = _compute_expires_at(ttl_seconds=ttl_seconds, now=now)
         async with self._lock:
             bucket = self._data.setdefault(_scope_key(scope), {})
@@ -220,13 +219,13 @@ class InMemoryMemoryStore:
         self,
         scope: MemoryScope,
         *,
-        key: Optional[str] = None,
-        query: Optional[str] = None,
+        key: str | None = None,
+        query: str | None = None,
         limit: int = 20,
     ) -> list[MemoryEntry]:
         if limit < 0:
             raise ValueError("limit must be non-negative")
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         async with self._lock:
             bucket = self._data.get(_scope_key(scope), {})
             entries = [e for e in bucket.values() if not e.is_expired(now=now)]
@@ -263,7 +262,7 @@ class InMemoryMemoryStore:
             return True
 
     async def list_scopes(self, project_id: str) -> list[MemoryScope]:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         out: list[MemoryScope] = []
         async with self._lock:
             for (pid, uid, kind), bucket in self._data.items():

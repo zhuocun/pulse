@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from app.database import MILESTONES, PROJECTS, TASKS
 from app.repositories import repository
@@ -22,7 +22,7 @@ def _valid_name(value: Any) -> bool:
     return isinstance(value, str) and value != ""
 
 
-def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
+def create(data: dict[str, Any], user_id: str) -> str | None:
     project_id = data.get("projectId")
     # Write path order: existence -> access -> body validation, so a
     # non-member cannot probe a project's existence by sending a bad body.
@@ -54,8 +54,8 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
 
 
 def get(
-    project_id: Optional[str], user_id: str
-) -> Optional[Union[str, List[Any]]]:
+    project_id: str | None, user_id: str
+) -> str | list[Any] | None:
     if repository.find_by_id(PROJECTS, project_id or "") is None:
         return "Project not found"
     # Read path: any member (viewer and up) may list the milestones.
@@ -68,8 +68,8 @@ def get(
 
 
 def update(
-    milestone_id: Optional[str], data: Dict[str, Any], user_id: str
-) -> Optional[str]:
+    milestone_id: str | None, data: dict[str, Any], user_id: str
+) -> str | None:
     milestone = repository.find_by_id(MILESTONES, milestone_id or "")
     if not milestone_id or milestone is None:
         return None
@@ -95,7 +95,7 @@ def update(
     return "Milestone updated"
 
 
-def remove(milestone_id: Optional[str], user_id: str) -> Optional[str]:
+def remove(milestone_id: str | None, user_id: str) -> str | None:
     milestone = repository.find_by_id(MILESTONES, milestone_id or "")
     if not milestone_id or milestone is None:
         return None

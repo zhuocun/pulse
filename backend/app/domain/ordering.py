@@ -1,19 +1,19 @@
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass(frozen=True)
 class ReorderUpdate:
     item_id: str
-    changes: Dict[str, Any]
+    changes: dict[str, Any]
 
 
 def column_reorder_updates(
-    order_type: Optional[str],
-    from_column: Dict[str, Any],
-    reference_column: Dict[str, Any],
-    columns: List[Dict[str, Any]],
-) -> Optional[List[ReorderUpdate]]:
+    order_type: str | None,
+    from_column: dict[str, Any],
+    reference_column: dict[str, Any],
+    columns: list[dict[str, Any]],
+) -> list[ReorderUpdate] | None:
     # Moving a column relative to itself is a no-op. Without this guard
     # the algorithm produces contradictory index updates (e.g. set the
     # same row to ``idx`` and ``idx+1``) and corrupts the column order.
@@ -58,14 +58,14 @@ def column_reorder_updates(
 
 
 def task_reorder_updates(
-    order_type: Optional[str],
-    from_column_id: Optional[str],
-    reference_column_id: Optional[str],
-    from_task: Dict[str, Any],
-    reference_task: Optional[Dict[str, Any]],
-    from_column_tasks: List[Dict[str, Any]],
-    reference_column_tasks: List[Dict[str, Any]],
-) -> Optional[List[ReorderUpdate]]:
+    order_type: str | None,
+    from_column_id: str | None,
+    reference_column_id: str | None,
+    from_task: dict[str, Any],
+    reference_task: dict[str, Any] | None,
+    from_column_tasks: list[dict[str, Any]],
+    reference_column_tasks: list[dict[str, Any]],
+) -> list[ReorderUpdate] | None:
     if from_column_id != reference_column_id:
         updates = [
             ReorderUpdate(str(task["_id"]), {"index": task["index"] - 1})

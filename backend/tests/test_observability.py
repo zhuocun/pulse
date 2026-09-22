@@ -15,8 +15,8 @@ have to be reset between cases).
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import replace
-from typing import Iterable
 from unittest.mock import MagicMock
 
 import pytest
@@ -51,7 +51,6 @@ from app.observability.otel import (
     instrument_fastapi_app,
     record_token_usage,
 )
-
 
 # ---------------------------------------------------------------------------
 # Autouse cleanup: roll the OTel + Prometheus globals back between cases.
@@ -110,9 +109,8 @@ def test_configure_otel_uses_otlp_exporter_when_endpoint_set() -> None:
     assert otel_module._otel_configured is True
     # The configured tracer comes from a real ``TracerProvider``, not
     # the no-op proxy.
-    from opentelemetry.sdk.trace import TracerProvider
-
     from opentelemetry import trace
+    from opentelemetry.sdk.trace import TracerProvider
 
     assert isinstance(trace.get_tracer_provider(), TracerProvider)
 
@@ -572,7 +570,7 @@ def test_outcome_for_buckets_known_exception_types() -> None:
     from app.agents.errors import AgentRecursionError
     from app.agents.instrumentation import _outcome_for
 
-    assert _outcome_for(asyncio.TimeoutError()) == "timeout"
+    assert _outcome_for(TimeoutError()) == "timeout"
     assert _outcome_for(asyncio.CancelledError()) == "success"
     assert _outcome_for(GeneratorExit()) == "success"
     assert _outcome_for(AgentRecursionError("x", 5)) == "error"

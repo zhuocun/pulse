@@ -26,7 +26,8 @@ budget path implemented below.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 from fastapi import HTTPException, Request, status
 
@@ -42,7 +43,6 @@ from app.middleware.rate_limit import RateLimitBackend
 from app.observability.metrics import record_idempotency
 from app.security import current_user_id
 
-
 CHAT_MODEL_OVERRIDE_HEADER = "X-Pulse-Model"
 
 
@@ -50,7 +50,7 @@ def chat_model_override_from_request(
     request: Request,
     *,
     settings: Any = None,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Resolve the ``X-Pulse-Model`` header into a context dict, or ``None``.
 
     Returns ``{"chat_model": <BaseChatModel>}`` when the header is
@@ -88,10 +88,10 @@ def chat_model_override_from_request(
 
 
 def project_chat_model_from_map(
-    project_id: Optional[str],
+    project_id: str | None,
     *,
     settings: Any = None,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Resolve per-project default chat model from the env map (header still wins in merge)."""
 
     if not project_id or not str(project_id).strip():
@@ -119,10 +119,10 @@ def project_chat_model_from_map(
 
 def merged_v1_chat_context(
     *,
-    project_id: Optional[str],
+    project_id: str | None,
     request: Request,
     settings: Any = None,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Merge ``AGENT_PROJECT_CHAT_MODEL_MAP`` with ``X-Pulse-Model`` (header wins)."""
 
     mapped = project_chat_model_from_map(project_id, settings=settings)
@@ -139,14 +139,14 @@ def merged_v1_chat_context(
 async def run_v1_route(
     *,
     request: Request,
-    payload: Dict[str, Any],
-    auth_payload: Dict[str, Any],
+    payload: dict[str, Any],
+    auth_payload: dict[str, Any],
     runtime: AgentRuntime,
     rate_limiter: RateLimitBackend,
     budget_tracker: BudgetBackend,
-    project_inputs: Callable[[Dict[str, Any], Optional[str]], Dict[str, Any]],
-    find_body: Callable[[Any, List[Any]], Any],
-    agent_error_fallback: Optional[Callable[[Dict[str, Any]], Any]] = None,
+    project_inputs: Callable[[dict[str, Any], str | None], dict[str, Any]],
+    find_body: Callable[[Any, list[Any]], Any],
+    agent_error_fallback: Callable[[dict[str, Any]], Any] | None = None,
 ) -> Any:
     """Execute the common scaffolding for a structured v1 AI route.
 
@@ -202,7 +202,7 @@ async def run_v1_route(
         return replay
     reserved_budget = 0
     budget_reconciled = False
-    project_id: Optional[str] = None
+    project_id: str | None = None
     try:
         project_id = _project_id_from_payload(payload)
         agent_missing = False
@@ -242,7 +242,7 @@ async def run_v1_route(
             record_idempotency(route_path, "miss")
             return body
 
-        inputs: Dict[str, Any] = project_inputs(payload, project_id)
+        inputs: dict[str, Any] = project_inputs(payload, project_id)
         # Per-request chat-model override (``X-Pulse-Model`` header).  When
         # absent or feature is off, ``override`` is ``None`` and the runtime
         # falls back to the agent default.
@@ -250,7 +250,7 @@ async def run_v1_route(
 
         body: Any = None
         final_state: Any = None
-        custom_events: List[Any] = []
+        custom_events: list[Any] = []
         if agent_error_fallback is not None:
             try:
                 final_state, custom_events = await runtime.arun_with_events(
@@ -315,7 +315,7 @@ async def run_v1_route(
         _idem_fail(idem, exc)
 
 
-def _find_suggestion(events: List[Any], surface: str) -> Optional[Any]:
+def _find_suggestion(events: list[Any], surface: str) -> Any | None:
     """Return the first ``{kind: "suggestion", surface: <surface>}`` event payload."""
     event = next(
         (

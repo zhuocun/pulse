@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import importlib
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from app.config import Settings
 
@@ -207,9 +207,9 @@ def gen_ai_span_attrs(
     *,
     operation: str,
     agent_name: str,
-    model_id: Optional[str] = None,
-    project_id: Optional[str] = None,
-    autonomy: Optional[str] = None,
+    model_id: str | None = None,
+    project_id: str | None = None,
+    autonomy: str | None = None,
 ) -> dict[str, Any]:
     """Build a GenAI-spec attribute dict for a span.
 
@@ -237,7 +237,7 @@ def record_token_usage(
     span: Any,
     tokens_in: int,
     tokens_out: int,
-    model_id: Optional[str] = None,
+    model_id: str | None = None,
 ) -> None:
     """Annotate ``span`` with provider-reported token usage.
 

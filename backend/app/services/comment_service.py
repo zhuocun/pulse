@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from app.database import COMMENTS, TASKS, USERS
 from app.repositories import repository
@@ -16,7 +16,7 @@ def _valid_body(value: Any) -> bool:
     return isinstance(value, str) and value != ""
 
 
-def _mention_list(value: Any) -> List[str]:
+def _mention_list(value: Any) -> list[str]:
     """Normalize ``mentions`` to a list of userId strings.
 
     Missing / non-list inputs collapse to an empty list so the field is
@@ -31,7 +31,7 @@ def _mention_list(value: Any) -> List[str]:
 
 
 def _notify_mentions(
-    mentions: List[str],
+    mentions: list[str],
     *,
     author_id: str,
     task_id: str,
@@ -68,7 +68,7 @@ def _notify_mentions(
         )
 
 
-def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
+def create(data: dict[str, Any], user_id: str) -> str | None:
     """Create a comment on a task and notify any mentioned members.
 
     ``None`` -> router 404 ("Task not found"); ``"Forbidden"`` -> 403;
@@ -113,7 +113,7 @@ def create(data: Dict[str, Any], user_id: str) -> Optional[str]:
     return "Comment created"
 
 
-def get(task_id: str, user_id: str) -> Union[str, List[Dict[str, Any]]]:
+def get(task_id: str, user_id: str) -> str | list[dict[str, Any]]:
     """List a task's comments, oldest-first, for any project member.
 
     ``"Task not found"`` -> 404; ``"Forbidden"`` -> 403. Comments are
@@ -131,7 +131,7 @@ def get(task_id: str, user_id: str) -> Union[str, List[Dict[str, Any]]]:
     return repository.serialize_documents(ordered)
 
 
-def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
+def update(data: dict[str, Any], user_id: str) -> str | None:
     """Edit a comment's body. Author-only; mentions are not re-processed.
 
     ``None`` -> 404; ``"Forbidden"`` -> 403; ``"Bad request"`` -> 400.
@@ -156,7 +156,7 @@ def update(data: Dict[str, Any], user_id: str) -> Optional[str]:
     return "Comment updated"
 
 
-def remove(comment_id: Optional[str], user_id: str) -> Optional[str]:
+def remove(comment_id: str | None, user_id: str) -> str | None:
     """Delete a comment. Allowed for the author OR the project manager.
 
     ``None`` -> 404; ``"Forbidden"`` -> 403. The author can always remove

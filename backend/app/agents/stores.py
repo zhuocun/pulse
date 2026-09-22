@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from langgraph.store.base import BaseStore
 from langgraph.store.memory import InMemoryStore
@@ -63,8 +63,8 @@ class PostgresStoreSpec:
 def build_store(
     backend: str,
     *,
-    settings: Optional["Settings"] = None,
-) -> Union[BaseStore, PostgresStoreSpec, None]:
+    settings: Settings | None = None,
+) -> BaseStore | PostgresStoreSpec | None:
     """Return a :class:`BaseStore` for ``backend``.
 
     Returns ``None`` when the long-term store is disabled, an
@@ -105,9 +105,9 @@ async def open_store(
     backend: str,
     *,
     stack: AsyncExitStack,
-    settings: Optional["Settings"] = None,
-    pool: Optional[Any] = None,
-) -> Optional[BaseStore]:
+    settings: Settings | None = None,
+    pool: Any | None = None,
+) -> BaseStore | None:
     """Async counterpart of :func:`build_store`.
 
     For ``"none"`` and ``"memory"`` this is a thin wrapper around

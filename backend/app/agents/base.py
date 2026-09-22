@@ -23,8 +23,14 @@ import logging
 import re
 import threading
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Literal, Mapping, Optional, Sequence, get_args, get_type_hints
+from typing import (
+    Any,
+    Literal,
+    get_args,
+    get_type_hints,
+)
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.pregel import Pregel
@@ -80,7 +86,7 @@ class AgentMetadata:
     version: str = "0.1.0"
     tags: tuple[str, ...] = field(default_factory=tuple)
     recursion_limit: int = 25
-    context_schema: Optional[type[Any]] = None
+    context_schema: type[Any] | None = None
     status: AgentStatus = "active"
     rate_limit: tuple[int, int] = DEFAULT_LIMIT
     allowed_autonomy: tuple[AutonomyLevel, ...] = ("suggest", "plan")
@@ -127,7 +133,7 @@ class AgentMetadata:
         if schema is not None and hasattr(schema, "__annotations__"):
             try:
                 hints = get_type_hints(schema, include_extras=True)
-                _schema_dict: Optional[dict[str, Any]] = {
+                _schema_dict: dict[str, Any] | None = {
                     k: getattr(v, "__name__", str(v)) for k, v in hints.items()
                 }
             except (TypeError, NameError):
@@ -181,7 +187,7 @@ class BaseAgent(ABC):
         # Identity (``is``) comparisons drive invalidation; ``id()`` recycling
         # is safe here because the runtime holds strong refs to both
         # persistence objects for its lifetime.
-        self._compiled_state: Optional[tuple[Pregel, Any, Any]] = None
+        self._compiled_state: tuple[Pregel, Any, Any] | None = None
         # ``threading.Lock`` guards cache-field writes from sync ``compile()``
         # and from the cache-update step of async ``acompile()``; this keeps
         # cross-path consistency when sync ``invoke()`` (in a threadpool) and
@@ -193,7 +199,7 @@ class BaseAgent(ABC):
         # cache miss.  Created lazily so that constructing an agent in one
         # event-loop does not bind the lock to that loop -- Python 3.12 warns
         # if you await a lock created in a different loop context.
-        self._async_build_lock: Optional[asyncio.Lock] = None
+        self._async_build_lock: asyncio.Lock | None = None
         # Resolved lazily on first ``compile()`` so unit tests that never
         # touch the LLM never construct a real provider client.
         self._chat_model: Any = chat_model
@@ -207,8 +213,8 @@ class BaseAgent(ABC):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         """Construct and return the compiled LangGraph graph.
 
@@ -282,8 +288,8 @@ class BaseAgent(ABC):
 
     def _cache_hit(
         self,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
         force: bool,
     ) -> bool:
         """Return ``True`` when the cached compile matches the supplied
@@ -307,8 +313,8 @@ class BaseAgent(ABC):
     def compile(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver] = None,
-        store: Optional[BaseStore] = None,
+        checkpointer: BaseCheckpointSaver | None = None,
+        store: BaseStore | None = None,
         force: bool = False,
     ) -> Pregel:
         """Return the compiled graph, building it on first access.
@@ -332,8 +338,8 @@ class BaseAgent(ABC):
     async def acompile(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver] = None,
-        store: Optional[BaseStore] = None,
+        checkpointer: BaseCheckpointSaver | None = None,
+        store: BaseStore | None = None,
         force: bool = False,
     ) -> Pregel:
         """Async variant of :meth:`compile`; preferred in async contexts.
@@ -385,10 +391,10 @@ class BaseAgent(ABC):
         self,
         inputs: Any,
         *,
-        config: Optional[Mapping[str, Any]] = None,
+        config: Mapping[str, Any] | None = None,
         context: Any = None,
-        checkpointer: Optional[BaseCheckpointSaver] = None,
-        store: Optional[BaseStore] = None,
+        checkpointer: BaseCheckpointSaver | None = None,
+        store: BaseStore | None = None,
     ) -> Any:
         # Fix 8: pass config directly -- LangGraph already accepts Mapping.
         graph = self.compile(checkpointer=checkpointer, store=store)
@@ -402,10 +408,10 @@ class BaseAgent(ABC):
         self,
         inputs: Any,
         *,
-        config: Optional[Mapping[str, Any]] = None,
+        config: Mapping[str, Any] | None = None,
         context: Any = None,
-        checkpointer: Optional[BaseCheckpointSaver] = None,
-        store: Optional[BaseStore] = None,
+        checkpointer: BaseCheckpointSaver | None = None,
+        store: BaseStore | None = None,
     ) -> Any:
         # Fix 8: pass config directly -- LangGraph already accepts Mapping.
         graph = await self.acompile(checkpointer=checkpointer, store=store)
@@ -419,11 +425,11 @@ class BaseAgent(ABC):
         self,
         inputs: Any,
         *,
-        config: Optional[Mapping[str, Any]] = None,
+        config: Mapping[str, Any] | None = None,
         context: Any = None,
         stream_mode: Sequence[str] = ("updates", "messages", "custom"),
-        checkpointer: Optional[BaseCheckpointSaver] = None,
-        store: Optional[BaseStore] = None,
+        checkpointer: BaseCheckpointSaver | None = None,
+        store: BaseStore | None = None,
     ) -> AsyncIterator[tuple[str, Any]]:
         """Async-iterate over LangGraph events.
 

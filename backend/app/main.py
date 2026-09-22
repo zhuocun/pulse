@@ -1,9 +1,10 @@
 import logging
 import os
 import re
+from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Dict
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,8 +12,12 @@ from fastapi.responses import JSONResponse
 
 from app.agents import AgentRuntime
 from app.agents.checkpointing import resolve_agent_backend, resolve_agent_postgres_uri
-from app.agents.errors import AgentConfigurationError, AgentError, agent_app_error_content
 from app.agents.embeddings import assert_embeddings_provider_available, make_embeddings
+from app.agents.errors import (
+    AgentConfigurationError,
+    AgentError,
+    agent_app_error_content,
+)
 from app.agents.llm import assert_provider_available
 from app.config import Settings, settings
 from app.deploy_env import (
@@ -29,7 +34,6 @@ from app.observability.otel import configure_otel, instrument_fastapi_app
 from app.repositories import repository
 from app.routers import (
     agents,
-    ai as ai_router,
     auth,
     boards,
     comments,
@@ -41,6 +45,9 @@ from app.routers import (
     projects,
     tasks,
     users,
+)
+from app.routers import (
+    ai as ai_router,
 )
 from app.security import JWT_SECRET_MIN_LENGTH
 from app.system_config import load_or_create_jwt_secret
@@ -747,7 +754,7 @@ async def unhandled_exception_handler(_: Request, exc: Exception) -> JSONRespons
 
 
 @app.get("/health", include_in_schema=False)
-def legacy_health(request: Request) -> Dict[str, Any]:
+def legacy_health(request: Request) -> dict[str, Any]:
     """Liveness probe at the legacy path.
 
     Returning 200 directly avoids the 308 trap that breaks naive load

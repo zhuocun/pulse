@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any
 
 from fastapi import APIRouter, Body, Depends, status
 
@@ -6,12 +6,11 @@ from app.security import current_user_id, current_user_payload
 from app.services import user_service
 from app.validation import api_error, validation_errors
 
-
 router = APIRouter()
 
 
 @router.get("/", status_code=status.HTTP_200_OK)
-def get_user(payload: Dict[str, Any] = Depends(current_user_payload)) -> Dict[str, Any]:
+def get_user(payload: dict[str, Any] = Depends(current_user_payload)) -> dict[str, Any]:
     user_id = current_user_id(payload)
     user = user_service.get(user_id)
     if user is None:
@@ -21,9 +20,9 @@ def get_user(payload: Dict[str, Any] = Depends(current_user_payload)) -> Dict[st
 
 @router.put("/", status_code=status.HTTP_200_OK)
 def update_user(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
-) -> Dict[str, Any]:
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
+) -> dict[str, Any]:
     user_id = current_user_id(payload)
     if user_service.get(user_id) is None:
         api_error(status.HTTP_404_NOT_FOUND, "User not found")
@@ -45,17 +44,17 @@ def update_user(
 
 @router.get("/members", status_code=status.HTTP_200_OK)
 def get_members(
-    _: Dict[str, Any] = Depends(current_user_payload),
-) -> List[Dict[str, Any]]:
+    _: dict[str, Any] = Depends(current_user_payload),
+) -> list[dict[str, Any]]:
     members = user_service.get_members()
     return members
 
 
 @router.put("/likes", status_code=status.HTTP_200_OK)
 def switch_like_status(
-    data: Dict[str, Any] = Body(default_factory=dict),
-    payload: Dict[str, Any] = Depends(current_user_payload),
-) -> Dict[str, Any]:
+    data: dict[str, Any] = Body(default_factory=dict),
+    payload: dict[str, Any] = Depends(current_user_payload),
+) -> dict[str, Any]:
     user_id = current_user_id(payload)
     project_id = data.get("projectId")
     if project_id is None:

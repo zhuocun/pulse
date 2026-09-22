@@ -26,7 +26,6 @@ from app.agents.catalog.triage import TriageAgent, _nudges_for
 from app.agents.llm import make_stub_chat_model
 from app.agents.registry import registry as global_registry
 
-
 _AGENT_CLASSES = (
     BoardBriefAgent,
     TaskDraftingAgent,
@@ -441,12 +440,13 @@ def test_readiness_issues_shape_flows_into_polish_readiness() -> None:
     on ``if not issues: return deterministic, 0, 0`` and the LLM was never
     called.  Confirm the shape is compatible and the merge succeeds.
     """
+    from langchain_core.messages import AIMessage
+
     from app.agents.catalog.task_estimation import (
         ReadinessIssuePolish,
         ReadinessPolish,
         polish_readiness,
     )
-    from langchain_core.messages import AIMessage
 
     deterministic = _readiness({"taskName": "fix-login"})
     # The issues list must be non-empty so polish path is entered.
@@ -719,7 +719,7 @@ def test_chat_agent_provider_error_falls_back_to_stub_reply() -> None:
         async def ainvoke(self, _messages: Any, **__: Any) -> Any:
             raise RuntimeError("provider down")
 
-        def bind_tools(self, _tools: Any) -> "_FailingModel":
+        def bind_tools(self, _tools: Any) -> _FailingModel:
             return self
 
     # Patch is_stub_model to return False so the real-model branch is entered.
@@ -768,8 +768,9 @@ def test_chat_agent_trim_keeps_tool_message_paired_with_tool_call() -> None:
     tool message, and assert the conversation passed to the model begins
     with a HumanMessage (i.e. the orphan tool message was dropped).
     """
-    import app.agents.catalog.chat as chat_mod
     from langchain_core.messages import ToolMessage
+
+    import app.agents.catalog.chat as chat_mod
 
     agent = global_registry.get("chat-agent")
     checkpointer, store = _persistence()
@@ -781,7 +782,7 @@ def test_chat_agent_trim_keeps_tool_message_paired_with_tool_call() -> None:
             captured.append(list(messages))
             return AIMessage(content="ok")
 
-        def bind_tools(self, _tools: Any) -> "_CapturingModel":
+        def bind_tools(self, _tools: Any) -> _CapturingModel:
             return self
 
     original_is_stub = chat_mod.is_stub_model
@@ -843,8 +844,9 @@ def test_chat_agent_trim_fallback_when_no_human_fits_budget() -> None:
     answer.
     """
 
-    import app.agents.catalog.chat as chat_mod
     from langchain_core.messages import ToolMessage
+
+    import app.agents.catalog.chat as chat_mod
 
     agent = global_registry.get("chat-agent")
     checkpointer, store = _persistence()
@@ -856,7 +858,7 @@ def test_chat_agent_trim_fallback_when_no_human_fits_budget() -> None:
             captured.append(list(messages))
             return AIMessage(content="ok")
 
-        def bind_tools(self, _tools: Any) -> "_CapturingModel":
+        def bind_tools(self, _tools: Any) -> _CapturingModel:
             return self
 
     original_is_stub = chat_mod.is_stub_model
@@ -916,7 +918,7 @@ def test_chat_agent_propagates_cancellation_through_provider_call() -> None:
         async def ainvoke(self, _messages: Any, **__: Any) -> Any:
             raise asyncio.CancelledError("client disconnected")
 
-        def bind_tools(self, _tools: Any) -> "_CancellingModel":
+        def bind_tools(self, _tools: Any) -> _CancellingModel:
             return self
 
     original_is_stub = chat_mod.is_stub_model

@@ -15,6 +15,7 @@ interrupt payloads so the FE wire contract is stable.
 from __future__ import annotations
 
 import asyncio
+from typing import ClassVar
 
 import pytest
 from langchain_core.messages import HumanMessage
@@ -190,7 +191,7 @@ def test_chat_refuses_apply_when_approval_id_missing(chat_graph) -> None:
 
     # _mutation_finalize expects the runtime via get_runtime; stub it out.
     class _Rt:
-        context = {"autonomy_level": "plan", "project_id": "p1"}
+        context: ClassVar[dict[str, str]] = {"autonomy_level": "plan", "project_id": "p1"}
 
     import pytest
 

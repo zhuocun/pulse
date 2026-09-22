@@ -10,7 +10,7 @@ exercised deterministically without a database.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pytest
 from bson import ObjectId
@@ -20,19 +20,19 @@ from app.services import agent_mutation_journal
 
 class FakeJournalCollection:
     def __init__(self) -> None:
-        self.documents: List[Dict[str, Any]] = []
-        self.updates: List[tuple[Dict[str, Any], Dict[str, Any]]] = []
+        self.documents: list[dict[str, Any]] = []
+        self.updates: list[tuple[dict[str, Any], dict[str, Any]]] = []
 
-    def find_one(self, query: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def find_one(self, query: dict[str, Any]) -> dict[str, Any] | None:
         for doc in self.documents:
             if all(doc.get(k) == v for k, v in query.items()):
                 return doc
         return None
 
-    def insert_one(self, payload: Dict[str, Any]) -> None:
+    def insert_one(self, payload: dict[str, Any]) -> None:
         self.documents.append({**payload, "_id": ObjectId()})
 
-    def update_one(self, query: Dict[str, Any], update: Dict[str, Any]) -> None:
+    def update_one(self, query: dict[str, Any], update: dict[str, Any]) -> None:
         self.updates.append((query, update))
         doc = self.find_one(query)
         if doc is not None:
@@ -174,9 +174,9 @@ def test_undo_mutation_applies_task_updates_and_skips_malformed(
     fake_collection: FakeJournalCollection,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    calls: List[Dict[str, Any]] = []
+    calls: list[dict[str, Any]] = []
 
-    def fake_update(body: Dict[str, Any], user_id: str) -> Optional[str]:
+    def fake_update(body: dict[str, Any], user_id: str) -> str | None:
         calls.append({"body": body, "user_id": user_id})
         # Simulate a write miss on the second valid update so the
         # warning branch is exercised.
@@ -231,7 +231,7 @@ def test_undo_mutation_partial_failure_leaves_journal_reversible(
 ) -> None:
     """When some valid undo rows miss, the journal must stay reversible."""
 
-    def fake_update(body: Dict[str, Any], user_id: str) -> Optional[str]:
+    def fake_update(body: dict[str, Any], user_id: str) -> str | None:
         if body["_id"] == "t-ok":
             return "Task updated"
         return None
@@ -344,7 +344,7 @@ def test_undo_mutation_ignores_non_list_task_updates(
 ) -> None:
     called = False
 
-    def fake_update(*_args: Any, **_kwargs: Any) -> Optional[str]:
+    def fake_update(*_args: Any, **_kwargs: Any) -> str | None:
         nonlocal called
         called = True
         return "Task updated"

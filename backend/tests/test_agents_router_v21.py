@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import AsyncIterator, Iterable
 from dataclasses import replace
 from http import HTTPStatus
-from typing import Any, AsyncIterator, Iterable, Optional
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from pytest import FixtureRequest
 from langchain_core.messages import AIMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.config import get_stream_writer
@@ -18,10 +18,10 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore
 from langgraph.types import interrupt
+from pytest import FixtureRequest
 from typing_extensions import TypedDict
 
-from app import main
-from app import security
+from app import main, security
 from app.agents import AgentMetadata, BaseAgent
 from app.agents.registry import registry as global_registry
 from app.middleware.budget import BudgetTracker
@@ -48,8 +48,8 @@ class _NoiseAgent(BaseAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         def speak(state: _Probe) -> dict[str, Any]:
             writer = get_stream_writer()
@@ -80,8 +80,8 @@ class _InterruptingAgent(BaseAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         def gate(state: _Probe) -> dict[str, Any]:
             value = interrupt({"tool": "fe.boardSnapshot", "args": {"project_id": "p"}})
@@ -118,8 +118,8 @@ class _DeprecatedAgent(BaseAgent):
     def build(
         self,
         *,
-        checkpointer: Optional[BaseCheckpointSaver],
-        store: Optional[BaseStore],
+        checkpointer: BaseCheckpointSaver | None,
+        store: BaseStore | None,
     ) -> Pregel:
         def noop(state: _Probe) -> dict[str, Any]:
             return {"text": "old"}
@@ -652,7 +652,7 @@ def test_invoke_returns_real_usage_when_chat_model_reports_tokens(
         # tool catalogue; the chat-agent calls it now that PRD §5A.6 §4
         # binds the FE-executed read tools. The fake just returns ``self``
         # so the bound runnable still exposes ``ainvoke`` / ``invoke``.
-        def bind_tools(self, _tools: Any, **_: Any) -> "_ScriptedModel":
+        def bind_tools(self, _tools: Any, **_: Any) -> _ScriptedModel:
             return self
 
     chat_agent.set_chat_model(_ScriptedModel())
@@ -692,7 +692,7 @@ def test_stream_emits_real_usage_when_chat_model_reports_tokens(
                 },
             )
 
-        def bind_tools(self, _tools: Any, **_: Any) -> "_ScriptedModel":
+        def bind_tools(self, _tools: Any, **_: Any) -> _ScriptedModel:
             return self
 
     chat_agent.set_chat_model(_ScriptedModel())
@@ -905,8 +905,8 @@ def test_stream_records_rate_limited_invocation_metric(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """stream_agent records 'rate_limited' metric on 429."""
-    from app.observability import metrics as metrics_module
     from app.config import settings as app_settings
+    from app.observability import metrics as metrics_module
 
     metrics_module.configure_metrics(
         settings=replace(app_settings, prometheus_metrics=True)
@@ -949,8 +949,8 @@ def test_stream_records_budget_exhausted_invocation_metric(
     ai_budget_backend: BudgetTracker,
 ) -> None:
     """stream_agent records 'budget_exhausted' metric on 402."""
-    from app.observability import metrics as metrics_module
     from app.config import settings as app_settings
+    from app.observability import metrics as metrics_module
 
     metrics_module.configure_metrics(
         settings=replace(app_settings, prometheus_metrics=True)
@@ -1045,7 +1045,7 @@ def test_with_disconnect_suppresses_aclose_exception() -> None:
     class _BoomStream:
         """Async generator stand-in whose aclose raises."""
 
-        def __aiter__(self) -> "_BoomStream":
+        def __aiter__(self) -> _BoomStream:
             return self
 
         async def __anext__(self) -> Any:

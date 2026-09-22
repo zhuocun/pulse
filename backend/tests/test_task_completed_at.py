@@ -15,7 +15,7 @@ an existing stamp survives an unrelated edit (we record WHEN a task was
 completed, not when it was last touched).
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -24,7 +24,7 @@ from app.services import task_service
 from tests.conftest import FakeStore
 
 
-def auth_headers(token: str) -> Dict[str, str]:
+def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -32,7 +32,7 @@ def register_and_login(
     client: TestClient,
     username: str,
     email: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Register + login a user; return the login body plus a bearer token."""
 
     response = client.post(
@@ -68,7 +68,7 @@ def create_project(client: TestClient, token: str, name: str = "Pulse") -> str:
 
 def column_named(
     client: TestClient, token: str, project_id: str, column_name: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     columns = client.get(
         f"/api/v1/boards/?projectId={project_id}", headers=auth_headers(token)
     ).json()
@@ -87,13 +87,13 @@ def set_category(store: FakeStore, column_id: str, category: str) -> None:
     store.update_by_id(COLUMNS, column_id, {"category": category})
 
 
-def stored_task(store: FakeStore, task_id: str) -> Dict[str, Any]:
+def stored_task(store: FakeStore, task_id: str) -> dict[str, Any]:
     task = store.find_by_id(TASKS, task_id)
     assert task is not None
     return task
 
 
-def only_task(store: FakeStore, project_id: str) -> Dict[str, Any]:
+def only_task(store: FakeStore, project_id: str) -> dict[str, Any]:
     tasks = store.find_many(TASKS, {"projectId": project_id})
     assert len(tasks) == 1, tasks
     return tasks[0]
@@ -104,8 +104,8 @@ def make_task(
     project_id: str,
     column_id: str,
     **extra: Any,
-) -> Dict[str, Any]:
-    body: Dict[str, Any] = {
+) -> dict[str, Any]:
+    body: dict[str, Any] = {
         "projectId": project_id,
         "columnId": column_id,
         "coordinatorId": user_id,
