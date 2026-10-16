@@ -87,6 +87,11 @@ concrete rule plus the canonical anchor that demonstrates it.
   `paths:` filters in `backend-ci.yml` and `frontend-ci.yml`: those suites
   run ruff, pytest, eslint, tsc, jest and build, and none of them reads a
   `SKILL.md`.
+- **Sync `baseline.md` with `communicate`** — When copying skills over,
+  also make the body of `.claude/output-styles/baseline.md` equal the
+  canonical `communicate` body, keeping this file's own frontmatter and
+  H1. `skills-drift` does not check this file, so nothing else catches a
+  stale copy.
 - **Deprecation discipline** — A compat shim ships with a removal date.
   After sunset: delete on both sides. Don't preserve "for older
   clients" indefinitely.
