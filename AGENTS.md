@@ -3,6 +3,33 @@
 Short, durable gotchas for anyone (human or AI) editing this repo. Add an entry
 when a fix is non-obvious from the code alone.
 
+<!-- skill-selection-policy:start -->
+## Automatic skill selection
+
+- At task start and phase changes, inspect installed skill names and descriptions
+  through the host's metadata listing or discovery/search. If a listing is partial,
+  search for each responsibility in the request before selecting. Do not assume a
+  search result is the full inventory or read every skill body to build one.
+- Use descriptions as the sole applicability source. Match ordinary-language intent,
+  scope and exclusions, not just skill names. Do not use a separate catalog or a fixed
+  task-to-skill table. Select relevant skills without requiring the user to name them.
+- Honor explicit skill selections and exclusions, subject to higher-priority
+  instructions, permissions and host capabilities. Load only selected skill bodies.
+  If a requested skill is absent or unreadable, disclose the limitation rather than
+  inventing its procedure; continue permitted work without claiming to use it.
+- Combine compatible methods for mixed tasks, applying each only within its scope.
+  Preserve the user's explicit process role and decision authority. Do not combine
+  roles that disagree on who plans, performs or accepts work. If the descriptions
+  leave a consequential role choice unresolved, ask rather than guess.
+- Reconsider selection when the goal, phase or available capabilities change. Keep
+  applicable ongoing constraints, but do not rerun completed one-time steps such as
+  briefing merely because execution or review begins.
+- Selection grants no permission to spend resources, change files, delegate, use a
+  browser or take other actions. Follow user and host limits. If discovery or a
+  matching skill is unavailable, state any material coverage gap and use only
+  permitted alternatives; never claim that an unavailable skill ran.
+<!-- skill-selection-policy:end -->
+
 ## Coding harness
 
 Aim for code that is **precise · efficient · readable · scalable ·
@@ -206,4 +233,3 @@ The same review-and-merge flow applies across the `agent`, `pulse`, and `agent-s
 - **Open a PR before wrapping up.** A task isn't finished until its changes are up for review; don't leave finished work stranded on a pushed branch with no PR. Check for an existing PR on the branch first. If that branch's earlier PR has already merged, branch off fresh `main` and open a new PR rather than pushing onto the dead branch.
 - **Watch CI, then merge on green.** After opening a PR, watch its checks (subscribe to PR activity, or poll the check runs). Once all required checks pass, squash-merge. If CI goes red, push a fix rather than leaving it stranded. A PR-activity subscription only wakes on *failures* and review comments — a green pass emits no event, so confirm success by polling the checks, not by waiting to be notified. Merging `main` triggers the production deploy, so green CI is the merge gate.
 - **Never bypass hooks.** Don't use `--no-verify` / `--no-gpg-sign`, especially on workflow-file changes. If a commit-msg or pre-commit hook fails, fix the cause and make a new commit — don't amend past it.
-
